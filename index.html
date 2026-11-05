@@ -13,6 +13,7 @@
   --fg: #ddd8cb; --muted: #9a9e98; --brass: #c8a14c; --brass2: #e2c07d;
   --a: #5f93c9; --a2: #8fb6de; --a3: #3b6a99; --b: #c7664f; --b2: #e09a88; --b3: #8e3f2f;
   --good: #74ad7c; --bad: #d4574b; --bad2: #e58a7f; --warn: #d98a3e;
+  --troop: #c9c3b6; --troop2: #8f8a7f; --eq: #9d86d6; --crew: #bcaae8; /* 兵(両国共通)・装備と人員(紫系の組) */
   --terrain: #2a2f26; --contour: #3a4134;
   --f-disp: "Big Shoulders Text", "Arial Narrow", sans-serif;
   --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif;
@@ -209,8 +210,6 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
 .mg .mh { grid-column: 1 / -1; font-size: 11px; letter-spacing: .1em; color: var(--muted); border-top: 1px solid var(--line); padding-top: 4px; margin-top: 2px; }
 .mg .mh:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
 .mg .mflags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
-.mstk { display: flex; height: 8px; gap: 2px; border-radius: 2px; overflow: hidden; }
-.mstk i { display: block; height: 100%; }
 .mlog { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 120px; overflow-y: auto; font-size: 12px; }
 .mlog li { padding: 3px 8px; border-left: 2px solid var(--line); }
 .mlog li.ok { border-left-color: var(--good); } .mlog li.ng { border-left-color: var(--bad); color: var(--bad2); }
@@ -222,9 +221,6 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
 .oprow .on { font-weight: 700; }
 .oprow .od { font-size: 12px; color: var(--muted); }
 .oprow .why { font-size: 11px; color: var(--bad2); }
-.ctgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
-.ctgrid .btn { display: grid; gap: 2px; padding: 8px; text-align: center; }
-.ctgrid .btn small { font-size: 11px; color: var(--muted); }
 .res { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
 .res div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--panel2); padding: 3px 0; font-size: 13px; }
 .res div span:first-child { color: var(--muted); }
@@ -236,6 +232,9 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
 
 #rotate { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; place-items: center; text-align: center; padding: 24px; }
 #rotate .in { display: grid; gap: 14px; justify-items: center; max-width: 320px; }
+/* 国の特徴 */
+.trait { font-size: 11px; color: var(--muted); margin-top: -3px; line-height: 1.3; }
+.compact .trait { font-size: 10px; margin-top: -2px; }
 /* 崩壊の危険 */
 .risk { font-size: 11.5px; font-weight: 600; padding: 4px 8px; border-radius: 4px; line-height: 1.35; }
 .risk.lv1 { background: #3d3216; color: #f0d9a0; border: 1px solid #8a6d2a; }
@@ -367,11 +366,9 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     merc:  { key:'merc',  type:null,  name:'傭兵',     sub:'訓練済みの兵員',             lot:'10,000人', price:120000, power:0, soldiers:10000, interval:24, lag:10, trait:'軍人を増やす(人員充足率を上げる)' },
     food:  { key:'food',  type:null,  name:'兵糧',     sub:'穀物・保存食',               lot:'1単位', price:150000, power:0, soldiers:0, interval:12, lag:4, trait:'兵糧を回復(軍人10万人あたり30%)。3か月で廃棄' },
   };
-  // 装備の種類ごとの性質: wear=損耗の速さ, crew=戦力1あたりの必要兵数, ideal=理想の編成比
+  // 装備の性質(種類の区別はしない): wear=損耗の速さ, crew=戦力1あたりの必要兵数
   const EQ = {
-    front:  { name:'前線', wear:2.0, crew:0.04,   ideal:0.45 },
-    ranged: { name:'遠距離', wear:1.0, crew:0.005,  ideal:0.30 },
-    armor:  { name:'戦車', wear:0.4, crew:0.0005, ideal:0.25 },
+    all: { name:'装備', wear:1.3, crew:0.0196, ideal:1 },
   };
   const OPS = {
     assassin: { key:'assassin', name:'要人暗殺',         cost:30000, cd:20 },
@@ -380,11 +377,11 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     loan:     { key:'loan',     name:'融資',             cost:500000, cd:20, unlock:120 },
   };
   const CFG = {
-    startMoney: 3000000, batLow: -0.06, batDef: 0.02, minIdleWeeks: 35, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, satSold: false, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, needOff: 0.3, needOn: 0.45, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.35, suffOff: 1.15, satWin: 18, satTau: 12, satK: 0.15, wLose: 0.45, wAlarm: 0.6, wSat: 1.2, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, initLoan: 0, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, endA: 210, endB: 270, prodCost: 0.4, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
-    lossS: 0.0001, lossP: 0.0009, upkeep: 0.03, richLine: 5000000,
-    peaceLine: 25, peaceHold: 18, threatLag: 12,
+    startMoney: 3000000, batLow: -0.06, batDef: 0.02, minIdleWeeks: 35, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, satSold: false, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, needOff: 0.3, needOn: 0.45, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.5, suffOff: 1.3, satWin: 18, satTau: 12, satK: 0.15, wLose: 0.45, wAlarm: 0.6, wSat: 1.2, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, initLoan: 0, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, endA: 210, endB: 270, prodCost: 0.4, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
+    lossS: 0.0001, lossP: 0.0009, upkeep: 0.03, incomeK: 0.0022, richLine: 5000000,
+    absMode: true, crewK: 1.58, eqStd: 23.5, eqPriceK: 0.5, compK: 1.08, peaceLine: 25, peaceHold: 18, threatLag: 12,
     sortieBase: 0.004, transitTime: 12, frontSpeed: 0.006, capitalLine: 0.12,
-    foodRate: 0.05, farmDecay: 0.0018, loanLimit: 300000, loanAmount: 500000, loanInterest: 0.2, bothContractSusp: 0.15,
+    foodRate: 0.05, farmDecay: 0.0018, loanLimit: 300000, loanAmount: 500000, loanInterest: 0.2,
   };
 
   function rng(seed) {
@@ -400,30 +397,27 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
 
   function mkCountry(id, name, o) {
     const c = Object.assign({ id, name, alive: true, pipeline: [], lastArrival: -999,
-      taxMod: 1, taxModUntil: 0, taxAdvUntil: 0, priceMod: 1, priceModUntil: 0, pushMod: 1, pushModUntil: 0, sold: [], recv: [], bought: { equip: 0, merc: 0, food: 0 }, lastDeal: {}, foodLv: 105, noNeed: false, estTarget: 0, estNoise: 0, estAt: -99, contract: null, foodPaid: 0 }, o, { initSoldiers: o.soldiers, front: o.frontInit, reserve: o.soldiers - o.frontInit, transit: [], sortieRate: 0, push: 0, policy: 'normal', policyUntil: 0, cool: 30, massUntil: 0, massing: false, surT: 0, warned: 0, initFunds: o.funds, desertLv: 0, deserted: 0 });
-    totals(c); c.crewK = c.soldiers / (1.5 * c.crew); totals(c); c.initPower = c.power; return c;
+      taxMod: 1, taxModUntil: 0, taxAdvUntil: 0, priceMod: 1, priceModUntil: 0, pushMod: 1, pushModUntil: 0, sold: [], recv: [], bought: { equip: 0, merc: 0, food: 0 }, lastDeal: {}, foodLv: 105, noNeed: false, estTarget: 0, estNoise: 0, estAt: -99, }, o, { initSoldiers: o.soldiers, front: o.frontInit, reserve: o.soldiers - o.frontInit, transit: [], sortieRate: 0, push: 0, policy: 'normal', policyUntil: 0, cool: 30, massUntil: 0, massing: false, surT: 0, warned: 0, initFunds: o.funds, desertLv: 0, deserted: 0 });
+    totals(c); c.crewK = CFG.absMode ? CFG.crewK : c.soldiers / (1.5 * c.crew); totals(c); c.initPower = c.power; return c; // 人員充足率: どの国も同じ基準(装備1あたりの必要兵数)で測る
   }
   function totals(c) {
-    c.power = c.eq.front + c.eq.ranged + c.eq.armor;
-    c.crew = (c.eq.front * EQ.front.crew + c.eq.ranged * EQ.ranged.crew + c.eq.armor * EQ.armor.crew) * (c.crewK || 1);
+    c.power = c.eq.all;
+    c.crew = c.eq.all * EQ.all.crew * (c.crewK || 1);
   }
-  // 編成効率: 理想の比率に近いほど高い(0.7〜1.1)。前線装備だけでは戦えない
-  function comp(c) {
-    if (c.power <= 0) return 0.7;
-    let dev = 0; for (const k in EQ) dev += Math.abs(c.eq[k] / c.power - EQ[k].ideal);
-    return clamp(1.1 - dev * 0.5, 0.7, 1.1);
-  }
+  // 装備の効率(種類の区別をなくしたため一定)
+  function comp(c) { return CFG.compK; }
+
 
   // 戦争の設定(シナリオ)。Web版は2種
   const SCENARIOS = {
     s1: { key:'s1', name:'大国と小国', P0:0.52,
       desc:'豊かな大国A国と、貧しいが士気の高い小国B国。小国は資金が尽きやすい。',
-      A: { frontInit:61000, farmCap:143000, taxBase:15000, recruitBase:120, soldiers:130000, morale:60, antiwar:30, funds:5500000, eq:{ front:1170000, ranged:900000, armor:630000 }, susp:0, threat:40 },
-      B: { frontInit:45000, farmCap:74000, taxBase:8000, recruitBase:140, soldiers:80000,  morale:75, antiwar:20, funds:2000000, eq:{ front:900000, ranged:600000, armor:400000 }, susp:0, threat:60 } },
+      A: { trait:'大国: 豊かで兵が多い', frontInit:61000, farmCap:143000, taxBase:15000, recruitBase:120, soldiers:130000, morale:60, antiwar:30, funds:5050000, eq:{ all:2700000 }, susp:0, threat:40 },
+      B: { trait:'小国: 貧しいが戦意が高い', frontInit:45000, farmCap:74000, taxBase:8000, recruitBase:140, soldiers:80000,  morale:75, antiwar:20, funds:2550000, eq:{ all:1900000 }, susp:0, threat:60 } },
     s2: { key:'s2', name:'工業国と農業国', P0:0.5,
       desc:'装備は多いが兵と食料の乏しい工業国A国と、兵と食料は豊富だが装備の乏しい農業国B国。資金は互角。',
-      A: { frontInit:50000, farmCap:90000, taxBase:11000, recruitBase:100, soldiers:100000, morale:65, antiwar:25, funds:3500000, eq:{ front:1050000, ranged:800000, armor:550000 }, susp:0, threat:50 },
-      B: { frontInit:58000, farmCap:126000, taxBase:11000, recruitBase:170, soldiers:120000, morale:70, antiwar:20, funds:3500000, eq:{ front:1000000, ranged:650000, armor:400000 }, susp:0, threat:50 } },
+      A: { trait:'工業国: 装備が多く、兵と食料が乏しい', frontInit:50000, farmCap:90000, taxBase:11000, recruitBase:100, soldiers:100000, morale:65, antiwar:25, funds:3640000, eq:{ all:2400000 }, susp:0, threat:50 },
+      B: { trait:'農業国: 兵と食料が豊富で、装備が乏しい', frontInit:58000, farmCap:126000, taxBase:11000, recruitBase:170, soldiers:120000, morale:70, antiwar:20, funds:3360000, eq:{ all:2050000 }, susp:0, threat:50 } },
   };
   const BASE = SCENARIOS.s1;
   // 国の条件のゆらぎ(乱数): 兵・装備 ±15%、資金 ±30%、税収 ±25%、農業 ±15%、戦意 ±10、開戦時の戦線 ±4%
@@ -432,8 +426,8 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     if (!rr) return o;
     const u = (lo, hi) => lo + rr() * (hi - lo);
     const ks = u(0.85, 1.15); o.soldiers = Math.round(b.soldiers * ks); o.frontInit = Math.round(b.frontInit * ks);
-    const ke = u(0.85, 1.15); for (const k in o.eq) o.eq[k] = Math.round(b.eq[k] * ke * u(0.9, 1.1));
-    o.funds = Math.round(b.funds * u(0.7, 1.3) / 10000) * 10000; o.taxBase = Math.round(b.taxBase * u(0.75, 1.25));
+    const ke = u(0.85, 1.15); o.eq.all = Math.round(b.eq.all * ke * (u(0.9, 1.1) + u(0.9, 1.1) + u(0.9, 1.1)) / 3);
+    o.funds = Math.round(b.funds * u(0.7, 1.3) / 10000) * 10000; o.taxBase = Math.round((o.funds * CFG.incomeK + o.soldiers * CFG.upkeep) * u(0.95, 1.05)); // 収支(税収−兵の給与)が初期資金にほぼ比例する
     o.farmCap = Math.round(b.farmCap * u(0.85, 1.15)); o.morale = Math.round(b.morale + u(-10, 10)); o.antiwar = Math.round(b.antiwar + u(-5, 5));
     return o;
   }
@@ -537,7 +531,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
       if ((c.seenSusp || 0) >= 10) { tl(g, c.name + 'は、敵国の前線で同型の装備が使われていることに気付いた。', '相手国への納品が見えるたびに、' + c.name + 'の疑惑度が上がる(合計 +' + Math.round(c.seenSusp) + ')'); c.seenSusp = 0; }
       flag('warn', c.susp >= 50, c.name + 'の疑惑度が50を超えた。', c.name + 'は値引きを求めるようになった', c.name + 'の疑惑度が50を下回った。', '値引きの要求が止んだ');
       flag('stop', c.susp >= 80, c.name + 'の疑惑度が80を超えた。', c.name + 'との取引が止まった(膠着時の破格は例外)', c.name + 'の疑惑度が80を下回った。', c.name + 'との取引が再開できる');
-      flag('noneed', c.noNeed && c.morale >= CFG.peaceLine, c.name + 'の装備が初めて十分に揃った(装備充足率135%超)。', c.name + 'は武器を必要としなくなった(相場の5割以下なら買う)', c.name + 'が初めて再び武器を求め始めた。', '装備の損耗で充足率が115%を下回った', true);
+      flag('noneed', c.noNeed && c.morale >= CFG.peaceLine, c.name + 'の装備が初めて十分に揃った(装備充足率150%超)。', c.name + 'は武器を必要としなくなった(相場の5割以下なら買う)', c.name + 'が初めて再び武器を求め始めた。', '装備の損耗や兵の増加で充足率が130%を下回った', true);
       flag('finish', sh > 0.65 && c.antiwar > 50 && c.morale >= CFG.peaceLine, c.name + 'が圧倒的優勢のまま、反戦感情が50を超えた。', c.name + 'は早期終結を望み、武器を求めるようになった');
       flag('food70', c.foodLv < 70, c.name + 'の兵糧が70%を下回った。', '戦意の低下と出動の鈍化が目に見えて強まる', c.name + 'の兵糧が70%以上に戻った。', '兵糧の不足が和らいだ');
       flag('food', c.foodLv < 90, c.name + 'の兵糧が90%を下回った。', '兵糧の相場が1.3倍になった。戦意と出動の勢いの落ち込みが強まっていく', c.name + 'の兵糧が90%以上に戻った。', '兵糧の不足が和らいだ');
@@ -563,7 +557,9 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
 
     // 装備: 充足率95%を切ると、扱う人がいないため相場が落ちる
     const lack = f < 0.95 ? -clamp((0.95 - f) * 1.5, 0, 0.5) : 0;
-    return lack;
+    // 装備充足率が低いほど相場が上がり、高いほど下がる
+    const suff = CFG.absMode ? CFG.eqPriceK * clamp(1 - c.power / (Math.max(1, c.soldiers) * CFG.eqStd), -0.3, 0.4) : 0;
+    return lack + suff;
   }
   function fairMult(g, c, item) {
     if (item === 'food') { let f = foodMult(c); if (c.susp >= 50) f *= 0.8; if (g.t < c.priceModUntil) f *= c.priceMod; return f; }
@@ -579,7 +575,8 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   // 需要: 劣勢ほど高く、優勢ほど低い。超優勢かつ反戦感情が高いと「早く終わらせたい」で再び高まる
   // 需要(危機感): 押されている・相手に武器が届いている(警戒)・損耗が大きいほど高い。最近受け取った分だけ一時的に満たされる
   // 装備充足率: 司令部が必要と考える装備(開戦時の装備が基準)に対して、いまどれだけ持っているか。必要かどうかの判断に使う
-  function eqTarget(g, c) { return c.initPower * CFG.eqNeed; }
+  // 装備充足率: どの国も同じ基準(兵1人あたりの装備)で測る。同じ数字なら同じだけ欲しがる
+  function eqTarget(g, c) { return CFG.absMode ? Math.max(1, c.soldiers) * CFG.eqStd : c.initPower * CFG.eqNeed; }
   function eqSuff(g, c) { return c.power / eqTarget(g, c); }
   // 危機感(相場の高さ): 押されている・相手国に武器が届いて警戒している・兵の損耗が大きい・早く終わらせたい
   function needParts(g, c) {
@@ -626,8 +623,6 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     return c.soldiers > 0 ? farm / c.soldiers : 9;
   }
   function shortage(g, c) { return clamp(1 - selfSuff(g, c), 0, 1); }
-  function foodIncome(g, c, mult) { return c.soldiers * shortage(g, c) * CFG.foodRate * priceStep(g) * mult; }
-  function contract(g, cid, mult) { return { ok:false, text:'兵糧は倉庫から販売します。' }; }
 
 
   function costRate(k) { return CFG.cost[k]; } // 原価(定価に対する割合)
@@ -959,7 +954,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
       c.pipeline = c.pipeline.filter(p => {
         if (p.at > g.t) return true;
         const it = ITEMS[p.item];
-        if (it.type === 'mix') for (const q in EQ) c.eq[q] += it.power * EQ[q].ideal; c.front += it.soldiers; syncSoldiers(c); totals(c); c.lastArrival = g.t;
+        if (it.type === 'mix') c.eq.all += it.power; c.front += it.soldiers; syncSoldiers(c); totals(c); c.lastArrival = g.t;
         if (p.item === 'food') c.foodLv = Math.min(CFG.foodMax, c.foodLv + foodRestore(c)); else c.morale = clamp(c.morale + p.value / 40000, 0, 100); const sAdd = CFG.seeSusp * SUSM[p.item]; oc.susp = clamp(oc.susp + sAdd, -100, 100); oc.seenSusp = (oc.seenSusp || 0) + sAdd; // 敵国に届いた装備は、こちらの国にも見える
         c.recv.push({ t: g.t, v: p.value }); if (c.recv.length > 40) c.recv.shift();
         c.threat = clamp(c.threat - p.value / CFG.threatK * CFG.threatSelf, 0, 100); // 自国に届くと警戒が和らぐ
@@ -1107,7 +1102,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   function dateOf(t) { const n = weekOf(t); return (Math.floor(n / 48) + 1) + '年目 ' + (Math.floor(n / 4) % 12 + 1) + '月' + (n % 4 + 1) + '週'; }
   function fmt(n) { return Math.round(n).toLocaleString('ja-JP'); }
 
-  root.BothSides = { discEff, alertModal, collapseRisk, priceBand, priceLabel, foodRestore, foodPen, foodMult, eqSuff, eqTarget, eventSchedule, SCENARIOS, needParts, BASE, terrOf, territory, desertRate, EVENTS, triggerEvent, POLICY, crewFill, SUSM, nextPriceCheck, pressure, transitSum, retreat, answerOrder, baseline, weekOf, dateOf, ITEMS, EQ, comp, itemBonus, priceStep, listPrice, selfSuff, shortage, foodIncome, contract, OPS, CFG, newGame, step, sell, covert, fairMult, demand, estimate, shareOf, eff, fmt, other };
+  root.BothSides = { discEff, alertModal, collapseRisk, priceBand, priceLabel, foodRestore, foodPen, foodMult, eqSuff, eqTarget, eventSchedule, SCENARIOS, needParts, BASE, terrOf, territory, desertRate, EVENTS, triggerEvent, POLICY, crewFill, SUSM, nextPriceCheck, pressure, transitSum, retreat, answerOrder, baseline, weekOf, dateOf, ITEMS, EQ, comp, itemBonus, priceStep, listPrice, selfSuff, shortage,  OPS, CFG, newGame, step, sell, covert, fairMult, demand, estimate, shareOf, eff, fmt, other };
 })(typeof window !== 'undefined' ? window : globalThis);
 
 
@@ -1119,7 +1114,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const stage = $('stage');
   let g, started = false, act = null, dbg = false, scale = 1, rotDismissed = false;
-  const fundRef = c => Math.max(2500000, c.initFunds * 1.8);
+  const fundRef = c => SC.fund;
   const SHORT = { equip: '装備一式', merc: '傭兵', food: '兵糧' };
 
   function short(n) {
@@ -1130,6 +1125,16 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     return sg + Math.round(a);
   }
   const weeks = t => Math.ceil(t / 3);
+  // ゲージの満タン値: 戦争ごとに、開戦時の両国の値から決める(両国で共通)
+  const SC = { troop: 150000, fund: 7500000, eq: 2, crew: 3 };
+  function setScales() {
+    const A = g.c.A, B = g.c.B, up = (v, st) => Math.ceil(v / st - 1e-9) * st;
+    SC.troop = up(Math.max(A.front, B.front, A.reserve, B.reserve) * 1.4, 10000); // 例: 4万と7万なら10万
+    SC.fund = up(Math.max(A.funds, B.funds) * 1.35, 500000); // 例: 550万と300万なら750万
+    SC.eq = Math.max(2, up(Math.max(S.eqSuff(g, A), S.eqSuff(g, B)) * 1.6, 0.5)); // 「不要」の150%が必ず入る
+    SC.crew = Math.max(2, up(Math.max(S.crewFill(A), S.crewFill(B)) * 1.5, 0.5));
+  }
+  const tkEq = () => [100 / (SC.eq * 100) * 100, 150 / (SC.eq * 100) * 100], tkCrew = () => [95, 110, 150].map(v => v / (SC.crew * 100) * 100);
 
   // ---------- fit ----------
   function fit() {
@@ -1184,6 +1189,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   function buildCard(id) {
     $('c' + id).innerHTML = `
       <div class="ch"><span class="nm">${id}国</span><div class="flags" id="${id}fl"></div><button class="more" data-more="${id}" aria-label="${id}国の詳細">詳細</button></div>
+      <div class="trait" id="${id}tr"></div>
       <div class="risk" id="${id}rk" hidden></div>
       <div class="gg">
         ${row(id, 'mor', 'mor', '戦意', false, [25], true)}
@@ -1191,8 +1197,8 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
         ${row(id, 'frt', 'frt', '前線', false, null, true)}
         ${row(id, 'res', 'sol', '予備', true)}
         ${row(id, 'sor', 'sor', '出動', true)}
-        ${row(id, 'crw', 'crw', '充足', false, [31.7, 36.7, 50], true)}
-        ${row(id, 'eqs', 'eqs', '装備', false, [50], true)}
+        ${row(id, 'eqs', 'eqs', '装備', false, tkEq(), true)}
+        ${row(id, 'crw', 'crw', '充足', false, tkCrew(), true)}
         ${row(id, 'food', 'food', '兵糧', false, [53.8, 69.2, 76.9], true)}
         ${row(id, 'fund', 'fund', '資金', false, null, true)}
         ${row(id, 'sus', 'sus', '疑惑', false, [50, 75, 90], true)}
@@ -1261,16 +1267,16 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     for (const id of ['A', 'B']) {
       const c = g.c[id], s = S.shareOf(g, id), lc = id === 'A' ? 'var(--a2)' : 'var(--b2)';
       const tr = S.transitSum(c);
-      setBar(id + 'frtB', c.front / (c.initSoldiers * 0.9) * 100, lc);
+      setBar(id + 'frtB', c.front / SC.troop * 100, 'var(--troop)'); // 両国共通の満タン値・共通の色
       setV(id + 'frtV', short(c.front), '前線の部隊 ' + fmt(c.front) + '人(移動中 ' + fmt(tr) + '人)');
-      setBar(id + 'resB', c.reserve / (c.initSoldiers * 0.9) * 100, id === 'A' ? 'var(--a3)' : 'var(--b3)');
+      setBar(id + 'resB', c.reserve / SC.troop * 100, 'var(--troop2)');
       setV(id + 'resV', short(c.reserve), '後方の予備 ' + fmt(c.reserve) + '人');
       const sw = c.sortieRate * 3;
       setBar(id + 'sorB', sw / 1200 * 100, sw < 250 ? 'var(--bad)' : 'var(--brass)');
-      { const q = S.eqSuff(g, c), nn = c.noNeed; setBar(id + 'eqsB', Math.min(q, 2) / 2 * 100, nn ? 'var(--muted)' : q < 0.85 ? 'var(--good)' : 'var(--brass)');
-        setV(id + 'eqsV', Math.min(999, Math.round(q * 100)) + '%', '装備充足率 ' + Math.round(q * 100) + '%(開戦時の装備を100%とした保有量。135%を超えると武器を買わなくなり、115%を下回ると再び買う)', nn ? 'var(--muted)' : ''); }
-      { const cf = S.crewFill(c); setBar(id + 'crwB', Math.min(cf, 3) / 3 * 100, cf < 0.95 ? 'var(--bad)' : cf <= 1.1 ? 'var(--warn)' : 'var(--brass)');
-        setV(id + 'crwV', Math.min(999, Math.round(cf * 100)) + '%', '人員充足率 ' + (cf * 100).toFixed(0) + '%(全軍の兵÷装備を扱う必要人数。110%以下で傭兵の相場が上がり、95%を切ると装備の相場が落ちる)', cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : ''); }
+      { const q = S.eqSuff(g, c), nn = c.noNeed; setBar(id + 'eqsB', Math.min(q, SC.eq) / SC.eq * 100, nn ? 'var(--muted)' : 'var(--eq)');
+        setV(id + 'eqsV', Math.min(999, Math.round(q * 100)) + '%', '装備充足率 ' + Math.round(q * 100) + '%(兵1人あたりの装備を、どの国も同じ基準で測った値。低いほど装備を高く買い、150%を超えると武器を買わなくなり、130%を下回ると再び買う)', nn ? 'var(--muted)' : ''); }
+      { const cf = S.crewFill(c); setBar(id + 'crwB', Math.min(cf, SC.crew) / SC.crew * 100, cf < 0.95 ? 'var(--bad)' : cf <= 1.1 ? 'var(--warn)' : 'var(--crew)');
+        setV(id + 'crwV', Math.min(999, Math.round(cf * 100)) + '%', '人員充足率 ' + (cf * 100).toFixed(0) + '%(全軍の兵÷装備を扱う必要人数。どの国も同じ基準。110%以下で傭兵の相場が上がり、95%を切ると装備の相場が落ちる)', cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : ''); }
       setV(id + 'sorV', short(sw) + '/週', '出動の勢い 毎週' + fmt(sw) + '人(予備の数・戦意・兵糧で決まる)', sw < 250 ? 'var(--bad2)' : '');
       setBar(id + 'morB', c.morale, c.morale < 25 ? 'var(--bad)' : 'var(--good)');
       setV(id + 'morV', c.morale.toFixed(0), null, c.morale < 25 ? 'var(--bad2)' : '');
@@ -1288,6 +1294,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
       let anyD = false;
       for (const k in dz) { $(id + k + 'B').classList.toggle('danger', dz[k]); $(id + k + 'V').classList.toggle('danger', dz[k]); if (dz[k]) anyD = true; }
       $('c' + id).classList.toggle('alert', anyD);
+      { const tr = $(id + 'tr'), t = c.trait || ''; if (tr.textContent !== t) tr.textContent = t; tr.hidden = !t; }
       { const rk = S.collapseRisk(g, c), el = $(id + 'rk');
         if (rk.lv > 0) {
           const t = (rk.lv === 2 ? '崩壊の危険' : '崩壊の注意') + ': ' + rk.why.join('・') + (rk.weeks != null ? '(あと約' + rk.weeks + '週で降伏)' : '');
@@ -1411,7 +1418,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   }
   function syncUnits(side) {
     const c = g.c[side], list = FX.units[side];
-    const want = { armor: Math.max(0, Math.min(8, Math.round(c.eq.armor / 120000))), inf: Math.max(c.front > 1000 ? 1 : 0, Math.min(20, Math.round(c.front / 4500))) };
+    const want = { armor: Math.max(0, Math.min(8, Math.round(c.power * 0.25 / 120000))), inf: Math.max(c.front > 1000 ? 1 : 0, Math.min(20, Math.round(c.front / 4500))) };
     for (const kind of ['armor', 'inf']) {
       const alive = list.filter(u => u.kind === kind && !u.dying);
       const lo = kind === 'inf' && started ? want[kind] - 2 : want[kind], hi = kind === 'inf' && started ? want[kind] + 2 : want[kind];
@@ -1608,16 +1615,13 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     const fund = mrow('資金', c.funds / fundRef(c) * 100, c.funds < S.CFG.loanLimit ? 'var(--bad)' : c.funds >= S.CFG.richLine ? 'var(--good)' : 'var(--brass)', short(c.funds), [S.CFG.loanLimit / fundRef(c) * 100, Math.min(100, S.CFG.richLine / fundRef(c) * 100)], 0, c.funds < S.CFG.loanLimit ? 'var(--bad2)' : '');
     const tr = S.territory(g, c.id), front = mrow('国土(戦況)', tr * 100, lc, Math.round(tr * 100) + '%', [50, 35, 65]);
     const food = mrow('兵糧', Math.min(c.foodLv, 130) / 130 * 100, c.foodLv < 70 ? 'var(--bad)' : c.foodLv < 90 ? 'var(--warn)' : 'var(--good)', Math.round(c.foodLv) + '%', [53.8, 69.2, 76.9], 0, c.foodLv < 90 ? 'var(--bad2)' : '');
-    const troops = mrow('前線/予備', c.front / (c.initSoldiers * 0.9) * 100, lc, short(c.front) + '/' + short(c.reserve));
+    const troops = mrow('前線/予備', c.front / SC.troop * 100, 'var(--troop)', short(c.front) + '/' + short(c.reserve));
     const sortie = mrow('出動の勢い', c.sortieRate * 3 / 1200 * 100, c.sortieRate * 3 < 250 ? 'var(--bad)' : 'var(--brass)', short(c.sortieRate * 3) + '/週');
-    const cp = S.comp(c);
-    const comp = `<span class="ml">編成</span><div class="mstk"><i style="width:${c.eq.front / c.power * 100}%;background:var(--${c.id.toLowerCase()}2)"></i><i style="width:${c.eq.ranged / c.power * 100}%;background:var(--${c.id.toLowerCase()})"></i><i style="width:${c.eq.armor / c.power * 100}%;background:var(--${c.id.toLowerCase()}3)"></i></div><span class="mv"${cp < 0.9 ? ' style="color:var(--bad2)"' : ''}>効率${Math.round(cp * 100)}%</span>`;
     let rows;
-    const cf = S.crewFill(c), crew = mrow('人員充足率', Math.min(cf, 3) / 3 * 100, cf < 0.95 ? 'var(--bad)' : cf <= 1.1 ? 'var(--warn)' : 'var(--brass)', Math.round(cf * 100) + '%', [31.7, 36.7, 50], 0, cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : '');
-    const eqs = mrow('装備充足率', Math.min(S.eqSuff(g, c), 2) / 2 * 100, c.noNeed ? 'var(--muted)' : 'var(--brass)', Math.round(S.eqSuff(g, c) * 100) + '%', [50]);
+    const cf = S.crewFill(c), crew = mrow('人員充足率', Math.min(cf, SC.crew) / SC.crew * 100, cf < 0.95 ? 'var(--bad)' : cf <= 1.1 ? 'var(--warn)' : 'var(--crew)', Math.round(cf * 100) + '%', tkCrew(), 0, cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : '');
+    const eqs = mrow('装備充足率', Math.min(S.eqSuff(g, c), SC.eq) / SC.eq * 100, c.noNeed ? 'var(--muted)' : 'var(--eq)', Math.round(S.eqSuff(g, c) * 100) + '%', tkEq());
     const alert = mrow('警戒', c.threat, c.threat >= 60 ? 'var(--warn)' : '#b8b3a6', c.threat.toFixed(0), [50]);
     if (kind === 'sell') rows = `<span class="mh">${c.name}の状態(販売の判断材料)</span>${eqs}${food}${front}${fund}${morale}${susRow(c)}${alert}${crew}${troops}${flagsOf(c)}`;
-    else if (kind === 'food') rows = `<span class="mh">${c.name}の状態(兵糧の判断材料)</span>${food}${fund}${morale}${anti}${susRow(c)}${troops}${flagsOf(c)}<span class="mh">${oc.name}(両国と契約すると疑惑度が上がる)</span>${susRow(oc)}<span class="ml">兵糧契約</span><span></span><span class="mv">${oc.contract ? 'あり ×' + oc.contract.mult.toFixed(1) : 'なし'}</span>`;
     else rows = `<span class="mh">${c.name}の状態(暗躍の判断材料)</span>${morale}${anti}${susRow(c)}${fund}${front}${sortie}${flagsOf(c)}<span class="mh">${oc.name}(暗躍の疑惑は相手国にも波及する)</span>${susRow(oc)}`;
     return `<div class="mg">${rows}</div>`;
   }
@@ -1644,16 +1648,6 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
         <div class="quick">${[[0, '無償供与'], [0.3, '×0.3'], [0.5, '×0.5'], [0.8, '×0.8'], [1, '×1.0'], [1.2, '×1.2'], [1.5, '×1.5'], [1.8, '×1.8'], [2, '×2.0']].map(([m, l]) => `<button class="btn" data-qm="${m}">${l}</button>`).join('')}</div>
         <div class="foot"><button class="btn" data-do="close">閉じて再開</button><button class="btn primary" data-do="sell" ${has && !act.blocked ? '' : 'disabled'}>${!has ? '在庫なし' : act.blocked ? '価格を変えてください' : (act.m === 0 ? '無償で渡す' : '売り込む')}</button></div>
         ${respHTML()}${panel(c, 'sell')}${logHTML()}`;
-    } else if (act.kind === 'food') {
-      const ss = S.selfSuff(g, c), sh = S.shortage(g, c);
-      const opts = [[0.8, '安く契約', '疑惑度が少しずつ下がる'], [1, '相場で契約', '疑惑度は変わらない'], [1.3, '高く契約', '疑惑度が少しずつ上がる']];
-      h = `<div class="stamp">兵糧契約 / 時が止まっています ${S.dateOf(g.t)}</div><h2>${c.name}と兵糧を契約する</h2>${panel(c, 'food')}
-        <div class="kv"><span>兵糧自給率 <b>${Math.round(ss * 100)}%</b></span><span>不足分 <b>${Math.round(sh * 100)}%</b></span><span>現在の契約 <b>${c.contract ? '×' + c.contract.mult.toFixed(1) : 'なし'}</b></span><span>${oc.name}との契約 <b>${oc.contract ? 'あり' : 'なし'}</b></span></div>
-        <p style="font-size:12px;color:var(--muted)">契約中は兵糧の不足分を供給し、毎週代金を受け取ります。代金は兵士数と不足分で決まり、${c.name}の資金が尽きると契約は終わります。不足を放置すると戦意が下がり反戦感情が上がります。両国と同時に契約すると、両国の疑惑度が少しずつ上がります。</p>
-        <div class="ctgrid">${opts.map(([m, l, d]) => `<button class="btn" data-ct="${m}" ${sh <= 0 ? 'disabled' : ''}><b>${l}</b><span class="num">毎週 ${fmt(S.foodIncome(g, c, m) * 3)}</span><small>${d}</small></button>`).join('')}</div>
-        ${sh <= 0 ? '<p style="font-size:12px;color:var(--bad2)">現在は自給できているため、契約を必要としていません。</p>' : ''}
-        ${respHTML()}${logHTML()}
-        <div class="foot"><button class="btn" data-ct="cancel" ${c.contract ? '' : 'disabled'}>契約を解除</button><button class="btn" data-do="close">閉じて再開</button></div>`;
     } else if (act.kind === 'newgame') {
       h = `<div class="stamp">新しい戦争 / 時が止まっています ${S.dateOf(g.t)}</div><h2>今の戦争を捨てて始めますか</h2>
         <p>今の戦争は精算されず、記録も残りません。</p>
@@ -1708,11 +1702,11 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
         <li>地図の破線が戦線です。兵は後方の予備から前線へ出動し、前線で消耗します。出動の勢いは予備の数・戦意・兵糧で決まり、押す力の差で戦線がじわじわ動きます。戦線は「これまでの結果」、各国の数値は「これからの予兆」です。</li>
         <li>各国の司令部は、前線の数の差を見て大規模な増援を送り、相手の増援には遅れて対抗します。反戦感情が高まった国は、首都に兵を集結させて総攻撃を仕掛けます。集結や増援はニュースと札の表示で分かります。</li>
         <li>各国の札の「販売」「暗躍」を押すと時が止まり、落ち着いて選べます。</li>
-        <li>装備を扱うには兵が必要です(人員充足率=全軍の兵÷必要人数、開戦時150%)。兵は戦闘で減り、徴兵では少ししか補えません。人手が足りなくなると装備を足しても戦力にならず、傭兵が高く売れます。数値は札の上で指を置く(カーソルを乗せる)と正確な値が出ます。</li>
+        <li>装備を扱うには兵が必要です(人員充足率=全軍の兵÷必要人数。どの国も同じ基準で、開戦時の値は国によって異なる)。兵は戦闘で減り、徴兵では少ししか補えません。人手が足りなくなると装備を足しても戦力にならず、傭兵が高く売れます。数値は札の上で指を置く(カーソルを乗せる)と正確な値が出ます。</li>
         <li>装備は戦わなくても少しずつ劣化します。資金が開戦時の25%を下回った国では前線から兵が離れ始め、5%以下で大量に離れます。降伏は、戦意20未満かつ国土35%未満が約12週続いた時です。</li>
-        <li>片方の国に届いた装備は、もう片方の国にも見えます。届くたびに相手国の疑惑度が上がるため(前線0.3・遠距離0.45・戦車0.75・傭兵0.9)、両方に売るほど両方から疑われます。</li>
+        <li>片方の国に届いた装備は、もう片方の国にも見えます。届くたびに相手国の疑惑度が上がるため(装備0.6・傭兵0.9・兵糧0.3)、両方に売るほど両方から疑われます。</li>
         <li>価格は自分で決めます。高すぎれば断られ、安く売れば感謝されて疑惑度が下がります。疑惑度50以上で値引き要求、80以上で取引停止。逆に疑惑度がマイナス(信頼)だと、相場より高くても快く買ってくれます。</li>
-        <li>相場(どれだけ高くても買うか)は、各国の危機感で決まります。押されている・相手国に武器が届いて警戒している(約4週後)・前線の兵が減っている国ほど高く買います。一方、買うかどうかは「装備充足率」で決まります。開戦時の装備を100%として、135%を超えると相場が高くても「武器は不要」になり、損耗で115%を下回ると再び買います。同じ品目を続けて買った国は、その品目の相場がすぐに下がります(続けるほど大きく下がり、高い品目ほど影響が大きい)。下がった相場は数週で戻ります。資金が500万以上ある国は、相場の1.2倍までなら普通に買い、1.4倍までしぶしぶ買います。</li>
+        <li>相場(どれだけ高くても買うか)は、各国の危機感で決まります。押されている・相手国に武器が届いて警戒している(約4週後)・前線の兵が減っている国ほど高く買います。装備は「装備充足率」(兵1人あたりの装備。どの国も同じ基準)も相場に表れ、低い国ほど高く買います。150%を超えると相場が高くても「武器は不要」になり、損耗や兵の増加で130%を下回ると再び買います。同じ品目を続けて買った国は、その品目の相場がすぐに下がります(続けるほど大きく下がり、高い品目ほど影響が大きい)。下がった相場は数週で戻ります。資金が500万以上ある国は、相場の1.2倍までなら普通に買い、1.4倍までしぶしぶ買います。</li>
         <li>扱う品は「装備一式」「傭兵」「兵糧」の3つです。装備一式は装備充足率を、傭兵は人員充足率を、兵糧は兵糧を回復します。</li>
         <li>兵糧は、農業で賄えない分だけ減っていきます。100%を切ると戦意と出動がなだらかに落ち、70%を下回ると目に見えて弱ります。130%未満なら相場どおりに買い(早めに売っておけば不足を防げます)、90%未満の国は高く買います(70〜90%は1.3倍、60〜70%は1.8倍、60%未満は2.0倍)。兵糧1単位で、軍人10万人あたり30%回復します(軍人が多い国ほど回復は少ない)。兵糧は初めは生産停止で、作ってから3か月売れないと傷んで廃棄されます。</li>
         <li>3秒で1週間が過ぎます。定価は2年目3月・2年目9月・3年目4月に見直され、その時点でどちらの国も戦意を失っていなければ0.1倍ずつ上がります。</li>
@@ -1854,6 +1848,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   function setupGame(sc) {
     curSc = sc || curSc;
     g = S.newGame(null, { scenario: curSc }); g.paused = true; started = false; act = null; wireKey = '';
+    setScales(); for (const id of ['A', 'B']) { const open = $('c' + id).classList.contains('open'); buildCard(id); $('c' + id).classList.toggle('open', open); }
     FX.units = { A: [], B: [] }; FX.flashes = []; FX.ripples = []; FX.prevPipe = { A: [], B: [] }; FX.shareLog = []; FX.lastCas = { A: null, B: null }; FX.killAcc = { A: 0, B: 0 }; FX.arrAcc = { A: 0, B: 0 }; FX.prevTransit = { A: [], B: [] };
     render();
   }
@@ -1877,7 +1872,6 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
       act.log.push({ ok: r.ok, text: it.name.replace('一式', '') + ' ' + (act.m === 0 ? '無償' : '×' + act.m.toFixed(2)) + ' → ' + r.text });
       if (!r.ok && r.tier !== 'none') act.blocked = true;
       renderAct(); render(); return; }
-    const ct = e.target.closest('[data-ct]'); if (ct) { const r = S.contract(g, act.cid, ct.dataset.ct === 'cancel' ? null : +ct.dataset.ct); act.msg = r.text; act.ok = r.ok; act.log.push({ ok: r.ok, text: '兵糧: ' + r.text }); renderAct(); render(); return; }
     const o = e.target.closest('[data-op]'); if (o) { const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); act.msg = r.text; act.ok = r.ok; act.log.push({ ok: r.ok, text: O[o.dataset.op].name + ': ' + r.text }); renderAct(); render(); return; }
   });
   stage.addEventListener('input', e => { if (act && e.target.id === 'mRange') { if (+e.target.value !== act.m) act.blocked = false; act.m = +e.target.value; updatePrice(); } });
