@@ -1,0 +1,1882 @@
+<title>Both Sides</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Text:wght@600;800&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
+<style>
+/* Layout: god's-eye war table. The map is the screen; state cards float on each territory; the stockroom and wire run along the bottom. One fixed stage scaled to the viewport. */
+:root {
+  --bg: #14171a; --ink: #101315; --panel: #1c2024; --panel2: #23282d; --line: #323940;
+  --fg: #ddd8cb; --muted: #9a9e98; --brass: #c8a14c; --brass2: #e2c07d;
+  --a: #5f93c9; --a2: #8fb6de; --a3: #3b6a99; --b: #c7664f; --b2: #e09a88; --b3: #8e3f2f;
+  --good: #74ad7c; --bad: #d4574b; --bad2: #e58a7f; --warn: #d98a3e;
+  --terrain: #2a2f26; --contour: #3a4134;
+  --f-disp: "Big Shoulders Text", "Arial Narrow", sans-serif;
+  --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif;
+  --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); }
+body { font-family: var(--f-body); font-size: 13px; }
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+button { font: inherit; color: inherit; cursor: pointer; }
+button:focus-visible, input:focus-visible { outline: 2px solid var(--brass); outline-offset: 2px; }
+.num { font-family: var(--f-num); font-variant-numeric: tabular-nums; }
+
+#stage { position: absolute; left: 0; top: 0; transform-origin: 0 0; overflow: hidden; background: var(--bg); }
+#stage.full { width: 1280px; height: 720px; --top: 56px; --tray: 168px; }
+#stage.compact { width: 900px; height: 420px; --top: 40px; --tray: 72px; font-size: 12px; }
+
+/* top bar */
+.topbar { position: absolute; left: 0; top: 0; right: 0; height: var(--top); padding: 0 16px; display: flex; align-items: center; gap: 22px; background: var(--ink); border-bottom: 1px solid var(--line); }
+.compact .topbar { gap: 12px; padding: 0 10px; }
+.brand { font-family: var(--f-disp); font-weight: 800; font-size: 26px; letter-spacing: .06em; line-height: 1; white-space: nowrap; }
+.compact .brand { font-size: 18px; }
+.brand span { color: var(--brass); }
+.clock { display: grid; gap: 2px; width: 210px; }
+.compact .clock { width: 150px; gap: 1px; }
+.clock .ct { display: flex; justify-content: space-between; align-items: baseline; font-size: 10px; color: var(--muted); }
+.clock .ct b { color: var(--fg); font-family: var(--f-body); font-weight: 700; font-size: 19px; letter-spacing: .02em; line-height: 1.1; }
+.compact .clock .ct b { font-size: 15px; }
+.clock .track { height: 3px; }
+.track { position: relative; height: 6px; background: var(--panel2); border-radius: 3px; }
+.track i { position: absolute; left: 0; top: 0; bottom: 0; background: var(--brass); border-radius: 3px; }
+.track .tk { position: absolute; top: -3px; width: 2px; height: 12px; background: var(--fg); opacity: .7; }
+.clock .step { font-size: 10px; color: var(--muted); }
+.compact .clock .step { display: none; }
+.sp { flex: 1; }
+.hv { display: grid; line-height: 1.1; }
+.hv small { font-size: 10px; color: var(--muted); }
+.hv b { font-family: var(--f-num); font-size: 18px; font-weight: 600; }
+.compact .hv small { display: none; }
+.compact .hv b { font-size: 15px; }
+.ibtn { min-width: 44px; height: 40px; padding: 0 10px; border-radius: 6px; border: 1px solid var(--line); background: var(--panel2); display: inline-flex; align-items: center; justify-content: center; gap: 6px; font-size: 12px; }
+.compact .ibtn { height: 34px; min-width: 40px; padding: 0 8px; }
+.ibtn:hover:not(:disabled) { border-color: var(--brass); }
+.ibtn:disabled { opacity: .4; cursor: not-allowed; }
+.ibtn.on { border-color: var(--brass); color: var(--brass2); }
+
+/* map */
+.map { position: absolute; left: 0; right: 0; top: var(--top); bottom: var(--tray); }
+.map svg.terrain { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#fx { position: absolute; left: 0; top: 0; pointer-events: none; }
+.cap { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 4px; pointer-events: none; }
+.cap .dot { width: 36px; height: 36px; border-radius: 50%; background: var(--bg); border: 3px solid currentColor; display: grid; place-items: center; }
+.compact .cap .dot { width: 26px; height: 26px; }
+.cap span { font-size: 12px; color: var(--fg); text-shadow: 0 1px 2px #000; white-space: nowrap; }
+.compact .cap span { display: none; }
+.pill { position: absolute; top: 8px; transform: translateX(-50%); display: flex; gap: 6px; align-items: center; padding: 4px 10px; border-radius: 999px; background: var(--bg); border: 1px solid var(--brass); font-family: var(--f-num); font-size: 12px; white-space: nowrap; transition: left .4s linear; }
+.pill .pa { color: var(--a2); } .pill .pb { color: var(--b2); } .pill .pm { color: var(--muted); font-family: var(--f-body); }
+.ship { position: absolute; bottom: 8px; display: flex; flex-wrap: wrap; gap: 4px; max-width: 300px; }
+.compact .ship { display: none; }
+.ship span { font-family: var(--f-num); font-size: 11px; padding: 2px 8px; border-radius: 4px; background: var(--bg); border: 1px solid var(--brass); color: var(--brass2); white-space: nowrap; }
+
+/* state cards */
+.card { position: absolute; top: 12px; width: 300px; padding: 10px 12px; background: rgba(20, 23, 26, .93); border: 1px solid var(--line); border-radius: 6px; display: grid; gap: 7px; }
+.compact .card { top: 8px; width: 214px; padding: 7px 9px; gap: 5px; }
+.card.A { left: 14px; border-top: 3px solid var(--a); } .card.B { right: 14px; border-top: 3px solid var(--b); }
+.compact .card.A { left: 8px; } .compact .card.B { right: 8px; }
+.ch { display: flex; align-items: center; gap: 6px; }
+.ch .nm { font-family: var(--f-disp); font-weight: 800; font-size: 22px; letter-spacing: .04em; line-height: 1; }
+.compact .ch .nm { font-size: 17px; }
+.A .nm { color: var(--a2); } .B .nm { color: var(--b2); }
+.flags { display: flex; flex-wrap: wrap; gap: 4px; flex: 1; justify-content: flex-end; }
+.scn { display: grid; gap: 8px; margin-top: 10px; }
+.scn .btn { display: grid; gap: 3px; text-align: left; padding: 10px 12px; }
+.scn .btn span { font-size: 12px; color: var(--muted); }
+.scn .btn.primary span { color: inherit; opacity: .8; }
+.flag { font-size: 10.5px; padding: 1px 6px; border-radius: 3px; background: var(--panel2); color: var(--muted); white-space: nowrap; }
+.flag.bad { background: #43231f; color: #f0c2ba; } .flag.good { background: #2b3a2d; color: #b9d8bd; }
+.more { display: inline-block; font-size: 11px; padding: 2px 8px; border-radius: 3px; border: 1px solid var(--line); background: var(--panel2); }
+.card.open .more { border-color: var(--brass); color: var(--brass2); }
+.gg { display: grid; grid-template-columns: 18px 34px minmax(0, 1fr) 54px; gap: 5px 7px; align-items: center; }
+.compact .gg { grid-template-columns: 30px minmax(0, 1fr) 42px; gap: 3px 6px; }
+.compact .gg svg { display: none; }
+.card:not(.open) .det { display: none; }
+.gg .lb.em { color: var(--fg); font-weight: 700; font-size: 14px; }
+.gg .v.em { font-size: 15px; font-weight: 600; }
+.gg .bar.em { height: 11px; }
+.gg .lb:not(.em), .gg .v:not(.em) { font-size: 11.5px; }
+.gg .bar:not(.em) { height: 6px; }
+.compact .gg .lb.em { font-size: 12.5px; } .compact .gg .v.em { font-size: 13px; } .compact .gg .bar.em { height: 8px; }
+.gg .lb { color: var(--muted); }
+.gg .v { font-family: var(--f-num); text-align: right; white-space: nowrap; }
+.gg .v[data-full] { text-decoration: underline dotted rgba(221, 216, 203, .35); text-underline-offset: 3px; cursor: help; }
+.bar { position: relative; height: 8px; background: var(--panel2); border-radius: 2px; overflow: hidden; }
+.compact .bar { height: 6px; }
+.bar i { position: absolute; top: 0; bottom: 0; left: 0; border-radius: 2px; transition: width .3s linear, left .3s linear; }
+.bar .tk { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--fg); opacity: .55; }
+.comp { display: grid; gap: 3px; }
+.comp .cl { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); }
+.comp .stk { display: flex; height: 8px; gap: 2px; border-radius: 2px; overflow: hidden; }
+.comp .stk i { display: block; height: 100%; transition: width .3s linear; }
+.sub { display: flex; justify-content: space-between; gap: 6px; font-size: 11px; color: var(--muted); }
+.sub b { font-family: var(--f-num); font-weight: 500; color: var(--fg); }
+.acts { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 6px; }
+.acts button { height: 44px; border-radius: 5px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 6px; }
+.compact .acts button { height: 38px; }
+.A .acts button { border: 1px solid var(--a3); background: #1e2a36; }
+.B .acts button { border: 1px solid var(--b3); background: #33201c; }
+.acts button:hover:not(:disabled) { border-color: var(--brass); }
+.acts button:disabled { opacity: .4; cursor: not-allowed; }
+.A .acts svg { stroke: var(--a2); } .B .acts svg { stroke: var(--b2); }
+.dbg { border-top: 1px dashed var(--line); padding-top: 4px; font-size: 11px; color: var(--muted); display: flex; flex-wrap: wrap; gap: 2px 10px; }
+.dbg b { color: var(--brass2); font-family: var(--f-num); font-weight: 500; }
+
+/* tray */
+.tray { position: absolute; left: 0; right: 0; bottom: 0; height: var(--tray); padding: 10px 16px; background: var(--ink); border-top: 1px solid var(--line); display: flex; gap: 18px; }
+.compact .tray { padding: 6px 10px; gap: 10px; align-items: center; }
+.tl { font-size: 11px; color: var(--muted); letter-spacing: .1em; margin-bottom: 6px; }
+.compact .tl { display: none; }
+.stock { display: flex; gap: 8px; }
+.compact .stock { gap: 6px; }
+.slot { width: 140px; height: 76px; padding: 7px 8px; border-radius: 6px; background: var(--panel); border: 1px solid var(--line); display: grid; grid-template-rows: auto 1fr auto; gap: 3px; text-align: left; }
+.compact .slot { width: 104px; height: 40px; padding: 3px 7px; grid-template-columns: minmax(0, 1fr) auto; grid-template-rows: auto auto; gap: 0 6px; }
+.slot.off { border-color: var(--brass); }
+.slotw { position: relative; }
+.fcan { position: absolute; right: 6px; bottom: 10px; z-index: 1; font-size: 10px; padding: 1px 6px; border-radius: 3px; border: 1px solid var(--bad2); background: #43231f; color: #f0c2ba; }
+#sl_food .st { background: #2a2f36; color: var(--brass2); }
+.slot .sn { display: flex; justify-content: space-between; align-items: center; font-size: 12px; font-weight: 700; gap: 4px; }
+.compact .slot .sn { font-size: 11px; }
+.slot .st { font-size: 10px; padding: 1px 6px; border-radius: 3px; background: #2b3a2d; color: #b9d8bd; font-weight: 400; }
+.slot.off .st { background: #43231f; color: #f0c2ba; }
+.compact .slot .st { display: none; }
+.compact .fcan { bottom: auto; top: -8px; right: -4px; font-size: 9px; padding: 0 4px; }
+.slot .cnt { font-family: var(--f-num); font-size: 24px; font-weight: 600; line-height: 1; align-self: center; }
+.compact .slot .cnt { font-size: 16px; grid-column: 2; grid-row: 1 / 3; }
+.slot.off .cnt { color: var(--brass2); }
+.slot .pg { height: 4px; background: var(--bg); border-radius: 2px; overflow: hidden; }
+.slot .pg i { display: block; height: 100%; background: var(--brass); }
+.wire { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.wire ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
+.wire li { display: flex; gap: 10px; font-size: 13.5px; line-height: 1.45; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.compact .wire li { font-size: 11px; }
+.compact .wire li:nth-child(n+4) { display: none; }
+.compact .wire ul { gap: 1px; }
+.wire li .t { font-family: var(--f-num); color: var(--muted); flex: none; font-size: 11px; padding-top: 1px; }
+.wire li .x { overflow: hidden; text-overflow: ellipsis; }
+.wire li.intel .x { color: var(--brass2); } .wire li.event .x { color: #e8cf96; } .wire li.bad .x { color: var(--bad2); } .wire li.op .x { color: #b9a3d6; } .wire li.sale .x { color: var(--fg); }
+
+/* tooltip */
+#tip { position: absolute; z-index: 40; padding: 4px 8px; border-radius: 4px; background: var(--fg); color: var(--bg); font-family: var(--f-num); font-size: 12px; white-space: nowrap; pointer-events: none; transform: translate(-50%, -100%); }
+
+/* modal (inside stage) */
+.modal { position: absolute; inset: 0; z-index: 30; background: rgba(16, 19, 21, .78); display: grid; place-items: center; padding: 12px; }
+.mc { background: var(--panel); border: 1px solid var(--line); border-top: 3px solid var(--brass); border-radius: 6px; padding: 18px 20px; width: min(640px, 100%); max-height: 100%; overflow-y: auto; display: grid; gap: 11px; }
+.compact .mc { padding: 12px 14px; gap: 8px; width: min(700px, 100%); }
+.mc.A { border-top-color: var(--a); } .mc.B { border-top-color: var(--b); }
+.mc h2 { margin: 0; font-family: var(--f-disp); font-size: 26px; letter-spacing: .04em; color: var(--brass); text-wrap: balance; line-height: 1.15; }
+.compact .mc h2 { font-size: 20px; }
+.mc.A h2 { color: var(--a2); } .mc.B h2 { color: var(--b2); }
+.mc p { margin: 0; line-height: 1.7; }
+.mc ul { margin: 0; padding-left: 1.2em; display: grid; gap: 4px; line-height: 1.6; }
+.stamp { font-size: 11px; letter-spacing: .12em; color: var(--muted); }
+.kv { display: flex; flex-wrap: wrap; gap: 3px 14px; font-size: 12px; color: var(--muted); }
+.kv b { color: var(--fg); font-family: var(--f-num); font-weight: 600; }
+.picks { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+.compact .picks { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 6px; }
+.pick { text-align: left; background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 8px; display: grid; gap: 2px; }
+.compact .pick { padding: 6px; }
+.pick.sel { border-color: var(--brass); box-shadow: inset 0 0 0 1px var(--brass); }
+.pick .pn { font-weight: 700; display: flex; justify-content: space-between; gap: 6px; }
+.pick .pl { font-size: 11px; color: var(--muted); }
+.compact .pick .pl.tr { display: none; }
+.pick .pe { font-size: 12px; color: var(--brass2); font-family: var(--f-num); }
+.priceline { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; }
+.priceline .mult { font-family: var(--f-num); font-size: 26px; font-weight: 600; color: var(--brass); }
+.compact .priceline .mult { font-size: 20px; }
+.priceline .yen { font-family: var(--f-num); font-size: 16px; }
+input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
+#mRange { -webkit-appearance: none; appearance: none; height: 34px; background: transparent; cursor: pointer; }
+#mRange::-webkit-slider-runnable-track { height: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; }
+#mRange::-webkit-slider-thumb { -webkit-appearance: none; width: 28px; height: 28px; margin-top: -9px; border-radius: 50%; background: var(--brass); border: 3px solid var(--bg); }
+#mRange::-moz-range-track { height: 12px; background: var(--panel2); border: 1px solid var(--line); border-radius: 6px; }
+#mRange::-moz-range-thumb { width: 24px; height: 24px; border-radius: 50%; background: var(--brass); border: 3px solid var(--bg); }
+.quick { display: flex; flex-wrap: wrap; gap: 6px; }
+.btn { background: var(--panel2); border: 1px solid var(--line); border-radius: 4px; padding: 6px 12px; min-height: 36px; }
+.btn:hover:not(:disabled) { border-color: var(--brass); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn.primary { background: var(--brass); color: #1a1508; border-color: var(--brass); font-weight: 700; }
+.quick .btn { padding: 3px 10px; font-size: 12px; min-height: 32px; }
+.mg { display: grid; grid-template-columns: 92px minmax(0, 1fr) 76px; gap: 5px 10px; align-items: center; padding: 10px 12px; border-radius: 4px; background: #191b1d; border: 1px solid var(--line); }
+.compact .mg { grid-template-columns: 74px minmax(0, 1fr) 64px; gap: 3px 8px; padding: 6px 8px; }
+.mg .ml { font-size: 12px; color: var(--muted); }
+.mg .mv { font-family: var(--f-num); font-size: 12px; text-align: right; white-space: nowrap; }
+.mg .mh { grid-column: 1 / -1; font-size: 11px; letter-spacing: .1em; color: var(--muted); border-top: 1px solid var(--line); padding-top: 4px; margin-top: 2px; }
+.mg .mh:first-child { border-top: 0; padding-top: 0; margin-top: 0; }
+.mg .mflags { grid-column: 1 / -1; display: flex; flex-wrap: wrap; gap: 4px; }
+.mstk { display: flex; height: 8px; gap: 2px; border-radius: 2px; overflow: hidden; }
+.mstk i { display: block; height: 100%; }
+.mlog { list-style: none; margin: 0; padding: 0; display: grid; gap: 2px; max-height: 120px; overflow-y: auto; font-size: 12px; }
+.mlog li { padding: 3px 8px; border-left: 2px solid var(--line); }
+.mlog li.ok { border-left-color: var(--good); } .mlog li.ng { border-left-color: var(--bad); color: var(--bad2); }
+.resp { font-size: 14px; padding: 8px 10px; border-radius: 4px; background: var(--panel2); }
+.resp:empty { display: none; }
+.resp.ok { border-left: 3px solid var(--good); } .resp.ng { border-left: 3px solid var(--bad); }
+.foot { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+.oprow { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; align-items: center; padding: 7px 0; border-bottom: 1px solid var(--panel2); }
+.oprow .on { font-weight: 700; }
+.oprow .od { font-size: 12px; color: var(--muted); }
+.oprow .why { font-size: 11px; color: var(--bad2); }
+.ctgrid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; }
+.ctgrid .btn { display: grid; gap: 2px; padding: 8px; text-align: center; }
+.ctgrid .btn small { font-size: 11px; color: var(--muted); }
+.res { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 4px 16px; }
+.res div { display: flex; justify-content: space-between; border-bottom: 1px solid var(--panel2); padding: 3px 0; font-size: 13px; }
+.res div span:first-child { color: var(--muted); }
+.big { font-family: var(--f-num); font-size: 34px; font-weight: 600; line-height: 1.1; }
+.review { display: grid; gap: 6px; }
+.review div { padding: 8px 10px; border-radius: 4px; background: var(--panel2); border-left: 3px solid var(--brass); font-size: 13px; line-height: 1.6; }
+.review div.good { border-left-color: var(--good); }
+.chartbox svg { width: 100%; height: auto; display: block; }
+
+#rotate { position: fixed; inset: 0; z-index: 50; background: var(--bg); display: grid; place-items: center; text-align: center; padding: 24px; }
+#rotate .in { display: grid; gap: 14px; justify-items: center; max-width: 320px; }
+/* 崩壊の危険 */
+.risk { font-size: 11.5px; font-weight: 600; padding: 4px 8px; border-radius: 4px; line-height: 1.35; }
+.risk.lv1 { background: #3d3216; color: #f0d9a0; border: 1px solid #8a6d2a; }
+.risk.lv2 { background: #4a1f1a; color: #ffd0c8; border: 1px solid var(--bad); animation: pulse 1.6s ease-in-out infinite; }
+.compact .risk { font-size: 10.5px; padding: 3px 6px; }
+@media (prefers-reduced-motion: reduce) { .risk.lv2 { animation: none; } }
+.hsep { width: 1px; height: 26px; background: var(--line); margin: 0 6px 0 10px; }
+.compact .hsep { margin: 0 2px 0 6px; }
+@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .35; } }
+.bar.danger { box-shadow: 0 0 0 1px var(--bad); }
+.bar.danger i { animation: pulse 1.2s ease-in-out infinite; }
+.gg .v.danger { color: var(--bad2) !important; font-weight: 600; }
+.card.alert { border-color: var(--bad); }
+.effs { position: absolute; top: 44px; left: 50%; transform: translateX(-50%); display: grid; gap: 4px; justify-items: center; pointer-events: none; max-width: 560px; }
+.compact .effs { top: 36px; gap: 2px; max-width: 420px; }
+.effs span { padding: 3px 10px; border-radius: 4px; background: rgba(20, 23, 26, .92); border: 1px solid var(--line); font-size: 12px; white-space: nowrap; }
+.compact .effs span { font-size: 10.5px; padding: 2px 8px; }
+.effs span.ord { border-color: var(--brass); color: var(--brass2); }
+.effs span.pol { border-color: #7d6aa0; color: #cbbbe6; }
+.effs span.mod { border-color: var(--warn); color: #f0c493; }
+.effs span.pre { border-color: var(--line); color: var(--brass2); }
+.effs span.bad { border-color: var(--bad); background: rgba(74, 31, 26, .95); color: #ffd0c8; font-weight: 600; }
+.effs span.end { opacity: .55; border-style: dashed; }
+.ledger { display: grid; gap: 4px; padding: 10px 12px; border-radius: 4px; background: #191b1d; border: 1px solid var(--line); }
+.ledger div { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; padding: 2px 0; }
+.ledger div span:first-child { color: var(--muted); flex: none; }
+.ledger div b { font-family: var(--f-num); font-weight: 500; text-align: right; }
+.ledger .verdict { display: block; color: var(--fg); font-size: 13px; padding-top: 6px; border-top: 1px solid var(--line); margin-top: 4px; line-height: 1.6; }
+.fin { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.fin .fc { padding: 8px 10px; border-radius: 4px; background: #191b1d; border: 1px solid var(--line); display: grid; gap: 2px; }
+.fin .fc.A { border-top: 3px solid var(--a); } .fin .fc.B { border-top: 3px solid var(--b); }
+.fin .fc h3 { margin: 0 0 4px; font-size: 14px; display: flex; justify-content: space-between; gap: 6px; }
+.fin .fc h3 small { font-size: 11px; color: var(--bad2); font-weight: 600; }
+.fin .fc div { display: flex; justify-content: space-between; gap: 8px; font-size: 12.5px; }
+.fin .fc div span:first-child { color: var(--muted); }
+.fin .fc div b { font-family: var(--f-num); font-weight: 500; text-align: right; }
+.fin .fc .sep { border-top: 1px solid var(--line); margin-top: 4px; padding-top: 4px; }
+.finhd { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 4px 12px; font-size: 12.5px; color: var(--muted); }
+.finhd b { color: var(--fg); font-weight: 600; }
+.coda { font-size: 13px; color: var(--muted); font-style: italic; }
+.tline { list-style: none; margin: 0; padding: 0; max-height: 240px; overflow-y: auto; display: grid; gap: 2px; border: 1px solid var(--line); border-radius: 4px; background: #191b1d; }
+.tline li { display: grid; grid-template-columns: 7.5em minmax(0, 1fr); gap: 8px; padding: 5px 10px; border-bottom: 1px solid var(--panel2); font-size: 12px; line-height: 1.5; }
+.tline li .d { font-family: var(--f-num); color: var(--muted); font-size: 11px; padding-top: 1px; }
+.tline li .w { color: var(--fg); }
+.tline li .y { display: block; color: var(--muted); }
+.tline li .y::before { content: "→ "; color: var(--brass); }
+.tline li.act .w { color: #b9a3d6; }
+.tline li.bad .w { color: var(--bad2); }
+.tline li.end .w { color: var(--brass2); font-weight: 700; }
+@media (prefers-reduced-motion: reduce) { .bar i, .pill, .comp .stk i { transition: none; } .bar.danger i { animation: none; } }
+</style>
+
+<div id="stage" class="full">
+  <div class="topbar">
+    <div class="brand">BOTH<span>·</span>SIDES</div>
+    <div class="clock">
+      <div class="ct"><span>暦</span><b id="hDate">1年目 1月1週</b></div>
+      <div class="track"><i id="hTrack" style="width:0"></i></div>
+      <div class="step" id="hStep">定価 ×1.0</div>
+    </div>
+    <div class="sp"></div>
+    <div class="hv"><small>所持金</small><b id="hMoney" data-full="">300万</b></div>
+    <div class="hv"><small>利益(スコア)</small><b id="hProfit" data-full="">0</b></div>
+    <button class="ibtn" id="bPause" aria-label="一時停止"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect></svg></button>
+    <button class="ibtn" id="bDbg" title="隠し値の表示(検証用)">検証</button>
+    <span class="hsep" aria-hidden="true"></span>
+    <button class="ibtn" id="bRetreat">撤退</button>
+    <button class="ibtn" id="bNew">新しい戦争</button>
+  </div>
+
+  <div class="map" id="map">
+    <svg class="terrain" viewBox="0 0 1000 500" preserveAspectRatio="none" aria-hidden="true">
+      <rect x="0" y="0" width="1000" height="500" fill="var(--terrain)"></rect>
+      <g fill="none" stroke="var(--contour)" stroke-width="1.2" vector-effect="non-scaling-stroke">
+        <path d="M-20 80 C 160 40, 300 140, 480 90 S 780 50, 1020 110"></path>
+        <path d="M-20 150 C 170 110, 320 210, 500 160 S 800 120, 1020 180"></path>
+        <path d="M-20 340 C 140 300, 330 400, 520 350 S 770 310, 1020 380"></path>
+        <path d="M-20 420 C 190 380, 340 480, 510 430 S 820 390, 1020 450"></path>
+        <path d="M90 230 C 130 210, 180 220, 195 250 S 160 300, 115 280 S 65 250, 90 230 Z"></path>
+        <path d="M780 210 C 820 185, 875 200, 885 235 S 845 280, 805 270 S 755 240, 780 210 Z"></path>
+      </g>
+      <path d="M -10 280 C 160 262, 330 308, 500 290 S 790 262, 1010 282" fill="none" stroke="#3d5a6e" stroke-width="5" opacity=".55" vector-effect="non-scaling-stroke"></path>
+      <polygon id="polyA" points="" fill="var(--a)" opacity=".22"></polygon>
+      <polygon id="polyB" points="" fill="var(--b)" opacity=".22"></polygon>
+      <g id="routes" fill="none" stroke="var(--brass)" stroke-width="2" stroke-dasharray="5 6" vector-effect="non-scaling-stroke">
+        <path id="routeA" d="M500 500 C 430 430, 270 420, 110 385" hidden></path>
+        <path id="routeB" d="M500 500 C 570 430, 730 420, 890 385" hidden></path>
+      </g>
+      <polyline id="front1" points="" fill="none" stroke="var(--bg)" stroke-width="9" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline>
+      <polyline id="front2" points="" fill="none" stroke="var(--brass2)" stroke-width="3" stroke-dasharray="10 6" stroke-linejoin="round" vector-effect="non-scaling-stroke"></polyline>
+    </svg>
+    <canvas id="fx" aria-hidden="true"></canvas>
+    <div class="cap" style="left:11%;top:77%;color:var(--a)"><div class="dot"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3 7 7 .6-5.3 4.6 1.6 7.3L12 17.8 5.7 21.5l1.6-7.3L2 9.6 9 9z"></path></svg></div><span>A国 首都</span></div>
+    <div class="cap" style="left:89%;top:77%;color:var(--b)"><div class="dot"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2l3 7 7 .6-5.3 4.6 1.6 7.3L12 17.8 5.7 21.5l1.6-7.3L2 9.6 9 9z"></path></svg></div><span>B国 首都</span></div>
+    <div class="pill" id="pill"><span class="pa" id="pA"></span><span class="pm">戦線</span><span class="pb" id="pB"></span></div>
+    <div class="effs" id="effs"></div>
+    <div class="ship" id="shipA" style="left:20%"></div>
+    <div class="ship" id="shipB" style="right:20%;justify-content:flex-end"></div>
+    <section class="card A" id="cA" aria-label="A国"></section>
+    <section class="card B" id="cB" aria-label="B国"></section>
+  </div>
+
+  <div class="tray">
+    <div><div class="tl">倉庫(装備・傭兵は自動生産で押すと停止/再開。兵糧は押した回数だけ作る。各12まで)</div><div class="stock" id="stock"></div></div>
+    <div class="wire"><div class="tl">戦況ニュース</div><ul id="wire"></ul></div>
+  </div>
+
+  <div id="tip" hidden></div>
+  <div class="modal" id="modal" hidden><div class="mc" id="mc" role="dialog" aria-modal="true"></div></div>
+</div>
+
+<div id="rotate" hidden>
+  <div class="in">
+    <svg width="56" height="56" viewBox="0 0 24 24" fill="none" stroke="var(--brass)" stroke-width="1.6" aria-hidden="true"><rect x="7" y="2" width="10" height="20" rx="2"></rect><path d="M20 9a8 8 0 0 1 0 6M22 7a11 11 0 0 1 0 10"></path></svg>
+    <p style="margin:0;line-height:1.7">このゲームは横画面向けです。端末を横向きにしてお楽しみください。</p>
+    <button class="btn" id="bRotOk">このまま遊ぶ</button>
+  </div>
+</div>
+
+<script>
+
+(function (root) {
+  'use strict';
+  const ITEMS = {
+    equip: { key:'equip', type:'mix', name:'装備一式', sub:'小銃・火砲・戦車と整備部品', lot:'1組', price:80000,  power:80000, soldiers:0,     interval:6,  lag:8,  trait:'装備充足率を上げる' },
+    merc:  { key:'merc',  type:null,  name:'傭兵',     sub:'訓練済みの兵員',             lot:'10,000人', price:120000, power:0, soldiers:10000, interval:24, lag:10, trait:'軍人を増やす(人員充足率を上げる)' },
+    food:  { key:'food',  type:null,  name:'兵糧',     sub:'穀物・保存食',               lot:'1単位', price:150000, power:0, soldiers:0, interval:12, lag:4, trait:'兵糧を回復(軍人10万人あたり30%)。3か月で廃棄' },
+  };
+  // 装備の種類ごとの性質: wear=損耗の速さ, crew=戦力1あたりの必要兵数, ideal=理想の編成比
+  const EQ = {
+    front:  { name:'前線', wear:2.0, crew:0.04,   ideal:0.45 },
+    ranged: { name:'遠距離', wear:1.0, crew:0.005,  ideal:0.30 },
+    armor:  { name:'戦車', wear:0.4, crew:0.0005, ideal:0.25 },
+  };
+  const OPS = {
+    assassin: { key:'assassin', name:'要人暗殺',         cost:30000, cd:20 },
+    rumor:    { key:'rumor',    name:'敵国悪評流布',     cost:10000, cd:20 },
+    consult:  { key:'consult',  name:'戦闘コンサル',     cost:10000, cd:20 },
+    loan:     { key:'loan',     name:'融資',             cost:500000, cd:20, unlock:120 },
+  };
+  const CFG = {
+    startMoney: 3000000, batLow: -0.06, batDef: 0.02, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, satSold: false, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, needOff: 0.3, needOn: 0.45, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.35, suffOff: 1.15, satWin: 18, satTau: 12, satK: 0.15, wLose: 0.45, wAlarm: 0.6, wSat: 1.2, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, initLoan: 0, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, endA: 210, endB: 270, prodCost: 0.4, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
+    lossS: 0.0001, lossP: 0.0009, upkeep: 0.03, richLine: 5000000,
+    peaceLine: 25, peaceHold: 18, threatLag: 12,
+    sortieBase: 0.004, transitTime: 12, frontSpeed: 0.006, capitalLine: 0.12,
+    foodRate: 0.05, farmDecay: 0.0018, loanLimit: 300000, loanAmount: 500000, loanInterest: 0.2, bothContractSusp: 0.15,
+  };
+
+  function rng(seed) {
+    let a = seed >>> 0;
+    return function () {
+      a |= 0; a = a + 0x6D2B79F5 | 0;
+      let t = Math.imul(a ^ a >>> 15, 1 | a);
+      t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t;
+      return ((t ^ t >>> 14) >>> 0) / 4294967296;
+    };
+  }
+  const clamp = (v, lo, hi) => Math.max(lo, Math.min(hi, v));
+
+  function mkCountry(id, name, o) {
+    const c = Object.assign({ id, name, alive: true, pipeline: [], lastArrival: -999,
+      taxMod: 1, taxModUntil: 0, taxAdvUntil: 0, priceMod: 1, priceModUntil: 0, pushMod: 1, pushModUntil: 0, sold: [], recv: [], bought: { equip: 0, merc: 0, food: 0 }, lastDeal: {}, foodLv: 105, noNeed: false, estTarget: 0, estNoise: 0, estAt: -99, contract: null, foodPaid: 0 }, o, { initSoldiers: o.soldiers, front: o.frontInit, reserve: o.soldiers - o.frontInit, transit: [], sortieRate: 0, push: 0, policy: 'normal', policyUntil: 0, cool: 30, massUntil: 0, massing: false, surT: 0, warned: 0, initFunds: o.funds, desertLv: 0, deserted: 0 });
+    totals(c); c.crewK = c.soldiers / (1.5 * c.crew); totals(c); c.initPower = c.power; return c;
+  }
+  function totals(c) {
+    c.power = c.eq.front + c.eq.ranged + c.eq.armor;
+    c.crew = (c.eq.front * EQ.front.crew + c.eq.ranged * EQ.ranged.crew + c.eq.armor * EQ.armor.crew) * (c.crewK || 1);
+  }
+  // 編成効率: 理想の比率に近いほど高い(0.7〜1.1)。前線装備だけでは戦えない
+  function comp(c) {
+    if (c.power <= 0) return 0.7;
+    let dev = 0; for (const k in EQ) dev += Math.abs(c.eq[k] / c.power - EQ[k].ideal);
+    return clamp(1.1 - dev * 0.5, 0.7, 1.1);
+  }
+
+  // 戦争の設定(シナリオ)。Web版は2種
+  const SCENARIOS = {
+    s1: { key:'s1', name:'大国と小国', P0:0.52,
+      desc:'豊かな大国A国と、貧しいが士気の高い小国B国。小国は資金が尽きやすい。',
+      A: { frontInit:61000, farmCap:143000, taxBase:15000, recruitBase:120, soldiers:130000, morale:60, antiwar:30, funds:5500000, eq:{ front:1170000, ranged:900000, armor:630000 }, susp:0, threat:40 },
+      B: { frontInit:45000, farmCap:74000, taxBase:8000, recruitBase:140, soldiers:80000,  morale:75, antiwar:20, funds:2000000, eq:{ front:900000, ranged:600000, armor:400000 }, susp:0, threat:60 } },
+    s2: { key:'s2', name:'工業国と農業国', P0:0.5,
+      desc:'装備は多いが兵と食料の乏しい工業国A国と、兵と食料は豊富だが装備の乏しい農業国B国。資金は互角。',
+      A: { frontInit:50000, farmCap:90000, taxBase:11000, recruitBase:100, soldiers:100000, morale:65, antiwar:25, funds:3500000, eq:{ front:1050000, ranged:800000, armor:550000 }, susp:0, threat:50 },
+      B: { frontInit:58000, farmCap:126000, taxBase:11000, recruitBase:170, soldiers:120000, morale:70, antiwar:20, funds:3500000, eq:{ front:1000000, ranged:650000, armor:400000 }, susp:0, threat:50 } },
+  };
+  const BASE = SCENARIOS.s1;
+  // 国の条件のゆらぎ(乱数): 兵・装備 ±15%、資金 ±40%、税収 ±25%、農業 ±15%、戦意 ±10、開戦時の戦線 ±4%
+  function spec(id, rr, sc) {
+    const b = sc[id], o = JSON.parse(JSON.stringify(b));
+    if (!rr) return o;
+    const u = (lo, hi) => lo + rr() * (hi - lo);
+    const ks = u(0.85, 1.15); o.soldiers = Math.round(b.soldiers * ks); o.frontInit = Math.round(b.frontInit * ks);
+    const ke = u(0.85, 1.15); for (const k in o.eq) o.eq[k] = Math.round(b.eq[k] * ke * u(0.9, 1.1));
+    o.funds = Math.round(b.funds * u(0.6, 1.4) / 10000) * 10000; o.taxBase = Math.round(b.taxBase * u(0.75, 1.25));
+    o.farmCap = Math.round(b.farmCap * u(0.85, 1.15)); o.morale = Math.round(b.morale + u(-10, 10)); o.antiwar = Math.round(b.antiwar + u(-5, 5));
+    return o;
+  }
+  function newGame(seed, opts) {
+    seed = seed == null ? Math.floor(Math.random() * 1e9) : seed;
+    opts = opts || {};
+    const rr = (opts.random || CFG.randomCountries) ? rng(seed * 7 + 13) : null;
+    const sc = SCENARIOS[opts.scenario || CFG.scenario || 's1'];
+    const g = {
+      seed, r: rng(seed), t: 0, over: false, paused: false, modal: null,
+      money: CFG.startMoney - CFG.initLoan * 2, revenue: 0, spent: 0, opsSpent: 0, sales: 0, foodRev: 0, loans: CFG.initLoan ? [{ cid: 'A', amount: CFG.initLoan, t: 0, rate: 0, init: true }, { cid: 'B', amount: CFG.initLoan, t: 0, rate: 0, init: true }] : [], loanOut: CFG.initLoan * 2, lastStep: 1, stats: { refuse: 0, noneed: 0, nofunds: 0, stop: 0, nomorale: 0, foodNeglect: 0, maxSusp: 0, free: 0 },
+      cas: { A: 0, B: 0 }, supplied: { equip: 0, merc: 0, food: 0 }, opsCount: { assassin: 0, rumor: 0, consult: 0, loan: 0 },
+      order: null, orderCount: 0, lastOrderT: -999,
+      inv: { equip: 2, merc: 0, food: 0 }, foodLots: [], foodQueue: 0, pending: [],
+      prodOn: { equip: true, merc: true, food: false },
+      prodT: { equip: 0, merc: 0, food: 0 },
+      cd: { assassin: 0, rumor: 0, consult: 0, loan: 0 },
+      sched: [], news: [], tl: [], peaceT: 0, nextEvent: 1e9, evIdx: 0, P: 0.56, fhist: [], nextCmd: 4.3, lastEvent: null, result: null,
+      history: [], random: !!rr, scenario: sc.key,
+      c: {
+        A: mkCountry('A', 'A国', spec('A', rr, sc)),
+        B: mkCountry('B', 'B国', spec('B', rr, sc)),
+      },
+    };
+    g.P = sc.P0; if (rr) g.P = clamp(sc.P0 - 0.02 + rr() * 0.04, 0.467, 0.533); // 開戦時の国土の表示は45〜55%に収める
+    g.evSeq = eventSchedule(seed);
+    news(g, '開戦から数週間。A国とB国の戦線は膠着しつつある。', 'info');
+    return g;
+  }
+
+  function other(id) { return id === 'A' ? 'B' : 'A'; }
+  // 押す力: 前線の部隊と、彼らが扱える装備で決まる
+  function foodFactor(g, c) { return Math.max(0.4, 1 - CFG.foodPush * foodPen(c)); }
+  // 地の利: 本土に押し込まれた側は守りが固く、深く攻め込んだ側は補給が伸びて弱る
+  function terrain(g, c) {
+    if (!g) return 1;
+    const own = c.id === 'A' ? g.P : 1 - g.P;
+    return own < 0.5 ? 1 + 0.8 * (0.5 - own) : 1 - 0.5 * Math.max(0, own - 0.55);
+  }
+  // 司令部の方針: aggr=積極 / normal=保守 / pass=消極
+  const POLICY = { aggr: { name: '積極', price: 0.15, sortie: 1.8, push: 1.15, anti: 0.15, morale: -0.1 }, normal: { name: '保守', price: 0, sortie: 1, push: 1, anti: 0, morale: 0 }, pass: { name: '消極', price: -0.1, sortie: 0.5, push: 0.88, anti: -0.15, morale: 0.1 } };
+  const pol = c => POLICY[c.policy || 'normal'];
+  function policyPush(c) { return pol(c).push; }
+  function eff(c, g) {
+    const fill = c.crew > 0 ? Math.min(1, c.front / (c.crew * 0.5)) : 1; // 装備の稼働率: 前線の兵で、前線にある半分の装備を扱えるか
+    return (c.power * fill * comp(c) + c.front * 9) * policyPush(c) * (g && g.t < c.pushModUntil ? c.pushMod : 1) * (0.7 + c.morale / 250) * (g ? foodFactor(g, c) * terrain(g, c) : 1);
+  }
+  // 戦線の位置(A国の領土の割合)。押す力の差でじわじわ動く
+  // 戦況による戦意の変化(毎秒)。国土の割合に対してなめらかに変わる
+  function batMorale(s) { const BATP = [[0, CFG.batLow], [0.27, CFG.batLow], [0.33, CFG.batDef], [0.42, CFG.batDef], [0.48, -0.01], [0.52, -0.01], [0.58, 0.03], [1, 0.03]]; for (let i = 1; i < BATP.length; i++) if (s <= BATP[i][0]) { const [x0, y0] = BATP[i - 1], [x1, y1] = BATP[i]; return y0 + (y1 - y0) * (s - x0) / (x1 - x0); } return 0.03; }
+  function shareOf(g, id) { return id === 'A' ? g.P : 1 - g.P; }
+  // 表示上の国土: 戦線は押す力の差に対して中央付近で1.5倍動く(内部の40%=国土35%)。首都付近では守りが固く動きが鈍る
+  function terrOf(x) {
+    if (x <= 0.4) return 0.03 + (Math.max(0.05, x) - 0.05) / 0.35 * 0.32;
+    if (x >= 0.6) return 1 - terrOf(1 - x);
+    return 0.5 + (x - 0.5) * 1.5;
+  }
+  function territory(g, id) { return terrOf(shareOf(g, id)); }
+  // 資金が初期の25%を下回ると前線から兵が離脱し始め、5%以下で顕著になる(1週あたりの離脱率)
+  function desertRate(c) {
+    const f = c.initFunds > 0 ? c.funds / c.initFunds : 1;
+    if (f >= CFG.desertStart) return 0;
+    if (f >= CFG.desertHeavy) return CFG.desertMid * (CFG.desertStart - f) / (CFG.desertStart - CFG.desertHeavy);
+    return CFG.desertMid + (CFG.desertMax - CFG.desertMid) * (CFG.desertHeavy - f) / CFG.desertHeavy;
+  }
+  // 崩壊の危険(表示用): 首都陥落と降伏の条件にどれだけ近いかを2段階で返す
+  function collapseRisk(g, c) {
+    const t = terrOf(shareOf(g, c.id)), out = [];
+    let lv = 0;
+    const add = (l, why) => { out.push({ l, why }); if (l > lv) lv = l; };
+    if (c.surT > 0) add(2, '降伏を検討中');
+    else if (c.morale < 25 && t < 0.4) add(1, '降伏の恐れ');
+    if (t < CFG.defeatAlert) add(2, '首都が陥落寸前'); else if (t < 0.28) add(1, '首都に迫られている');
+    out.sort((x, y) => y.l - x.l);
+    return { lv, why: out.map(x => x.why), weeks: c.surT > 0 ? Math.max(1, Math.ceil((CFG.surrHold - c.surT) / 3)) : null };
+  }
+  // 時を止めて知らせる(他の知らせと重なった時は順番に出す)
+  function alertModal(g, title, text, stamp) { (g.alertQ || (g.alertQ = [])).push({ kind: 'event', title, text, stamp, pre: false }); }
+  function pressure(g, id) { const a = eff(g.c.A, g), b = eff(g.c.B, g), s = a / (a + b || 1); return id === 'A' ? s : 1 - s; }
+  function transitSum(c) { return c.transit.reduce((s, x) => s + x.n, 0); }
+  function syncSoldiers(c) { c.soldiers = c.reserve + c.front + transitSum(c); }
+  function tl(g, what, why, kind) { g.tl.push({ t: g.t, what, why: why || '', kind: kind || 'state' }); if (g.tl.length > 120) g.tl.shift(); }
+  // 状態の変化を検知して、因果の履歴に残す
+  function milestones(g) {
+    for (const c of [g.c.A, g.c.B]) {
+      const m = c.ms || (c.ms = {});
+      // once: 何度も行き来する項目は、初めての時だけ記録する
+      const flag = (key, on, onText, onWhy, offText, offWhy, once) => {
+        if (on && !m[key]) { m[key] = true; if (!once || !m[key + '_on']) { m[key + '_on'] = true; tl(g, onText, onWhy); } }
+        else if (!on && m[key]) { m[key] = false; if (offText && (!once || !m[key + '_off'])) { m[key + '_off'] = true; tl(g, offText, offWhy); } }
+      };
+      const ss = selfSuff(g, c), dem = demand(g, c), sh = shareOf(g, c.id);
+      flag('nomorale', c.morale < CFG.peaceLine, c.name + 'の戦意が初めて25を下回った。', c.name + 'は武器を買わなくなった(相場の3割以下なら受け取る)', c.name + 'の戦意が初めて25以上に戻った。', c.name + 'は再び武器を買うようになった', true);
+      if ((c.seenSusp || 0) >= 10) { tl(g, c.name + 'は、敵国の前線で同型の装備が使われていることに気付いた。', '相手国への納品が見えるたびに、' + c.name + 'の疑惑度が上がる(合計 +' + Math.round(c.seenSusp) + ')'); c.seenSusp = 0; }
+      flag('warn', c.susp >= 50, c.name + 'の疑惑度が50を超えた。', c.name + 'は値引きを求めるようになった', c.name + 'の疑惑度が50を下回った。', '値引きの要求が止んだ');
+      flag('stop', c.susp >= 80, c.name + 'の疑惑度が80を超えた。', c.name + 'との取引が止まった(膠着時の破格は例外)', c.name + 'の疑惑度が80を下回った。', c.name + 'との取引が再開できる');
+      flag('noneed', c.noNeed && c.morale >= CFG.peaceLine, c.name + 'の装備が初めて十分に揃った(装備充足率135%超)。', c.name + 'は武器を必要としなくなった(相場の5割以下なら買う)', c.name + 'が初めて再び武器を求め始めた。', '装備の損耗で充足率が115%を下回った', true);
+      flag('finish', sh > 0.65 && c.antiwar > 50 && c.morale >= CFG.peaceLine, c.name + 'が圧倒的優勢のまま、反戦感情が50を超えた。', c.name + 'は早期終結を望み、武器を求めるようになった');
+      flag('food70', c.foodLv < 70, c.name + 'の兵糧が70%を下回った。', '戦意の低下と出動の鈍化が目に見えて強まる', c.name + 'の兵糧が70%以上に戻った。', '兵糧の不足が和らいだ');
+      flag('food', c.foodLv < 90, c.name + 'の兵糧が90%を下回った。', '兵糧の相場が1.3倍になった。戦意と出動の勢いの落ち込みが強まっていく', c.name + 'の兵糧が90%以上に戻った。', '兵糧の不足が和らいだ');
+      flag('sortie', c.sortieRate * 3 < 250 && !c.massing, c.name + 'の出動の勢いが初めて細った(毎週250人未満)。', '予備の不足・戦意の低下・兵糧不足のいずれかが原因。前線の補充が追いつかなくなる', c.name + 'の出動の勢いが初めて回復した。', '前線への補充が再開した', true);
+      flag('mass', c.massing, c.name + 'が首都に兵を集結させ始めた。', '反戦感情が高まり、早く終わらせるための総攻撃の準備');
+    }
+  }
+  function news(g, text, kind) { g.news.unshift({ t: g.t, text, kind: kind || 'info' }); if (g.news.length > 60) g.news.pop(); }
+  function schedule(g, at, fn) { g.sched.push({ at, fn }); }
+
+  // 品目ごとの不足感: 編成で足りない装備ほど高く評価する
+  function crewFill(c) { return c.crew > 0 ? c.soldiers / c.crew : 9; }
+  function itemBonus(c, item) {
+    if (!item) return 0;
+    const it = ITEMS[item];
+    const f = crewFill(c);
+    if (!it.type) {
+      // 傭兵: 充足率110%以下で相場が上がり、120%前後で通常、それ以上は人が余っていて安くなる
+      if (f <= 1.1) return clamp((1.1 - f) * 1.5, 0, 0.6);
+      if (f <= 1.2) return 0;
+      return -clamp((f - 1.2) / 0.3 * 0.25, 0, 0.25);
+    }
+
+    // 装備: 充足率95%を切ると、扱う人がいないため相場が落ちる
+    const lack = f < 0.95 ? -clamp((0.95 - f) * 1.5, 0, 0.5) : 0;
+    return lack;
+  }
+  function fairMult(g, c, item) {
+    if (item === 'food') { let f = foodMult(c); if (c.susp >= 50) f *= 0.8; if (g.t < c.priceModUntil) f *= c.priceMod; return f; }
+    const D = demand(g, c);
+    const wealth = CFG.wWealth * clamp((c.funds - 1000000) / 3000000, 0, 1);
+    let f = CFG.fBase + CFG.fNeed * D + wealth + (c.morale - 50) / 300 + itemBonus(c, item) + pol(c).price;
+    f = CFG.stretchC + (f - CFG.stretchC) + CFG.stretchA * CFG.stretchW * Math.tanh((f - CFG.stretchC) / CFG.stretchW); // 中央(1.1倍)付近ほど動きを大きくする
+    if (c.susp >= 50) f *= 0.8;
+    if (item) f -= buyImpact(c, item); // 司令部が買った量を把握し、同じ品目を続けて買うほどその品目の相場が下がる
+    if (g.t < c.priceModUntil) f *= c.priceMod;
+    return clamp(f, 0.4, 2);
+  }
+  // 需要: 劣勢ほど高く、優勢ほど低い。超優勢かつ反戦感情が高いと「早く終わらせたい」で再び高まる
+  // 需要(危機感): 押されている・相手に武器が届いている(警戒)・損耗が大きいほど高い。最近受け取った分だけ一時的に満たされる
+  // 装備充足率: 司令部が必要と考える装備(開戦時の装備が基準)に対して、いまどれだけ持っているか。必要かどうかの判断に使う
+  function eqTarget(g, c) { return c.initPower * CFG.eqNeed; }
+  function eqSuff(g, c) { return c.power / eqTarget(g, c); }
+  // 危機感(相場の高さ): 押されている・相手国に武器が届いて警戒している・兵の損耗が大きい・早く終わらせたい
+  function needParts(g, c) {
+    const s = shareOf(g, c.id);
+    const losing = clamp((0.6 - s) / 0.25, 0, 1);
+    const alarm = c.threat / 100;
+    const loss = clamp(1 - c.front / (c.initSoldiers * 0.5), 0, 1);
+    const finish = (s > 0.65 && c.antiwar > 50) ? (c.antiwar - 50) / 50 * 0.6 : 0;
+    return { losing, alarm, loss, finish };
+  }
+  // 同じ品目を続けて買うほど、その品目の相場が下がる(1回目:1、2回目:4、3回目:9…の割合)。高い品目ほど影響が大きい
+  const BUYK = { equip: 0.012, merc: 0.0167, food: 0 };
+  function buyImpact(c, item) { const n = c.bought[item] || 0; return BUYK[item] * n * n; }
+  // 需要(相場の高さ)。必要かどうかは装備充足率で別に判断する
+  function demand(g, c) {
+    const p = needParts(g, c);
+    const raw = Math.max(0, CFG.needBase + CFG.wLose * p.losing + CFG.wAlarm * p.alarm + 0.4 * p.loss + p.finish);
+    return 1.25 * Math.tanh(raw / 0.8);
+  }
+
+
+  // 相場の段階表示(兵糧以外)。数値ではなく言葉で示す
+  const PLABEL = [[0.6, '大幅な値崩れ', 0.5], [0.8, '値崩れ', 0.7], [0.9, 'やや安い', 0.85], [1.1, 'ほぼ定価', 1.0], [1.3, '少し高騰', 1.2], [1.5, '高騰', 1.4], [9, '大高騰', 1.6]];
+  function priceBand(m) { for (const b of PLABEL) if (m < b[0]) return { label: b[1], mid: b[2] }; return { label: '大高騰', mid: 1.6 }; }
+  function priceLabel(g, c, item) { return priceBand(estimate(g, c, item)); }
+  function estimate(g, c, item) {
+    if (item === 'food') return fairMult(g, c, item); // 兵糧の相場は備蓄の段階で決まり、正確に分かる
+    return fairMult(g, c, item) * (1 + c.estNoise);
+  }
+
+  // 定価の段階上昇: 80週1.1倍・100週1.2倍・120週1.3倍(実時間4/5/6分)。生産費は元の定価基準のまま
+  // 定価の見直し: 2年目3月・2年目9月・3年目4月。その時点でどちらの国も戦意を失っていなければ0.1倍ずつ上がる
+  const PRICE_CHECKS = [168, 240, 324];
+  function priceStep(g) { return g.pl || 1; }
+  function nextPriceCheck(g) { return PRICE_CHECKS[g.plIdx || 0]; }
+  function listPrice(g, item) { return Math.round(ITEMS[item].price * priceStep(g)); }
+  // 兵糧の自給率: 農業力(市民数と時間で低下)÷兵士数。100%を下回ると外部の兵糧が必要
+  // 兵糧: 農業で賄えない分だけ備蓄(foodLv)が減る。1単位で軍人10万人あたり30%回復
+  function foodRestore(c) { return 30 * CFG.foodRef / Math.max(1, c.soldiers); }
+  function foodPen(c) { return c.foodLv >= 100 ? 0 : Math.min(3, Math.pow((100 - c.foodLv) / 30, 2)); } // 70%で1、なだらかに強まる(上限3)
+  function foodMult(c) { const f = c.foodLv; return f >= 90 ? 1.0 : f >= 70 ? 1.3 : f >= 60 ? 1.8 : 2.0; }
+  function selfSuff(g, c) {
+    const farm = c.farmCap * Math.max(0.2, 1 - CFG.farmDecay * g.t);
+    return c.soldiers > 0 ? farm / c.soldiers : 9;
+  }
+  function shortage(g, c) { return clamp(1 - selfSuff(g, c), 0, 1); }
+  function foodIncome(g, c, mult) { return c.soldiers * shortage(g, c) * CFG.foodRate * priceStep(g) * mult; }
+  function contract(g, cid, mult) { return { ok:false, text:'兵糧は倉庫から販売します。' }; }
+
+
+  function costRate(k) { return CFG.cost[k]; } // 原価(定価に対する割合)
+  function take(g, item) { g.inv[item]--; if (item === 'food') g.foodLots.shift(); }
+  function deliver(g, c, item) {
+    const it = ITEMS[item];
+    const at = g.t + it.lag;
+    c.pipeline.push({ at, item, value: it.price });
+  }
+
+  // 1週間に受け付ける発注の数(調達の処理能力)
+  const SUSM = { equip: 2, merc: 3, food: 1 };
+  // 値引き・無償供与の効き目: 疑惑度と戦意で別々に札を持つ。1回ごとに3週の札が付き、古い札から1枚ずつ消える
+  // 残っている札の数で効き目が決まる(100・50・25・12.5%)。札が3枚ある時に重ねると、3枚の期限を今から3・6・9週に引き直す
+  const DISC_EFF = [1, 0.5, 0.25, 0.125], DISC_CD = 9;
+  function discQ(c, k) { const d = c.disc || (c.disc = { s: [], m: [] }); return d[k]; }
+  function discEff(g, c, k) { const q = discQ(c, k); while (q.length && q[0] <= g.t) q.shift(); return DISC_EFF[Math.min(q.length, 3)]; }
+  function discAdd(g, c, k) { const q = discQ(c, k); while (q.length && q[0] <= g.t) q.shift();
+    if (q.length >= 3) { q.length = 0; q.push(g.t + DISC_CD, g.t + DISC_CD * 2, g.t + DISC_CD * 3); }
+    else q.push(Math.max(q.length ? q[q.length - 1] : g.t, g.t) + DISC_CD); }
+  // 値引き・無償供与の効果を適用する(疑惑度の下げ幅と戦意の上げ幅)。2回目以降で効き目が落ちていれば weak
+  function discApply(g, c, sBase, mBase) {
+    const es = sBase > 0 ? discEff(g, c, 's') : 1, em = mBase > 0 ? discEff(g, c, 'm') : 1;
+    const ds = scaled(sBase, es), dm = scaled(mBase, em);
+    if (sBase > 0) discAdd(g, c, 's'); if (mBase > 0) discAdd(g, c, 'm');
+    // 戦意は満額で疑惑度だけ薄れた時は「少し薄かった」。それ以外で薄れた時は「薄かった」
+    const note = (es < 1 || em < 1) ? (mBase > 0 && em === 1 ? '効果は少し薄かった' : '効果は薄かった') : '';
+    return { ds, dm, weak: !!note, note };
+  }
+  // 売上の内訳: 原価より高く売れた分と、原価以下で渡した分(無償供与を含む)
+  function book(g, c, item, price) {
+    const cost = ITEMS[item].price * costRate(item), a = g.acct || (g.acct = { gainRev: 0, gain: 0, lossRev: 0, loss: 0 });
+    if (price > cost) { a.gainRev += price; a.gain += price - cost; } else { a.lossRev += price; a.loss += cost - price; }
+    const b = c.salesBy || (c.salesBy = { equip: { n: 0, v: 0, free: 0 }, merc: { n: 0, v: 0, free: 0 }, food: { n: 0, v: 0, free: 0 } });
+    b[item].n++; b[item].v += price; if (price <= 0) b[item].free++;
+  }
+  const scaled = (v, e) => Math.ceil(v * e - 1e-9); // 小数点以下は切り上げ
+  const sm = (v, item) => Math.sign(v) * Math.round(Math.abs(v) * SUSM[item]);
+  function sell(g, cid, item, mult) {
+    const c = g.c[cid], it = ITEMS[item];
+    if (g.over) return { ok:false, text:'' };
+    if (g.inv[item] < 1) return { ok:false, tier:'none', text: it.name + 'の在庫がありません。' };
+    mult = Math.round(mult * 100) / 100;
+    if (mult <= 0) {
+      // 無償供与: 疑惑度が大きく下がり、受け取った国の戦意が持ち直す
+      take(g, item); deliver(g, c, item); g.stats.free++; g.supplied[item]++;
+      const da = discApply(g, c, 4 * SUSM[item], 8), d = da.ds, mo = da.dm, en = da.weak ? '。' + da.note + '。' : ''; book(g, c, item, 0);
+      c.susp = clamp(c.susp - d, -100, 100); c.morale = clamp(c.morale + mo, 0, 100); c.antiwar = clamp(c.antiwar - 2, 0, 100);
+      news(g, c.name + 'へ' + it.name + '(' + it.lot + ')を無償供与。疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo + (da.weak ? '。' + da.note : ''), 'sale');
+      tl(g, 'あなたは' + c.name + 'へ' + it.name + 'を無償供与した。' + (da.weak ? da.note + '。' : ''), c.name + 'の疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo, 'act');
+      return { ok:true, tier:'free', text: c.name + 'は無償供与を受け取った。疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo + '、反戦感情 -2' + en };
+    }
+    const price = Math.round(listPrice(g, item) * mult);
+    const ratio = mult / fairMult(g, c, item);
+    const own = shareOf(g, c.id), stalemate = own > 0.38 && own < 0.62;
+    // 大幅な値引きは、通常なら断られる状況でも受け取られる
+    let bypass = '';
+    if (c.susp >= 80) { if (ratio <= 0.4 && stalemate) bypass = '取引停止中だが、膠着した戦況で破格の申し出を受け入れた'; else { g.stats.stop++; return { ok:false, tier:'stop', text: c.name + 'は取引を停止している(疑惑度80以上)。戦況が膠着していれば、相場の4割以下の破格なら受け取る。' }; } }
+    if (c.morale < CFG.peaceLine) { if (ratio <= 0.3) bypass = bypass || '戦う意思を失いかけていたが、破格の支援を受け取った'; else { g.stats.nomorale++; return { ok:false, tier:'nomorale', text: c.name + 'に購入の意思がない(戦意25未満)。相場の3割以下なら受け取る。' }; } }
+    const noNeed = item === 'food' ? c.foodLv >= CFG.foodFull : item === 'equip' ? c.noNeed : false;
+    if (noNeed) { if (ratio <= 0.5) bypass = bypass || '必要としていなかったが、安さにつられて買った'; else { g.stats.noneed++; news(g, c.name + 'は「今は必要ない」と' + it.name + 'の購入を見送った。', 'bad'); return { ok:false, tier:'noneed', text: item === 'food' ? c.name + 'は兵糧が十分にあり(130%以上)、今は必要としていない。相場の5割以下なら買う。' : c.name + 'は装備が十分に揃っており、今は武器を必要としていない。相場の5割以下なら買う。' }; } }
+    if (c.funds < price) { g.stats.nofunds++; return { ok:false, tier:'nofunds', text: c.name + 'は資金が足りない。' }; }
+    let tier, ds, dm = 0, label;
+    // 信頼(マイナスの疑惑度)があると、相場より高い価格も受け入れる。快く買っても信頼は少し消費される
+    // 同じ価格なら、信頼が厚いほど疑惑度の上昇は小さい(逆転しない)
+    const trust = -c.susp;
+    const rich = c.funds >= CFG.richLine;
+    const band = trust >= 40 ? { w: 1.45, r: 1.6, w1: 1, w2: 3, rd: 6 } : trust >= 15 ? { w: 1.3, r: 1.45, w1: 1, w2: 1, rd: 4 } : rich ? { w: 1.2, r: 1.4, w1: 0, w2: 0, rd: 2, rich: true } : { w: CFG.bandW, r: CFG.bandR, w1: 0, w2: 0, rd: 2 };
+    if (ratio > band.r) { tier = 'refuse'; ds = 2; label = '買わない'; }
+    else if (ratio > band.w) { tier = 'reluctant'; ds = band.rd; label = 'しぶしぶ買う'; }
+    else if (ratio > 1.1) { tier = 'willing'; ds = ratio > 1.3 ? band.w2 : band.w1; label = band.rich ? '資金に余裕があり普通に買う' : '信頼から快く買う'; }
+    else if (ratio >= 0.9) { tier = 'normal'; ds = 0; label = '普通に買う'; }
+    else if (ratio >= 0.7) { tier = 'grateful'; ds = -2; label = 'ありがたく買う'; }
+    else if (ratio > 0.4) { tier = 'thanks'; ds = -2; dm = 3; label = '感謝される'; }
+    else { tier = 'debt'; ds = -3; dm = 4; label = '恩義を感じる'; }
+    let weak = false, wnote = '';
+    if (ds < 0) { const da = discApply(g, c, -ds * SUSM[item], dm); ds = -da.ds; dm = da.dm; weak = da.weak; wnote = da.note; } // 値引きの効き目は続けるほど薄れる
+    else ds = sm(ds, item); c.susp = clamp(c.susp + ds, -100, 100); c.morale = clamp(c.morale + dm, 0, 100);
+    const sTxt = (ds === 0 ? '' : '(疑惑度 ' + (ds > 0 ? '+' : '') + ds + (dm ? '、戦意 +' + dm : '') + ')') + (weak ? '。' + wnote : '');
+    if (tier === 'refuse') {
+      g.stats.refuse++;
+      news(g, c.name + 'は' + it.name + 'の購入を拒否した ×' + mult.toFixed(1) + sTxt, 'bad');
+      return { ok:false, tier, text: c.name + ': ' + label + sTxt };
+    }
+    take(g, item); if (item === 'food') g.foodRev += price; g.money += price; g.revenue += price; g.sales++; g.supplied[item]++; c.sold.push({ t: g.t, v: price, k: item }); c.bought[item] += 1; c.lastDeal[item] = { m: mult, t: g.t, tier, label }; // 前回の成約(画面に表示する)
+    c.funds -= price; deliver(g, c, item); book(g, c, item, price);
+    news(g, c.name + 'が' + it.name + '(' + it.lot + ')を' + fmt(price) + 'で購入: ' + label + sTxt, 'sale');
+    if (bypass) tl(g, c.name + 'は' + bypass + '(' + it.name + ' ×' + mult.toFixed(2) + ')。', '大幅な値引きは、断られる状況でも通ることがある', 'act');
+    return { ok:true, tier, text: c.name + ': ' + label + '。' + fmt(price) + 'の売上' + sTxt + (bypass ? '。' + bypass : '') };
+  }
+
+  function covert(g, op, cid, arg) {
+    const o = OPS[op], c = g.c[cid], oc = g.c[other(cid)];
+    if (g.over) return { ok:false, text:'' };
+    if (g.cd[op] > 0) return { ok:false, text: o.name + 'は準備中です(あと' + Math.ceil(g.cd[op] / 3) + '週)。' };
+    if (g.money < o.cost) return { ok:false, text:'資金が足りません。' };
+    g.money -= o.cost; g.opsSpent += o.cost; g.cd[op] = o.cd; g.opsCount[op]++;
+    if (op === 'assassin') {
+      c.morale = clamp(c.morale + 15, 0, 100); c.antiwar = clamp(c.antiwar - 10, 0, 100);
+      c.susp = clamp(c.susp + 30, -100, 100); oc.susp = clamp(oc.susp + (oc.susp <= -15 ? 5 : 10), -100, 100);
+      news(g, c.name + 'の要人が死亡。' + c.name + '国内で' + oc.name + 'への報復を求める声が高まる。', 'op');
+      tl(g, 'あなたは' + c.name + 'で要人暗殺を仕掛けた。', c.name + 'の戦意 +15・反戦感情 -10、疑惑度 ' + c.name + '+30/' + oc.name + '+10', 'act');
+      return { ok:true, text: c.name + 'の戦意 +15、反戦感情 -10。疑惑度 ' + c.name + '+30 / ' + oc.name + '+10' };
+    }
+    if (op === 'rumor') {
+      c.morale = clamp(c.morale + 8, 0, 100);
+      c.susp = clamp(c.susp + 10, -100, 100); oc.susp = clamp(oc.susp + (oc.susp <= -15 ? 1.5 : 3), -100, 100);
+      news(g, c.name + 'の報道に' + oc.name + '軍の非道を伝える記事が相次ぐ。', 'op');
+      tl(g, 'あなたは' + c.name + 'で悪評を流布した。', c.name + 'の戦意 +8、疑惑度 +10', 'act');
+      return { ok:true, text: c.name + 'の戦意 +8。疑惑度 ' + c.name + '+10 / ' + oc.name + '+3' };
+    }
+    if (op === 'consult') {
+      const p = arg === 'pass' ? 'pass' : 'aggr', P = POLICY[p];
+      c.policy = p; c.policyUntil = g.t + 30; c.susp = clamp(c.susp + 5, -100, 100);
+      news(g, c.name + 'の司令部が方針を「' + P.name + '」に切り替えた。', 'op');
+      tl(g, 'あなたは' + c.name + 'に「' + P.name + '」の作戦方針を進言した(10週間)。', p === 'aggr' ? '装備・傭兵の相場が上がり、前線への出動と押す力が増す。反戦感情が上がり戦意は下がっていく' : '装備・傭兵の相場が下がり、出動と押す力が減る(対抗の増援は行う)。反戦感情が下がり戦意は上がっていく', 'act');
+      return { ok:true, text: c.name + 'の方針を10週間「' + P.name + '」に変えた。' + (p === 'aggr' ? '相場+0.15、出動1.8倍、押す力+15%、反戦感情と戦意が徐々に悪化' : '相場-0.1、出動0.5倍、押す力-12%、反戦感情と戦意が徐々に改善') + '。' + c.name + 'の疑惑度 +5' };
+    }
+    if (op === 'loan') {
+      g.money += o.cost; g.opsSpent -= o.cost; g.cd[op] = 0; g.opsCount[op]--;
+      if (g.t < o.unlock) return { ok:false, text:'融資は開戦40週目(1年目11月)から行えます。' };
+      if (g.loans.some(l => l.cid === cid && !l.init)) return { ok:false, text: c.name + 'への融資は1回までです。' };
+      if (c.funds > CFG.loanLimit) return { ok:false, text: c.name + 'は資金に余裕があり、融資を必要としていない(資金30万以下で受け入れ)。' };
+      g.money -= o.cost; g.cd[op] = o.cd; c.funds += o.cost; g.loanOut += o.cost;
+      g.loans.push({ cid, amount: o.cost, t: g.t }); g.opsCount.loan++;
+      news(g, c.name + 'へ' + fmt(o.cost) + 'を融資した。', 'op');
+      tl(g, 'あなたは' + c.name + 'へ50万を融資した。', c.name + 'の資金が増え、武器を買えるようになった', 'act');
+      return { ok:true, text: c.name + 'へ' + fmt(o.cost) + 'を融資。終戦時に利息20%付きで回収(崩壊した場合は回収不能)' };
+    }
+    return { ok:false, text:'' };
+  }
+
+  // ---- events ----
+  // イベントは発生時に対象国を決め、本文と効果を確定する(make)。
+  // 優勢側3種 / 劣勢・削る4種 / 商人3種
+  const lead = g => g.P >= 0.5 ? g.c.A : g.c.B;
+  const lag = g => g.P >= 0.5 ? g.c.B : g.c.A;
+  const soldSince = (c, t0) => c.sold.reduce((s, x) => s + (x.t >= t0 ? x.v : 0), 0);
+  const EVENTS = [
+    // ---- 優勢側がより優勢になる ----
+    { id:1, cat:'lead', pre:false, title:'速報', w:g => 1,
+      make:g => { const c = lead(g); return { text: c.name + 'の戦果が大きく報じられている。' + c.name + 'の戦意 +8',
+        fire:() => { c.morale = clamp(c.morale + 8, 0, 100); } }; } },
+    { id:2, cat:'lead', pre:true, delay:18, title:'事前情報', w:g => 1,
+      make:g => { const c = lead(g); return { text: c.name + 'が約6週後に大規模な突破作戦を行う見込み。発動から8週間、' + c.name + 'の押す力 +25%',
+        fire:() => { c.pushMod = 1.25; c.pushModUntil = g.t + 24; news(g, c.name + 'が突破作戦を開始。8週間、押す力 +25%', 'event'); } }; } },
+    { id:3, cat:'lead', pre:true, delay:24, title:'事前情報', w:g => 1,
+      make:g => { const c = lead(g); return { text: '同盟国が約8週後に' + c.name + 'へ武器を供与する予定。' + c.name + 'の武器戦力 +8%',
+        fire:() => { for (const k in EQ) c.eq[k] *= 1.08; totals(c); news(g, '同盟国の武器が' + c.name + 'に到着。武器戦力 +8%', 'event'); } }; } },
+    // ---- 劣勢側を支える / 強い側を削る ----
+    { id:4, cat:'even', pre:true, delay:30, title:'事前情報', w:g => 1,
+      make:g => { const c = g.c.A.morale >= g.c.B.morale ? g.c.A : g.c.B; return { text: c.name + 'の閣僚が約10週後に辞任する見込み。国内にはまだ出ていない。' + c.name + 'の戦意 -8、反戦感情 +5',
+        fire:() => { c.morale = clamp(c.morale - 8, 0, 100); c.antiwar = clamp(c.antiwar + 5, 0, 100); news(g, c.name + 'の閣僚が辞任。戦意 -8、反戦感情 +5', 'event'); } }; } },
+    { id:5, cat:'even', pre:true, delay:30, title:'事前情報', w:g => 1,
+      make:g => { const c = g.c.A.front / g.c.B.front <= 1 ? g.c.A : g.c.B; return { text: c.name + 'で大規模な徴兵令が準備されている。約10週後に発令。' + c.name + 'の軍人 +15,000、反戦感情 +5',
+        fire:() => { c.reserve += 15000; syncSoldiers(c); c.antiwar = clamp(c.antiwar + 5, 0, 100); news(g, c.name + 'で徴兵令。軍人 +15,000、反戦感情 +5', 'event'); } }; } },
+    { id:7, cat:'even', pre:false, title:'速報', w:g => 1,
+      make:g => { const c = lag(g); return { text: c.name + 'の防衛戦が英雄的に報じられている。' + c.name + 'の戦意 +10',
+        fire:() => { c.morale = clamp(c.morale + 10, 0, 100); } }; } },
+    { id:8, cat:'even', pre:false, title:'速報', w:g => 1,
+      make:g => { const c = g.c.A.power >= g.c.B.power ? g.c.A : g.c.B; return { text: c.name + 'の補給基地で大規模な事故。' + c.name + 'の武器戦力 -5%',
+        fire:() => { for (const k in EQ) c.eq[k] *= 0.95; totals(c); } }; } },
+    // ---- 商人に関わる ----
+    { id:9, cat:'merchant', pre:false, title:'速報', w:g => 1,
+      make:g => { const vA = soldSince(g.c.A, g.t - 60), vB = soldSince(g.c.B, g.t - 60), any = vA + vB > 0;
+        const c = any ? (vA >= vB ? g.c.A : g.c.B) : (g.c.A.funds >= g.c.B.funds ? g.c.A : g.c.B);
+        return { text: '競合の武器商人が' + c.name + 'に参入した(' + (any ? '最近あなたが多く売っている国' : '資金の多い国') + ')。10週間、' + c.name + 'の相場 -20%',
+          fire:() => { c.priceMod = 0.8; c.priceModUntil = g.t + 30; } }; } },
+    { id:10, cat:'merchant', pre:true, delay:39, title:'事前情報', w:g => 1,
+      make:g => { const t0 = g.t; return { text: '国際調査団が約13週後に報告書を公表する。これから13週の間に両国へ販売していると、両国の疑惑度が上がる(販売額の偏りが少ないほど大きく、最大 +25)。',
+        fire:() => { const vA = soldSince(g.c.A, t0), vB = soldSince(g.c.B, t0);
+          if (vA > 0 && vB > 0) { const d = Math.round(10 + 15 * Math.min(vA, vB) / Math.max(vA, vB));
+            for (const c of [g.c.A, g.c.B]) c.susp = clamp(c.susp + d, -100, 100);
+            news(g, '国際調査団の報告書が公表された。両国への販売が指摘され、両国の疑惑度 +' + d, 'event'); }
+          else news(g, '国際調査団の報告書が公表された。あなたへの指摘はなかった。', 'event'); } }; } },
+    { id:11, cat:'merchant', pre:true, delay:39, title:'事前情報', w:g => 1,
+      make:g => ({ text: '第三国が約13週後に停戦の仲介を発表する予定。両国の戦意 -8',
+        fire:() => { g.c.A.morale = clamp(g.c.A.morale - 8, 0, 100); g.c.B.morale = clamp(g.c.B.morale - 8, 0, 100); news(g, '第三国が停戦仲介を発表。両国の戦意 -8', 'event'); } }) },
+  ];
+
+  // イベントの時期と種類は、プレイヤーの操作と無関係な専用の乱数で開戦時に決める(同じシードなら同じ順番・同じ時期)
+  // 対象国は発生時の戦況で決まる(優勢側・劣勢側など)
+  function eventSchedule(seed) {
+    const r = rng(seed * 31 + 7), seq = []; let t = 20, last = null;
+    while (t < CFG.cap) {
+      const pool = EVENTS.filter(e => e.id !== last), e = pool[Math.floor(r() * pool.length)];
+      seq.push({ t, id: e.id }); last = e.id; t += 33 + r() * 10;
+    }
+    return seq;
+  }
+  function pickEvent(g) { const x = g.evSeq[g.evIdx || 0]; g.evIdx = (g.evIdx || 0) + 1; return EVENTS.find(e => e.id === x.id); }
+  function nextEventAt(g) { const x = g.evSeq && g.evSeq[g.evIdx || 0]; return x ? x.t : 1e9; }
+  const PRE_LABEL = { 2: 'の突破作戦', 3: 'へ同盟国の武器供与', 4: 'の閣僚辞任', 5: 'の徴兵令', 10: '国際調査団の報告', 11: '停戦の仲介' };
+  function triggerEvent(g, forced) {
+    const e = forced || pickEvent(g); g.lastEvent = e.id; 
+    const m = e.make(g);
+    if (e.pre) { schedule(g, g.t + e.delay, m.fire); news(g, '[情報] ' + m.text, 'intel'); const who = (m.text.match(/(A国|B国)/) || [''])[0]; g.pending.push({ at: g.t + e.delay, label: (PRE_LABEL[e.id] ? (e.id === 10 || e.id === 11 ? '' : who) + PRE_LABEL[e.id] : '予定') }); }
+    else { m.fire(); news(g, '[速報] ' + m.text, 'event'); }
+    g.modal = { kind:'event', title:e.title, text:m.text, pre:e.pre };
+    g.paused = true;
+  }
+
+  // 介入しなかった場合の戦争(同じ開戦条件で何もしない)
+  function baseline(seed, rnd, sc) {
+    const b = newGame(seed, { random: rnd, scenario: sc }); b.noBase = true; for (const k in b.prodOn) b.prodOn[k] = false;
+    let guard = 0;
+    while (!b.over && guard++ < 6000) { if (b.modal && b.modal.kind !== 'result') { b.modal = null; b.paused = false; } step(b, 0.1); }
+    return { t: b.t, weeks: weekOf(b.t), cas: b.cas.A + b.cas.B, type: b.result ? b.result.type : 'cap' };
+  }
+  function retreat(g) { if (g.over) return; endGame(g, 'retreat', 'あなたは戦場から手を引いた。戦争はまだ続いている。'); }
+  // 緊急発注: 劣勢に追い込まれた国・戦況が急変した国から、期限付きの好条件の依頼が届く
+  function checkOrder(g) {
+    if (g.order || g.orderCount >= 4 || g.t < 30 || g.over) return;
+    for (const id of ['A', 'B']) {
+      const c = g.c[id], s = shareOf(g, id), trusted = c.susp <= -15;
+      if (g.t - g.lastOrderT < (trusted ? 45 : 60)) continue;
+      const past = g.history.length > 30 ? g.history[g.history.length - 31] : null;
+      const sPast = past ? (id === 'A' ? past.share : 1 - past.share) : s;
+      if (!(s < (trusted ? 0.42 : 0.38) || sPast - s > (trusted ? 0.06 : 0.08))) continue;
+      if (c.susp >= 50 || c.morale < CFG.peaceLine) continue;
+      const item = 'equip';
+      const fair = fairMult(g, c, item), qty = 2, mult = Math.max(1.4, Math.ceil(fair * 1.25 * 20) / 20), unit = Math.round(listPrice(g, item) * mult);
+      if (c.funds < unit * qty) continue;
+      g.lastOrderT = g.t; g.orderCount++;
+      g.modal = { kind: 'order', cid: id, item, qty, mult, unit, weeks: 4, fair };
+      g.paused = true;
+      news(g, '[緊急発注] ' + c.name + 'から' + ITEMS[item].name + 'の至急の依頼が届いた。', 'intel');
+      return;
+    }
+  }
+  function answerOrder(g, accept) {
+    const m = g.modal; if (!m || m.kind !== 'order') return;
+    g.modal = null; g.paused = false;
+    if (!accept) { news(g, g.c[m.cid].name + 'の緊急発注を見送った。', 'info'); return; }
+    g.order = { cid: m.cid, item: m.item, left: m.qty, qty: m.qty, mult: m.mult, deadline: g.t + m.weeks * 3 };
+    news(g, g.c[m.cid].name + 'の緊急発注を引き受けた(' + m.weeks + '週以内に' + ITEMS[m.item].name + '×' + m.qty + ')。', 'sale');
+  }
+  function processOrder(g) {
+    const o = g.order; if (!o) return;
+    const c = g.c[o.cid], it = ITEMS[o.item];
+    while (o.left > 0 && g.inv[o.item] > 0) {
+      const price = Math.round(listPrice(g, o.item) * o.mult);
+      if (c.funds < price) break;
+      take(g, o.item); g.money += price; g.revenue += price; g.sales++; g.supplied[o.item]++; c.sold.push({ t: g.t, v: price, k: o.item, order: true });
+      c.funds -= price; deliver(g, c, o.item); c.susp = clamp(c.susp - 2, -100, 100); o.left--;
+      news(g, c.name + 'へ緊急発注の' + it.name + 'を' + fmt(price) + 'で納品(残り' + o.left + ')。', 'sale');
+    }
+    if (o.left <= 0) { c.susp = clamp(c.susp - 8, -100, 100); c.morale = clamp(c.morale + 3, 0, 100); news(g, c.name + 'の緊急発注をすべて納品した。疑惑度 -8、戦意 +3', 'sale'); tl(g, c.name + 'の緊急発注を期限内に納品した。', '必要な時に届けたことで、疑惑度 -8・戦意 +3', 'act'); g.order = null; return; }
+    if (g.t > o.deadline) { c.susp = clamp(c.susp + 10, -100, 100); news(g, c.name + 'への緊急発注は期限切れ。約束を破られたと受け取られた。疑惑度 +10', 'bad'); g.order = null; }
+  }
+
+  function endGame(g, type, text, loser) {
+    g.over = true; g.paused = true;
+    tl(g, text, type === 'peace' ? '両国の戦意が25未満のまま約6週続いた' : type === 'cap' ? '期限に達した' : type === 'retreat' ? 'あなたが撤退した' : (g.endWhy || '戦意20未満・国土35%未満のまま約12週が過ぎた'), 'end');
+    let repaid = 0, lost = 0;
+    for (const l of g.loans) { if ((type === 'collapse' && l.cid === loser) || type === 'retreat') lost += l.amount; else repaid += l.amount * (1 + (l.rate != null ? l.rate : CFG.loanInterest)); }
+    g.order = null;
+    g.money += repaid;
+    const fin = {}; for (const c of [g.c.A, g.c.B]) fin[c.id] = { terr: terrOf(shareOf(g, c.id)), morale: c.morale, antiwar: c.antiwar, front: c.front, reserve: c.reserve, eq: eqSuff(g, c), food: c.foodLv, funds: c.funds, susp: c.susp, sales: c.salesBy || null };
+    g.result = { loser: loser || null, scName: (SCENARIOS[g.scenario] || {}).name || '', random: g.random, weeksLeft: Math.max(0, Math.round((CFG.cap - g.t) / 3)), final: fin, acct: Object.assign({ gainRev: 0, gain: 0, lossRev: 0, loss: 0 }, g.acct || {}), type, text, t: g.t, profit: g.money - CFG.startMoney, money: g.money, revenue: g.revenue, spent: g.spent, opsSpent: g.opsSpent, sales: g.sales, foodRev: g.foodRev, loanOut: g.loanOut, loanRepaid: repaid, loanLost: lost,
+      leftover: Object.keys(g.inv).reduce((s, k) => s + g.inv[k] * ITEMS[k].price, 0), wasted: Object.keys(g.inv).reduce((s, k) => s + g.inv[k] * ITEMS[k].price * costRate(k), 0), stats: Object.assign({}, g.stats), timeline: g.tl.slice(), weeks: weekOf(g.t), cas: g.cas.A + g.cas.B, supplied: Object.assign({}, g.supplied), opsCount: Object.assign({}, g.opsCount), base: g.noBase ? null : baseline(g.seed, g.random, g.scenario) };
+    news(g, text, 'end');
+    g.modal = { kind:'result' };
+  }
+
+  // ---- 司令部: 遅れて届く前線の情報を見て、大量投入・対抗・総攻撃を判断する ----
+  function sendWave(g, c, n, kind) {
+    n = Math.floor(Math.min(n, c.reserve)); if (n < 3000) return false;
+    c.reserve -= n; c.transit.push({ n, at: g.t + CFG.transitTime, t0: g.t, wave: kind, seen: {} });
+    return true;
+  }
+  function commander(g) {
+    const lag = g.fhist.length > 6 ? g.fhist[g.fhist.length - 7] : null; // 約2週前の観測
+    for (const c of [g.c.A, g.c.B]) {
+      const e = g.c[other(c.id)];
+      // 総攻撃の発動
+      if (c.massing && g.t >= c.massUntil) {
+        c.massing = false;
+        const n = c.reserve * 0.8;
+        if (sendWave(g, c, n, 'offensive')) { c.morale = clamp(c.morale + 5, 0, 100); news(g, c.name + 'が総攻撃を開始した。約' + fmt(Math.round(n / 1000) * 1000) + '人が前線へ向かっている。', 'event'); tl(g, c.name + 'が総攻撃を開始した(約' + fmt(Math.round(n / 1000) * 1000) + '人)。', '集結させた予備の8割を一斉に投入'); }
+        c.cool = g.t + 30; continue;
+      }
+      if (c.massing || g.t < c.cool || !lag) continue;
+      const obsE = lag[e.id] + e.transit.filter(x => g.t - x.t0 >= 3).reduce((a, x) => a + x.n, 0);
+      const own = c.front + transitSum(c);
+      const ratio = own / Math.max(1, obsE);
+      // 1. 数で大きく劣ったら、まとめて補充する
+      if (c.policy !== 'pass' && ratio < (c.policy === 'aggr' ? 0.85 : 0.7) && c.reserve > 8000) {
+        const n = Math.min(c.reserve * 0.7, obsE * 0.95 - own);
+        if (n >= 6000 && sendWave(g, c, n, 'surge')) { news(g, '[観測] ' + c.name + 'が前線の劣勢を受け、約' + fmt(Math.round(n / 1000) * 1000) + '人の大規模な増援を送り出した。', 'intel'); tl(g, c.name + 'が大規模な増援を送った(約' + fmt(Math.round(n / 1000) * 1000) + '人)。', '前線の兵数が相手の7割を下回ったため'); c.cool = g.t + 24; continue; }
+      }
+      // 2. 相手の大波を確認したら、遅れて対抗する
+      const big = e.transit.find(x => x.wave && x.n >= 8000 && g.t - x.t0 >= 3 && !x.seen[c.id]);
+      if (big && c.reserve > 8000) {
+        big.seen[c.id] = true;
+        const n = Math.min(c.reserve * 0.6, big.n * 0.6);
+        if (sendWave(g, c, n, 'counter')) { news(g, '[観測] ' + c.name + 'が' + e.name + 'の増援に対抗し、約' + fmt(Math.round(n / 1000) * 1000) + '人を前線へ送った。', 'intel'); tl(g, c.name + 'が対抗の増援を送った(約' + fmt(Math.round(n / 1000) * 1000) + '人)。', e.name + 'の大規模な増援を確認したため'); c.cool = g.t + 18; continue; }
+      }
+      // 3. 予備が厚く、早く終わらせたい国は集結して総攻撃を準備する
+      const sh = shareOf(g, c.id);
+      if (c.policy !== 'pass' && g.t > 90 && c.reserve > c.front * 0.7 && c.antiwar >= 45 && sh >= 0.42 && c.morale >= 35) {
+        c.massing = true; c.massUntil = g.t + 12;
+        news(g, '[情報] ' + c.name + 'が首都に予備兵を集結させている。前線への出動が止まっている。', 'intel');
+      }
+    }
+  }
+
+  function step(g, dt) {
+    if (g.over || g.paused) return;
+    g.t += dt;
+    // production
+    for (const k in ITEMS) {
+      if (k === 'food' ? !(g.foodQueue > 0) : !g.prodOn[k]) continue; // 兵糧は押した回数分だけ作る
+      const it = ITEMS[k];
+      if (g.inv[k] >= CFG.invCap) { g.prodT[k] = 0; continue; } // 倉庫が満杯の品目は生産が止まる
+      g.prodT[k] += dt;
+      if (g.prodT[k] >= it.interval / CFG.prodRate) {
+        const cost = it.price * costRate(k);
+        if (g.money >= cost) { g.money -= cost; g.spent += cost; g.inv[k]++; if (k === 'food') { g.foodLots.push(g.t); g.foodQueue--; } g.prodT[k] -= it.interval / CFG.prodRate; }
+        else g.prodT[k] = it.interval / CFG.prodRate;
+      }
+    }
+    // 兵糧は作ってから3か月で傷み、廃棄される
+    while (g.foodLots.length && g.t - g.foodLots[0] >= CFG.foodLife) { g.foodLots.shift(); g.inv.food--; g.stats.spoiled = (g.stats.spoiled || 0) + 1; g.spoiledCost = (g.spoiledCost || 0) + ITEMS.food.price * costRate('food'); news(g, '倉庫の兵糧1単位が傷み、廃棄した。', 'bad'); }
+    const A = g.c.A, B = g.c.B;
+    // deliveries
+    for (const c of [A, B]) {
+      const oc = g.c[other(c.id)];
+      c.pipeline = c.pipeline.filter(p => {
+        if (p.at > g.t) return true;
+        const it = ITEMS[p.item];
+        if (it.type === 'mix') for (const q in EQ) c.eq[q] += it.power * EQ[q].ideal; c.front += it.soldiers; syncSoldiers(c); totals(c); c.lastArrival = g.t;
+        if (p.item === 'food') c.foodLv = Math.min(CFG.foodMax, c.foodLv + foodRestore(c)); else c.morale = clamp(c.morale + p.value / 40000, 0, 100); const sAdd = CFG.seeSusp * SUSM[p.item]; oc.susp = clamp(oc.susp + sAdd, -100, 100); oc.seenSusp = (oc.seenSusp || 0) + sAdd; // 敵国に届いた装備は、こちらの国にも見える
+        c.recv.push({ t: g.t, v: p.value }); if (c.recv.length > 40) c.recv.shift();
+        c.threat = clamp(c.threat - p.value / CFG.threatK * CFG.threatSelf, 0, 100); // 自国に届くと警戒が和らぐ
+        if (p.item !== 'food') schedule(g, g.t + CFG.threatLag, () => { oc.threat = clamp(oc.threat + p.value / CFG.threatK, 0, 100); }); // 兵糧は相手を警戒させない
+        
+        return false;
+      });
+    }
+    // scheduled
+    const due = g.sched.filter(s => s.at <= g.t); g.sched = g.sched.filter(s => s.at > g.t);
+    due.forEach(s => s.fn());
+    // combat
+    // 出動: 後方の予備から前線へ。勢いは予備の数・戦意・兵糧で決まる
+    for (const c of [A, B]) {
+      c.sortieRate = c.massing ? 0 : pol(c).sortie * c.reserve * CFG.sortieBase * (0.3 + c.morale / 100) * foodFactor(g, c);
+      c._sacc = (c._sacc || 0) + c.sortieRate * dt;
+      if (c._sacc >= 1 && g.t - (c._lastSortie || 0) >= 0.5) { c._lastSortie = g.t;
+        const n = Math.min(c.reserve, c._sacc); c._sacc = 0;
+        if (n > 0) { c.reserve -= n; c.transit.push({ n, at: g.t + CFG.transitTime, t0: g.t }); }
+      }
+      c.transit = c.transit.filter(x => { if (x.at <= g.t) { c.front += x.n; return false; } return true; });
+      syncSoldiers(c);
+    }
+    for (const c of [A, B]) {
+      // 相場感の誤差は、数週ごとに新しい目標へゆっくり移る(急に跳ねない)
+      if (g.t - c.estAt >= CFG.estEvery) { c.estTarget = g.r() * 0.24 - 0.12; c.estAt = g.t; }
+      c.estNoise += (c.estTarget - c.estNoise) * (1 - Math.exp(-dt / CFG.estTau));
+      // 最近の購入数は時間とともに薄れる
+      for (const k in c.bought) c.bought[k] *= Math.exp(-dt / CFG.boughtTau);
+      { const q = eqSuff(g, c); if (c.noNeed ? q < CFG.suffOff : q > CFG.suffOn) c.noNeed = !c.noNeed; } // 装備が十分なら、相場に関係なく「武器は不要」。判定に幅を持たせ、細かな切り替わりを防ぐ
+      // 装備の自然な劣化(保管・整備による目減り)
+      for (const k in EQ) c.eq[k] *= 1 - CFG.eqDecay * dt;
+      totals(c);
+      // 資金不足による前線からの離脱
+      const dr = desertRate(c), lv = dr <= 0 ? 0 : (c.funds / c.initFunds < CFG.desertHeavy ? 2 : 1);
+      if (dr > 0 && c.front > 0) { const n = Math.min(c.front, c.front * dr / 3 * dt); c.front -= n; c.deserted += n; syncSoldiers(c); }
+      if (lv > c.desertLv) {
+        if (lv === 1) { news(g, c.name + 'は資金が乏しく、給与の遅配で前線から兵が離れ始めた。', 'bad'); tl(g, c.name + 'の前線で兵の離脱が始まった。', '資金が初期の25%を下回った。予備から送っても、届くまでの間は前線が薄くなる'); }
+        else { news(g, c.name + 'の資金が底をつき、前線から兵が大量に離脱している。', 'bad'); tl(g, c.name + 'の前線で兵の離脱が深刻になった。', '資金が初期の5%を下回った'); }
+      }
+      c.desertLv = lv;
+    }
+    const eA = eff(A, g), eB = eff(B, g); A.push = eA; B.push = eB;
+    const pA = eA / (eA + eB || 1);
+    { const d = (pA - 0.5) * 2; g.P = clamp(g.P + CFG.frontSpeed * d * (1 + 2.5 * Math.abs(d)) * dt, 0.05, 0.95); }
+    const sA = g.P;
+    const losses = {};
+    for (const [c, eo, s] of [[A, eB, sA], [B, eA, 1 - sA]]) {
+      const ls = Math.min(c.front, CFG.lossS * eo * dt);
+      if (c.power > 0) { const base = CFG.lossP * eo * dt / c.power;
+        for (const k in EQ) c.eq[k] = Math.max(0, c.eq[k] - c.eq[k] * base * EQ[k].wear); }
+      c.front -= ls; syncSoldiers(c); totals(c); g.cas[c.id] += ls;
+      losses[c.id] = { ls, s };
+    }
+    const vol = g.t < 180 ? 1 : 1 + (g.t - 180) / 60 * 1.5;
+    for (const c of [A, B]) {
+      const { ls, s } = losses[c.id];
+      // economy
+      const tm = g.t < c.taxModUntil ? c.taxMod : 1;
+      if (c.policy !== 'normal') {
+        c.antiwar = clamp(c.antiwar + pol(c).anti * dt, 0, 100); c.morale = clamp(c.morale + pol(c).morale * dt, 0, 100);
+        if (g.t >= c.policyUntil) { news(g, c.name + 'の司令部は方針を「保守」に戻した。', 'info'); tl(g, c.name + 'の方針が「保守」に戻った。', '戦闘コンサルの効果が切れた'); c.policy = 'normal'; }
+      }
+      c.funds += (c.taxBase * tm - c.soldiers * CFG.upkeep) * dt;
+      if (c.funds < 0) c.funds = 0;
+      const rec = c.recruitBase * (1 - c.antiwar / 100) * dt;
+      c.reserve += rec; syncSoldiers(c);
+      // morale
+      const bat = batMorale(s);
+      c.morale = clamp(c.morale + ((-0.06 - (c.antiwar - 30) * 0.004 + bat) * vol + (c.morale > 70 ? -(c.morale - 70) * 0.01 : 0)) * dt, 0, 100);
+      // 兵糧
+      // 兵糧の備蓄: 自給できない分だけ減り、自給できていれば100%までゆっくり戻る
+      { const ss = selfSuff(g, c), d = (ss - 1) * CFG.foodDrain * 100 * dt;
+        if (d < 0) c.foodLv = Math.max(0, c.foodLv + d); else if (c.foodLv < 100) c.foodLv = Math.min(100, c.foodLv + d); }
+      { const p = foodPen(c); if (p > 0) { g.stats.foodNeglect += dt; c.morale = clamp(c.morale - CFG.foodMor * p * dt, 0, 100); c.antiwar = clamp(c.antiwar + CFG.foodAnti * p * dt, 0, 100); } }
+      const lossFrac = c.front > 0 ? ls / Math.max(c.front, 20000) / dt * 0.5 : 0;
+      c.antiwar = clamp(c.antiwar + (0.03 + lossFrac * 20) * dt, 0, 100);
+      c.threat = clamp(c.threat - CFG.threatDecay * dt, 0, 100);
+      const busy = 1 + Math.max(0, 0.5 - s) * 6; c.susp = c.susp > 0 ? Math.max(0, c.susp - 0.1 * busy * dt) : Math.min(0, c.susp + 0.1 * dt);
+    }
+    for (const k in g.cd) g.cd[k] = Math.max(0, g.cd[k] - dt);
+    g.stats.maxSusp = Math.max(g.stats.maxSusp, A.susp, B.susp);
+    if ((g.plIdx || 0) < PRICE_CHECKS.length && g.t >= PRICE_CHECKS[g.plIdx || 0]) {
+      g.plIdx = (g.plIdx || 0) + 1;
+      const broken = [A, B].filter(c => c.morale < CFG.peaceLine);
+      if (broken.length) {
+        news(g, '[相場] ' + broken.map(c => c.name).join('・') + 'が戦意を失っており、装備の需要は伸びなかった。定価は据え置き(×' + priceStep(g).toFixed(1) + ')。', 'info');
+        tl(g, '定価の見直しで、定価は据え置かれた(×' + priceStep(g).toFixed(1) + ')。', broken.map(c => c.name).join('・') + 'の戦意が25を下回っていたため');
+      } else {
+        g.pl = Math.round((priceStep(g) + 0.1) * 10) / 10;
+        const ps = g.pl, n = weekOf(g.t), yr = Math.floor(n / 48) + 1, mo = Math.floor(n / 4) % 12 + 1;
+        const txt = { 1.1: '戦争は' + yr + '年目の' + mo + '月を迎え、長期化の様相を見せている。両国の消耗が進み、装備の需要が高まっている。定価が元の1.1倍に上昇した。',
+          1.2: '開戦から' + yr + '年目の' + mo + '月。各地の工場は前線の消耗に追いつかず、装備はどこでも品薄だ。定価が元の1.2倍に上昇した。',
+          1.3: '戦争は泥沼と化している。装備の調達は奪い合いの様相を呈し、相場は高騰を続けている。定価が元の1.3倍に上昇した。' }[ps];
+        news(g, '[相場] ' + txt, 'event'); tl(g, '装備の定価が元の' + ps.toFixed(1) + '倍に上昇した。', '両国とも戦意を保ったまま戦争が長期化し、需要が高まったため(生産費は据え置き)');
+        g.pendingModal = { kind: 'event', title: '相場の変動', text: txt + '生産費は据え置きのため、ここからの販売は利幅が大きくなる。', pre: false };
+      }
+    }
+    if (g.pendingModal && !g.modal) { g.modal = g.pendingModal; g.pendingModal = null; g.paused = true; }
+    // history (1/s)
+    if (Math.floor(g.t) !== Math.floor(g.t - dt)) { g.fhist.push({ A: A.front, B: B.front }); milestones(g); }
+    if (g.t >= g.nextCmd) { g.nextCmd = g.t + 5.3; commander(g); } // 判断の間隔は週の区切りと揃えない
+    if (Math.floor(g.t) !== Math.floor(g.t - dt)) g.history.push({ t: Math.floor(g.t), share: sA, terr: terrOf(sA), mA: A.morale, mB: B.morale, money: g.money });
+    // end checks
+    for (const c of [A, B]) {
+      const s = c.id === 'A' ? sA : 1 - sA;
+      if (s < CFG.capitalLine) {
+        const w = g.c[other(c.id)];
+        g.endWhy = c.name + 'は国土の大半を失い、首都が陥落した';
+        return endGame(g, 'collapse', c.name + 'の戦線が崩壊。' + w.name + 'の勝利で戦争は終結した。', c.id);
+      }
+    }
+    for (const c of [A, B]) {
+      const own = shareOf(g, c.id);
+      // 戦線の後退を知らせる
+      const lv = own < 0.2 ? 3 : own < 0.28 ? 2 : own < 0.36 ? 1 : 0;
+      if (lv > c.warned) { c.warned = lv; news(g, ['', c.name + 'の戦線が後退している。', c.name + 'は国土の大半を失いつつある。首都が近い。', c.name + 'の首都まで敵が迫っている。崩壊は目前だ。'][lv], 'bad'); }
+      if (lv < c.warned - 1) c.warned = lv;
+      // 敗北の危機: 国土20%を下回ったら時を止めて知らせる(23%を上回るまで再び知らせない)
+      const tr = terrOf(own);
+      if (tr < CFG.defeatAlert && !c.defeatAlert) { c.defeatAlert = true; alertModal(g, '敗北の危機', 'これ以上戦線を押し込まれると、' + c.name + 'は敗北してしまう。', '警告'); tl(g, c.name + 'の国土が20%を下回った。', 'これ以上押し込まれると首都が陥落し、戦争は終わる', 'bad'); }
+      else if (tr > CFG.defeatAlert + 0.03) c.defeatAlert = false;
+      // 戦意が尽き、劣勢の国は降伏する(条件が約12週続くと降伏。途切れると数え直し)
+      if (c.morale < CFG.surrMorale && tr < CFG.surrenderLine) {
+        if (c.surT === 0 && !(g.t - (c.surAlertT == null ? -1e9 : c.surAlertT) < 12)) { c.surAlertT = g.t; alertModal(g, '降伏の兆し', '戦意が低く、国土も奪われ続け、' + c.name + 'は降伏を考え始めた。', '警告'); tl(g, c.name + 'が降伏を考え始めた。', '戦意20未満・国土35%未満。この状態が約12週続くと降伏する', 'bad'); }
+        c.surT += dt; if (c.surT >= CFG.surrHold) return endGame(g, 'collapse', c.name + 'は戦う意思を失い、降伏した。' + g.c[other(c.id)].name + 'の勝利で戦争は終結した。', c.id); }
+      else c.surT = 0;
+    }
+    if (A.morale < CFG.peaceLine && B.morale < CFG.peaceLine) {
+      if (g.peaceT === 0 && !(g.t - (g.peaceAlertT == null ? -1e9 : g.peaceAlertT) < 12)) { g.peaceAlertT = g.t; alertModal(g, '講和の動き', '両国の戦意が尽きて、上層部が講和に乗り出そうとしている。', '警告'); tl(g, '両国の上層部が講和に動き始めた。', '両国の戦意25未満。この状態が約6週続くと講和が成立する', 'bad'); }
+      g.peaceT += dt;
+      if (g.peaceT >= CFG.peaceHold) return endGame(g, 'peace', '両国の戦意が尽き、講和が成立した。');
+    } else g.peaceT = 0;
+    if (g.t >= CFG.cap - CFG.capWarn && !g.capWarned) { g.capWarned = true; alertModal(g, '強制講和の予告', '12週後に国際機関が乗り出し、戦争は強制的に講和となる。', '予告'); }
+    if (g.alertQ && g.alertQ.length && !g.modal) { g.modal = g.alertQ.shift(); g.paused = true; }
+    if (g.t >= CFG.cap) return endGame(g, 'cap', '3年目12月、国際社会の圧力により強制的に講和が結ばれた。');
+    // events
+    processOrder(g);
+    if (Math.floor(g.t) !== Math.floor(g.t - dt)) checkOrder(g);
+    if (!g.modal && g.t >= nextEventAt(g)) triggerEvent(g);
+  }
+
+  // 暦: 3秒=1週、4週=1か月、12か月=1年(48週)
+  function weekOf(t) { return Math.floor(t / 3); }
+  function dateOf(t) { const n = weekOf(t); return (Math.floor(n / 48) + 1) + '年目 ' + (Math.floor(n / 4) % 12 + 1) + '月' + (n % 4 + 1) + '週'; }
+  function fmt(n) { return Math.round(n).toLocaleString('ja-JP'); }
+
+  root.BothSides = { discEff, alertModal, collapseRisk, priceBand, priceLabel, foodRestore, foodPen, foodMult, eqSuff, eqTarget, eventSchedule, SCENARIOS, needParts, BASE, terrOf, territory, desertRate, EVENTS, triggerEvent, POLICY, crewFill, SUSM, nextPriceCheck, pressure, transitSum, retreat, answerOrder, baseline, weekOf, dateOf, ITEMS, EQ, comp, itemBonus, priceStep, listPrice, selfSuff, shortage, foodIncome, contract, OPS, CFG, newGame, step, sell, covert, fairMult, demand, estimate, shareOf, eff, fmt, other };
+})(typeof window !== 'undefined' ? window : globalThis);
+
+
+</script>
+<script>
+(function () {
+  const S = window.BothSides, I = S.ITEMS, O = S.OPS, fmt = S.fmt;
+  const $ = id => document.getElementById(id);
+  const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
+  const stage = $('stage');
+  let g, started = false, act = null, dbg = false, scale = 1, rotDismissed = false;
+  const fundRef = c => Math.max(2500000, c.initFunds * 1.8);
+  const SHORT = { equip: '装備一式', merc: '傭兵', food: '兵糧' };
+
+  function short(n) {
+    const a = Math.abs(n), sg = n < 0 ? '-' : '';
+    if (a >= 1e8) return sg + (a / 1e8).toFixed(1) + '億';
+    if (a >= 1e6) return sg + Math.round(a / 1e4) + '万';
+    if (a >= 1e4) return sg + (a / 1e4).toFixed(1) + '万';
+    return sg + Math.round(a);
+  }
+  const weeks = t => Math.ceil(t / 3);
+
+  // ---------- fit ----------
+  function fit() {
+    const vw = window.innerWidth, vh = window.innerHeight;
+    const compact = vh < 560 || vw < 1000;
+    stage.className = compact ? 'compact' : 'full';
+    const W = compact ? 900 : 1280, H = compact ? 420 : 720;
+    scale = Math.min(vw / W, vh / H);
+    stage.style.transform = 'scale(' + scale + ')';
+    stage.style.left = Math.max(0, (vw - W * scale) / 2) + 'px';
+    stage.style.top = Math.max(0, (vh - H * scale) / 2) + 'px';
+    $('rotate').hidden = rotDismissed || !(vh > vw && vw < 700);
+    if (typeof fxResize === 'function') fxResize();
+  }
+  window.addEventListener('resize', fit);
+  $('bRotOk').onclick = () => { rotDismissed = true; fit(); };
+
+  // ---------- build ----------
+  const IC = {
+    sol: '<circle cx="12" cy="7" r="3.5"></circle><path d="M5 21v-3a7 7 0 0 1 14 0v3"></path>',
+    mor: '<path d="M12 3c1 4 5 5 5 10a5 5 0 0 1-10 0c0-3 2-4 2-7 2 1 3 2 3 4"></path>',
+    ant: '<path d="M4 14c3 0 5-2 7-5 1 3 4 5 9 5-3 3-7 5-11 5"></path><path d="M11 9V4"></path>',
+    sus: '<circle cx="10.5" cy="10.5" r="6"></circle><path d="M15 15l5 5"></path>',
+    food: '<path d="M12 21V8M12 8c0-3 2-5 4-5 0 3-2 5-4 5zM12 8c0-3-2-5-4-5 0 3 2 5 4 5zM12 13c0-3 2-5 4-5 0 3-2 5-4 5zM12 13c0-3-2-5-4-5 0 3 2 5 4 5z"></path>',
+    fund: '<rect x="3" y="7" width="18" height="12" rx="2"></rect><path d="M16 13h2M3 10h18"></path>',
+    sell: '<path d="M3 8l9-5 9 5v8l-9 5-9-5z"></path><path d="M3 8l9 5 9-5M12 13v8"></path>',
+    frt: '<path d="M5 21V3"></path><path d="M5 4h12l-3 4 3 4H5"></path>',
+    crw: '<circle cx="9" cy="8" r="3"></circle><path d="M3 20v-2a6 6 0 0 1 12 0v2"></path><circle cx="17" cy="9" r="2.5"></circle><path d="M17 14a5 5 0 0 1 4.5 4.5V20"></path>',
+    sor: '<path d="M4 12h14"></path><path d="M13 6l6 6-6 6"></path>',
+    eqs: '<path d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6z"></path>',
+    ops: '<path d="M2 12s4-7 10-7 10 7 10 7-4 7-10 7S2 12 2 12z"></path><circle cx="12" cy="12" r="3"></circle>',
+  };
+  const ico = (k, stroke) => `<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="${stroke || 'var(--muted)'}" stroke-width="1.8" aria-hidden="true">${IC[k]}</svg>`;
+  function row(id, key, icon, label, det, ticks, em) {
+    const c = (det ? ' det' : '') + (em ? ' em' : '');
+    return `${ico(icon).replace('<svg', '<svg class="' + c + '"')}<span class="lb${c}">${label}</span>
+      <div class="bar${c}" id="${id}${key}B"><i></i>${(ticks || []).map(t => `<span class="tk" style="left:${t}%"></span>`).join('')}</div>
+      <span class="v${c}" id="${id}${key}V"></span>`;
+  }
+  function buildCard(id) {
+    $('c' + id).innerHTML = `
+      <div class="ch"><span class="nm">${id}国</span><div class="flags" id="${id}fl"></div><button class="more" data-more="${id}" aria-label="${id}国の詳細">詳細</button></div>
+      <div class="risk" id="${id}rk" hidden></div>
+      <div class="gg">
+        ${row(id, 'mor', 'mor', '戦意', false, [25], true)}
+        ${row(id, 'ant', 'ant', '反戦', true, [50])}
+        ${row(id, 'frt', 'frt', '前線', false, null, true)}
+        ${row(id, 'res', 'sol', '予備', true)}
+        ${row(id, 'sor', 'sor', '出動', true)}
+        ${row(id, 'crw', 'crw', '充足', false, [31.7, 36.7, 50], true)}
+        ${row(id, 'eqs', 'eqs', '装備', false, [50], true)}
+        ${row(id, 'food', 'food', '兵糧', false, [53.8, 69.2, 76.9], true)}
+        ${row(id, 'fund', 'fund', '資金', false, null, true)}
+        ${row(id, 'sus', 'sus', '疑惑', false, [50, 75, 90], true)}
+      </div>
+      <div class="sub"><span>兵糧1単位 <b id="${id}ct">—</b></span><span>融資 <b id="${id}ln">—</b></span></div>
+      <div class="dbg" id="${id}dbg" hidden></div>
+      <div class="acts">
+        <button data-open="sell" data-c="${id}">${ico('sell', '')}販売</button>
+        <button data-open="ops" data-c="${id}">${ico('ops', '')}暗躍</button>
+      </div>`;
+  }
+  function buildStock() {
+    $('stock').innerHTML = Object.values(I).map(it => it.key === 'food' ? `
+      <div class="slotw"><button class="slot" id="sl_food" data-food="add" title="押した回数だけ兵糧を作る(1回で1単位)。作ってから3か月売れないと廃棄">
+        <span class="sn"><span>${SHORT.food}</span><span class="st" id="ss_food">待機</span></span>
+        <span class="cnt" id="sc_food">×0</span>
+        <span class="pg"><i id="sp_food" style="width:0"></i></span>
+      </button><button class="fcan" data-food="sub" id="fcan" aria-label="兵糧の作成予約を1つ取り消す" hidden>取消</button></div>` : `
+      <button class="slot" id="sl_${it.key}" data-tog="${it.key}" title="${it.name}(${it.sub})・${it.trait}">
+        <span class="sn"><span>${SHORT[it.key]}</span><span class="st" id="ss_${it.key}">生産中</span></span>
+        <span class="cnt" id="sc_${it.key}">×0</span>
+        <span class="pg"><i id="sp_${it.key}" style="width:0"></i></span>
+      </button>`).join('');
+  }
+
+
+  // ---------- render ----------
+  function setBar(id, w, color, left) {
+    const el = $(id), i = el.querySelector('i');
+    i.style.width = Math.max(0, Math.min(100, w)) + '%'; i.style.left = (left || 0) + '%'; i.style.background = color;
+  }
+  function setV(id, text, full, color) { const el = $(id); el.textContent = text; if (full) el.dataset.full = full; else delete el.dataset.full; el.style.color = color || ''; }
+  function loanOf(id) { return g.loans.filter(l => l.cid === id).reduce((s, l) => s + l.amount, 0); }
+  function front(sA) {
+    const x = sA * 1000, t = g ? g.t : 0;
+    const jag = [0, -18, 12, -8, 20, -13, 7, -10, 15, 0];
+    frontArr = jag.map((o, i) => ({ x: x + o * (0.8 + 0.2 * Math.sin(t / 4 + i)), y: i * 500 / 9 }));
+    return frontArr.map(p => p.x.toFixed(1) + ',' + p.y.toFixed(1)).join(' ');
+  }
+
+  function render() {
+    const busy = !started || g.over || !!g.modal || !!act;
+    $('hDate').textContent = S.dateOf(g.t);
+    $('hTrack').style.width = Math.min(100, g.t / S.CFG.cap * 100) + '%';
+    const ps = S.priceStep(g);
+    { const nx = S.nextPriceCheck(g); $('hStep').textContent = '定価 ×' + ps.toFixed(1) + (nx ? '(次の見直し: ' + S.dateOf(nx).replace(/1週$/, '') + ')' : ''); }
+    setV('hMoney', short(g.money), '所持金 ' + fmt(g.money));
+    const p = g.money - S.CFG.startMoney;
+    setV('hProfit', (p >= 0 ? '+' : '') + short(p), '利益 ' + (p >= 0 ? '+' : '') + fmt(p), p >= 0 ? 'var(--good)' : 'var(--bad2)');
+    $('bPause').disabled = busy;
+    $('bRetreat').disabled = busy;
+    $('bPause').setAttribute('aria-label', g.paused && !busy ? '再開' : '一時停止');
+    $('bPause').innerHTML = g.paused && started && !busy
+      ? '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M7 4l13 8-13 8z"></path></svg>'
+      : '<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect></svg>';
+
+    const sA = S.territory(g, 'A'), pts = front(sA);
+    $('front1').setAttribute('points', pts); $('front2').setAttribute('points', pts);
+    $('polyA').setAttribute('points', '0,0 ' + pts + ' 0,500');
+    $('polyB').setAttribute('points', '1000,0 ' + pts + ' 1000,500');
+    $('pill').style.left = (sA * 100) + '%';
+    { const hist = g.history, ref = hist.length > 6 ? hist[hist.length - 7].terr : sA, d = sA - ref;
+      $('pA').textContent = d > 0.004 ? 'A国が押している ▶' : ''; $('pB').textContent = d < -0.004 ? '◀ B国が押している' : '';
+      if (Math.abs(d) <= 0.004) $('pA').textContent = '膠着'; }
+
+    for (const id of ['A', 'B']) {
+      const c = g.c[id], s = S.shareOf(g, id), lc = id === 'A' ? 'var(--a2)' : 'var(--b2)';
+      const tr = S.transitSum(c);
+      setBar(id + 'frtB', c.front / (c.initSoldiers * 0.9) * 100, lc);
+      setV(id + 'frtV', short(c.front), '前線の部隊 ' + fmt(c.front) + '人(移動中 ' + fmt(tr) + '人)');
+      setBar(id + 'resB', c.reserve / (c.initSoldiers * 0.9) * 100, id === 'A' ? 'var(--a3)' : 'var(--b3)');
+      setV(id + 'resV', short(c.reserve), '後方の予備 ' + fmt(c.reserve) + '人');
+      const sw = c.sortieRate * 3;
+      setBar(id + 'sorB', sw / 1200 * 100, sw < 250 ? 'var(--bad)' : 'var(--brass)');
+      { const q = S.eqSuff(g, c), nn = c.noNeed; setBar(id + 'eqsB', Math.min(q, 2) / 2 * 100, nn ? 'var(--muted)' : q < 0.85 ? 'var(--good)' : 'var(--brass)');
+        setV(id + 'eqsV', Math.min(999, Math.round(q * 100)) + '%', '装備充足率 ' + Math.round(q * 100) + '%(開戦時の装備を100%とした保有量。135%を超えると武器を買わなくなり、115%を下回ると再び買う)', nn ? 'var(--muted)' : ''); }
+      { const cf = S.crewFill(c); setBar(id + 'crwB', Math.min(cf, 3) / 3 * 100, cf < 0.95 ? 'var(--bad)' : cf <= 1.1 ? 'var(--warn)' : 'var(--brass)');
+        setV(id + 'crwV', Math.min(999, Math.round(cf * 100)) + '%', '人員充足率 ' + (cf * 100).toFixed(0) + '%(全軍の兵÷装備を扱う必要人数。110%以下で傭兵の相場が上がり、95%を切ると装備の相場が落ちる)', cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : ''); }
+      setV(id + 'sorV', short(sw) + '/週', '出動の勢い 毎週' + fmt(sw) + '人(予備の数・戦意・兵糧で決まる)', sw < 250 ? 'var(--bad2)' : '');
+      setBar(id + 'morB', c.morale, c.morale < 25 ? 'var(--bad)' : 'var(--good)');
+      setV(id + 'morV', c.morale.toFixed(0), null, c.morale < 25 ? 'var(--bad2)' : '');
+      setBar(id + 'antB', c.antiwar, '#b8b3a6');
+      setV(id + 'antV', c.antiwar.toFixed(0));
+      const v = c.susp;
+      setBar(id + 'susB', Math.abs(v) / 2, v >= 80 ? 'var(--bad)' : v >= 50 ? 'var(--warn)' : v < 0 ? 'var(--good)' : 'var(--brass)', v >= 0 ? 50 : 50 + v / 2);
+      setV(id + 'susV', (v > 0 ? '+' : '') + v.toFixed(0), '疑惑度 ' + v.toFixed(1) + '(-100 信頼 〜 100 疑惑/50で値引き要求・80で取引停止)', v >= 50 ? '#e2a764' : v < 0 ? 'var(--good)' : '');
+      const fl0 = c.foodLv, fcol = fl0 < 70 ? 'var(--bad)' : fl0 < 90 ? 'var(--warn)' : fl0 < 100 ? 'var(--brass)' : 'var(--good)';
+      setBar(id + 'foodB', Math.min(fl0, 130) / 130 * 100, fcol);
+      setV(id + 'foodV', Math.round(fl0) + '%', '兵糧 ' + Math.round(fl0) + '%(100%を切ると戦意と出動が落ち始め、70%を下回ると目に見えて弱る。90%未満で高く買う: 90%以上×1.0/70〜90%×1.3/60〜70%×1.8/60%未満×2.0。自給率 ' + Math.round(S.selfSuff(g, c) * 100) + '%)', fl0 < 70 ? 'var(--bad2)' : fl0 < 90 ? '#e2a764' : '');
+      setBar(id + 'fundB', c.funds / fundRef(c) * 100, c.funds < S.CFG.loanLimit ? 'var(--bad)' : 'var(--brass)');
+      setV(id + 'fundV', short(c.funds), '資金 ' + fmt(c.funds), c.funds < S.CFG.loanLimit ? 'var(--bad2)' : '');
+      const dz = { mor: c.morale < 35, sus: c.susp >= 50, food: c.foodLv < 90, fund: c.funds < S.CFG.loanLimit, sor: c.sortieRate * 3 < 250, crw: S.crewFill(c) < 0.95 };
+      let anyD = false;
+      for (const k in dz) { $(id + k + 'B').classList.toggle('danger', dz[k]); $(id + k + 'V').classList.toggle('danger', dz[k]); if (dz[k]) anyD = true; }
+      $('c' + id).classList.toggle('alert', anyD);
+      { const rk = S.collapseRisk(g, c), el = $(id + 'rk');
+        if (rk.lv > 0) {
+          const t = (rk.lv === 2 ? '崩壊の危険' : '崩壊の注意') + ': ' + rk.why.join('・') + (rk.weeks != null ? '(あと約' + rk.weeks + '週で降伏)' : '');
+          if (el.textContent !== t) el.textContent = t;
+          el.className = 'risk lv' + rk.lv; el.hidden = false;
+        } else el.hidden = true; }
+      $(id + 'ct').textContent = '+' + Math.round(S.foodRestore(c)) + '%';
+      const ln = loanOf(id); $(id + 'ln').textContent = ln ? short(ln) : '—';
+      const fl = [], dem = S.demand(g, c);
+      if (c.susp >= 80) fl.push('<span class="flag bad">取引停止</span>'); else if (c.susp >= 50) fl.push('<span class="flag bad">値引き要求</span>');
+      if (c.morale < 25) fl.push('<span class="flag bad">購入意思なし</span>');
+      else if (s > 0.65 && c.antiwar > 50) fl.push('<span class="flag good">早期終結を望む</span>');
+      else if (c.noNeed) fl.push('<span class="flag">武器は不要</span>');
+      if (c.foodLv < 100) fl.push('<span class="flag' + (c.foodLv < 90 ? ' bad' : '') + '">兵糧' + (c.foodLv < 70 ? '欠乏' : c.foodLv < 90 ? '不足・高値' : '不足') + '</span>');
+      if (S.desertRate(c) > 0) fl.push('<span class="flag bad">' + (c.funds < c.initFunds * S.CFG.desertHeavy ? '兵の大量離脱' : '兵の離脱') + '</span>');
+      if (c.funds < S.CFG.loanLimit && g.t >= O.loan.unlock && !g.loans.some(l => l.cid === id)) fl.push('<span class="flag">融資可</span>');
+      if (c.susp <= -40) fl.push('<span class="flag good">厚い信頼</span>'); else if (c.susp <= -15) fl.push('<span class="flag good">信頼</span>'); else if (c.funds >= S.CFG.richLine) fl.push('<span class="flag good">資金潤沢</span>');
+      if (c.policy !== 'normal') fl.push('<span class="flag">方針: ' + S.POLICY[c.policy].name + '</span>');
+      if (c.massing) fl.push('<span class="flag bad">首都に集結中</span>');
+      if (c.transit.some(x => x.wave)) fl.push('<span class="flag bad">大規模増援 移動中</span>');
+      $(id + 'fl').innerHTML = fl.slice(0, 4).join('');
+      const db = $(id + 'dbg'); db.hidden = !dbg;
+      if (dbg) db.innerHTML = `<span>需要 <b>${dem.toFixed(2)}</b></span><span>警戒 <b>${c.threat.toFixed(0)}</b></span><span>基本倍率 <b>×${S.fairMult(g, c).toFixed(2)}</b></span><span>押す力の比 <b>${Math.round(S.pressure(g, id) * 100)}%</b></span>`;
+      document.querySelectorAll('[data-open][data-c="' + id + '"]').forEach(b => b.disabled = busy);
+      // shipments
+      const sh = $('ship' + id);
+      const items = c.pipeline.slice().sort((a, b) => a.at - b.at);
+      sh.innerHTML = items.slice(0, 3).map(p => `<span>${SHORT[p.item]} 到着まで${Math.max(1, weeks(p.at - g.t))}週</span>`).join('') + (items.length > 3 ? `<span>ほか${items.length - 3}件</span>` : '');
+
+    }
+    for (const k in I) {
+      $('sc_' + k).textContent = '×' + g.inv[k];
+      const on = k === 'food' ? g.foodQueue > 0 : g.prodOn[k];
+      $('sp_' + k).style.width = on ? Math.min(100, g.prodT[k] / (I[k].interval / S.CFG.prodRate) * 100) + '%' : '0';
+      $('ss_' + k).textContent = k === 'food' ? (g.foodQueue > 0 ? '作成 残り' + g.foodQueue : '押すと1単位作る') : !on ? '停止中' : g.inv[k] >= S.CFG.invCap ? '満杯' : '生産中';
+      $('sl_' + k).classList.toggle('off', !on);
+      if (k === 'food') $('fcan').hidden = !(g.foodQueue > 0);
+    }
+    renderEffects();
+    renderWire();
+  }
+  // 期間付きの効果と予定(画面上部中央)。切れた効果は約2週「終了」と表示する
+  const effMemo = {};
+  function renderEffects() {
+    const wk = t => Math.max(1, Math.ceil(t / 3)), list = [];
+    if (g.order) list.push({ k: 'ord', cls: 'ord', t: '緊急発注: ' + g.c[g.order.cid].name + ' ' + I[g.order.item].name + ' 残り' + g.order.left + '/' + g.order.qty + '・あと' + wk(g.order.deadline - g.t) + '週' });
+    for (const id of ['A', 'B']) {
+      const c = g.c[id];
+      if (c.policy !== 'normal') list.push({ k: id + 'pol', cls: 'pol', t: c.name + ' 方針「' + S.POLICY[c.policy].name + '」 あと' + wk(c.policyUntil - g.t) + '週' });
+      if (g.t < c.priceModUntil) list.push({ k: id + 'pm', cls: 'mod', t: c.name + ' 競合の参入で相場 -20% あと' + wk(c.priceModUntil - g.t) + '週' });
+      if (g.t < c.pushModUntil) list.push({ k: id + 'push', cls: 'mod', t: c.name + ' 突破作戦で押す力 +25% あと' + wk(c.pushModUntil - g.t) + '週' });
+    }
+    for (const p of (g.pending || [])) if (p.at > g.t) list.push({ k: 'pre' + p.at, cls: 'pre', t: '予定: ' + p.label + ' あと' + wk(p.at - g.t) + '週' });
+    // 敗北・降伏・講和の危機は先頭に出し続ける
+    const crit = [];
+    for (const id of ['A', 'B']) {
+      const c = g.c[id];
+      if (S.terrOf(S.shareOf(g, id)) < S.CFG.defeatAlert) crit.push({ k: id + 'def', cls: 'bad', t: c.name + ' 敗北の危機: これ以上押し込まれると敗北' });
+      if (c.surT > 0) crit.push({ k: id + 'sur', cls: 'bad', t: c.name + ' 降伏を検討中 あと' + wk(S.CFG.surrHold - c.surT) + '週' });
+    }
+    if (g.peaceT > 0) crit.push({ k: 'peace', cls: 'bad', t: '講和の動き 成立まで あと' + wk(S.CFG.peaceHold - g.peaceT) + '週' });
+    list.unshift(...crit);
+    const keys = new Set(list.map(x => x.k));
+    for (const k in effMemo) if (!keys.has(k)) { if (!effMemo[k].endT) effMemo[k].endT = g.t; if (g.t - effMemo[k].endT > 6) delete effMemo[k]; }
+    for (const x of list) effMemo[x.k] = { t: x.t, cls: x.cls };
+    const ended = Object.entries(effMemo).filter(([k, v]) => v.endT != null).map(([k, v]) => `<span class="${v.cls} end">${esc(v.t.replace(/ あと\d+週$/, ''))} 終了</span>`);
+    $('effs').innerHTML = list.map(x => `<span class="${x.cls}">${esc(x.t)}</span>`).concat(ended).slice(0, 6).join('');
+  }
+  let wireKey = '';
+  function renderWire() {
+    const key = g.news.length + ':' + (g.news[0] && g.news[0].text);
+    if (key === wireKey) return; wireKey = key;
+    $('wire').innerHTML = g.news.slice(0, 6).map(n => `<li class="${n.kind}"><span class="t">${S.dateOf(n.t)}</span><span class="x" title="${esc(n.text)}">${esc(n.text)}</span></li>`).join('');
+  }
+
+  // ---------- living map (units, convoys, flashes, ripples) ----------
+  const FX = { cv: null, ctx: null, W: 0, H: 0, units: { A: [], B: [] }, flashes: [], ripples: [], prevPipe: { A: [], B: [] }, shareLog: [], lastRipple: -99, clock: 0, lastCas: { A: null, B: null }, killAcc: { A: 0, B: 0 }, arrAcc: { A: 0, B: 0 }, prevTransit: { A: [], B: [] } };
+  const MEN_PER_KILL = 3000, MEN_PER_MARKER = 3000;
+  const RM = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const COL = { A: { main: '#8fb6de', dark: '#3b6a99' }, B: { main: '#e09a88', dark: '#8e3f2f' } };
+  const CAPS = { A: { x: 0.11, y: 0.77 }, B: { x: 0.89, y: 0.77 } };
+  let frontArr = [];
+  function fxResize() {
+    const map = $('map'), cv = $('fx');
+    FX.W = map.offsetWidth; FX.H = map.offsetHeight;
+    const k = (window.devicePixelRatio || 1) * scale;
+    cv.width = Math.round(FX.W * k); cv.height = Math.round(FX.H * k);
+    cv.style.width = FX.W + 'px'; cv.style.height = FX.H + 'px';
+    FX.cv = cv; FX.ctx = cv.getContext('2d'); FX.k = k;
+  }
+  function frontX(yf) {
+    if (!frontArr.length) return FX.W / 2;
+    const yy = yf * 500;
+    for (let i = 1; i < frontArr.length; i++) {
+      const a = frontArr[i - 1], b = frontArr[i];
+      if (yy <= b.y) { const t = (yy - a.y) / ((b.y - a.y) || 1); return (a.x + (b.x - a.x) * t) / 1000 * FX.W; }
+    }
+    return frontArr[frontArr.length - 1].x / 1000 * FX.W;
+  }
+  function slotPos(side, i, kind) {
+    const dir = side === 'A' ? -1 : 1, step = 0.148;
+    let yf, off;
+    if (kind === 'armor') { const row = i % 5, col = Math.floor(i / 5); yf = 0.16 + step / 2 + row * step; off = 40 + col * 22; }
+    else { const row = i % 6, col = Math.floor(i / 6); yf = 0.16 + row * step; off = 16 + col * 18; }
+    return { x: frontX(yf) + dir * off, y: yf * FX.H };
+  }
+  // 前線の戦死: 一定の死傷者ごとに最前列の駒が倒れ、後ろの駒が詰め、増援が後方から加わる
+  function processKills(side) {
+    const cas = g.cas[side];
+    if (FX.lastCas[side] == null) { FX.lastCas[side] = cas; return; }
+    FX.killAcc[side] += cas - FX.lastCas[side]; FX.lastCas[side] = cas;
+    while (FX.killAcc[side] >= MEN_PER_KILL) {
+      FX.killAcc[side] -= MEN_PER_KILL;
+      const front = FX.units[side].filter(u => u.kind === 'inf' && !u.dying);
+      if (!front.length) break;
+      // 最前列(戦線に最も近い駒)から選ぶ
+      front.sort((a, b) => Math.abs(a.x - frontX(a.y / FX.H)) - Math.abs(b.x - frontX(b.y / FX.H)));
+      const pick = front[Math.floor(Math.random() * Math.min(4, front.length))];
+      pick.dying = true; pick.killed = true;
+    }
+  }
+  function syncUnits(side) {
+    const c = g.c[side], list = FX.units[side];
+    const want = { armor: Math.max(0, Math.min(8, Math.round(c.eq.armor / 120000))), inf: Math.max(c.front > 1000 ? 1 : 0, Math.min(20, Math.round(c.front / 4500))) };
+    for (const kind of ['armor', 'inf']) {
+      const alive = list.filter(u => u.kind === kind && !u.dying);
+      const lo = kind === 'inf' && started ? want[kind] - 2 : want[kind], hi = kind === 'inf' && started ? want[kind] + 2 : want[kind];
+      if (alive.length < lo) {
+        for (let n = alive.length; n < lo; n++) {
+          const cp = CAPS[side], yf = 0.16 + Math.random() * 0.74, dir = side === 'A' ? -1 : 1;
+          const sx = kind === 'inf' && started ? frontX(yf) + dir * (110 + Math.random() * 60) : cp.x * FX.W;
+          const sy = kind === 'inf' && started ? yf * FX.H : cp.y * FX.H;
+          list.push({ kind, x: sx, y: sy, a: 0, dying: false, ph: Math.random() * 6.28 });
+        }
+      } else if (alive.length > hi) {
+        for (let n = 0; n < alive.length - hi; n++) alive[alive.length - 1 - n].dying = true;
+      }
+    }
+    // assign slots in order: armor first (behind), then infantry
+    let ia = 0, ii = 0;
+    for (const u of list) {
+      if (u.dying) continue;
+      const p = u.kind === 'armor' ? slotPos(side, ia++, 'armor') : slotPos(side, ii++, 'inf');
+      u.tx = p.x; u.ty = p.y;
+    }
+  }
+  function drawUnit(ctx, u, side, s) {
+    const col = COL[side], w = (u.kind === 'armor' ? 16 : 13) * s, h = (u.kind === 'armor' ? 10 : 8) * s;
+    ctx.globalAlpha = u.a;
+    ctx.fillStyle = 'rgba(20,23,26,.85)'; ctx.strokeStyle = u.killed ? '#d4574b' : col.main; ctx.lineWidth = 1.4;
+    ctx.fillRect(u.x - w / 2, u.y - h / 2, w, h); ctx.strokeRect(u.x - w / 2, u.y - h / 2, w, h);
+    ctx.beginPath();
+    if (u.kind === 'armor') { ctx.ellipse(u.x, u.y, w * 0.32, h * 0.26, 0, 0, Math.PI * 2); }
+    else { ctx.moveTo(u.x - w / 2, u.y - h / 2); ctx.lineTo(u.x + w / 2, u.y + h / 2); ctx.moveTo(u.x + w / 2, u.y - h / 2); ctx.lineTo(u.x - w / 2, u.y + h / 2); }
+    ctx.stroke(); ctx.globalAlpha = 1;
+  }
+  function convoyPoint(side, p) {
+    const lag = I[p.item].lag, prog = Math.max(0, Math.min(1, 1 - (p.at - g.t) / lag));
+    if (p.vy == null) p.vy = 0.2 + Math.random() * 0.65;
+    const cp = CAPS[side], sx = cp.x * FX.W, sy = cp.y * FX.H, ex = frontX(p.vy), ey = p.vy * FX.H;
+    const mx = (sx + ex) / 2, my = Math.max(sy, ey) + 30;
+    const t = prog, x = (1 - t) * (1 - t) * sx + 2 * (1 - t) * t * mx + t * t * ex, y = (1 - t) * (1 - t) * sy + 2 * (1 - t) * t * my + t * t * ey;
+    return { x, y, sx, sy, mx, my, ex, ey, prog };
+  }
+  function drawConvoy(ctx, side, p, s) {
+    const q = convoyPoint(side, p), col = COL[side];
+    ctx.save(); ctx.globalAlpha = 0.35; ctx.strokeStyle = '#c8a14c'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
+    ctx.beginPath(); ctx.moveTo(q.sx, q.sy); ctx.quadraticCurveTo(q.mx, q.my, q.ex, q.ey); ctx.stroke(); ctx.restore();
+    const trail = { equip: [3, 0, 10], merc: [6, 1.6, 5], food: [4, 2.2, 6] }[p.item];
+    for (let n = 0; n < trail[0]; n++) {
+      const back = n * trail[2];
+      const lag = I[p.item].lag, dprog = back / (Math.hypot(q.ex - q.sx, q.ey - q.sy) || 1);
+      const pp = Object.assign({}, p, { at: p.at + dprog * lag });
+      const r = convoyPoint(side, pp); if (r.prog <= 0) continue;
+      ctx.fillStyle = col.main; ctx.strokeStyle = '#14171a'; ctx.lineWidth = 1;
+      if (p.item === 'equip') { const w = 9 * s, h = 6 * s; ctx.fillRect(r.x - w / 2, r.y - h / 2, w, h); ctx.strokeRect(r.x - w / 2, r.y - h / 2, w, h); }
+      else { ctx.beginPath(); ctx.arc(r.x, r.y, trail[1] * s, 0, Math.PI * 2); ctx.fill(); }
+    }
+  }
+  function drawTroops(ctx, side, x, s) {
+    if (x.vy == null) x.vy = 0.18 + Math.random() * 0.7;
+    const prog = Math.max(0, Math.min(1, (g.t - x.t0) / ((x.at - x.t0) || 1)));
+    if (x.k == null) { FX.arrAcc[side] += x.n; x.k = Math.floor(FX.arrAcc[side] / MEN_PER_MARKER); FX.arrAcc[side] -= x.k * MEN_PER_MARKER; }
+    if (!x.k) return;
+    const cp = CAPS[side], sx = cp.x * FX.W, sy = cp.y * FX.H;
+    const aliveInf = FX.units[side].filter(u => u.kind === 'inf' && !u.dying).length;
+    x._pos = [];
+    for (let i = 0; i < x.k; i++) {
+      const end = slotPos(side, aliveInf + i, 'inf');
+      const pr = Math.max(0, prog - i * (x.wave ? 0.012 : 0.04)), px = sx + (end.x - sx) * pr, py = sy + (end.y - sy) * pr;
+      x._pos.push({ x: px, y: py });
+      drawUnit(ctx, { x: px, y: py, kind: 'inf', a: 0.8 }, side, s);
+    }
+  }
+  function detectTroopArrivals(side) {
+    const now = g.c[side].transit, prev = FX.prevTransit[side];
+    for (const x of prev) if (!now.includes(x) && x.k) {
+      for (let i = 0; i < x.k; i++) {
+        const p = (x._pos && x._pos[i]) || slotPos(side, FX.units[side].length, 'inf');
+        FX.units[side].push({ kind: 'inf', x: p.x, y: p.y, a: 0.8, dying: false, ph: Math.random() * 6.28 });
+      }
+    }
+    FX.prevTransit[side] = now.slice();
+  }
+  function detectArrivals(side) {
+    const now = g.c[side].pipeline, prev = FX.prevPipe[side];
+    for (const p of prev) if (!now.includes(p) && p.at <= g.t + 0.2) {
+      const y = (p.vy == null ? 0.5 : p.vy);
+      FX.flashes.push({ side, yf: y, t0: FX.clock, big: p.item === 'equip' || p.item === 'merc' });
+    }
+    FX.prevPipe[side] = now.slice();
+  }
+  function detectPush() {
+    const sA = S.territory(g, 'A');
+    FX.shareLog.push({ t: g.t, s: sA }); while (FX.shareLog.length && FX.shareLog[0].t < g.t - 2) FX.shareLog.shift();
+    const d = sA - FX.shareLog[0].s;
+    if (Math.abs(d) > 0.012 && FX.clock - FX.lastRipple > 1.4) {
+      FX.lastRipple = FX.clock;
+      FX.ripples.push({ side: d > 0 ? 'A' : 'B', yf: 0.25 + Math.random() * 0.55, t0: FX.clock });
+    }
+  }
+  function fxFrame(dt) {
+    if (!FX.ctx || !g) return;
+    FX.clock += dt;
+    const ctx = FX.ctx, s = stage.classList.contains('compact') ? 0.8 : 1;
+    ctx.setTransform(FX.k, 0, 0, FX.k, 0, 0);
+    ctx.clearRect(0, 0, FX.W, FX.H);
+    if (started && !g.over && !g.paused) { detectArrivals('A'); detectArrivals('B'); detectPush(); }
+    else { FX.prevPipe.A = g.c.A.pipeline.slice(); FX.prevPipe.B = g.c.B.pipeline.slice(); }
+    for (const side of ['A', 'B']) {
+      if (started && !g.paused && !g.over) { detectTroopArrivals(side); processKills(side); } else FX.prevTransit[side] = g.c[side].transit.slice();
+      syncUnits(side);
+      const list = FX.units[side], moving = started && !g.paused;
+      for (const u of list) {
+        if (u.dying) { u.a -= dt * (u.killed ? 0.9 : 1.2); u.x += (side === 'A' ? -1 : 1) * dt * (u.killed ? 3 : 6); }
+        else { u.a = Math.min(1, u.a + dt * 1.5); const sp = Math.min(1, dt * 1.8); u.x += (u.tx - u.x) * sp; u.y += (u.ty - u.y) * sp; }
+        const jit = RM || !moving ? 0 : Math.sin(FX.clock * 2 + u.ph) * 1.2;
+        const ox = u.x; u.x += jit; drawUnit(ctx, u, side, s); u.x = ox;
+      }
+      FX.units[side] = list.filter(u => !(u.dying && u.a <= 0));
+      for (const p of g.c[side].pipeline) drawConvoy(ctx, side, p, s);
+      for (const x of g.c[side].transit) drawTroops(ctx, side, x, s);
+      if (g.c[side].massing) {
+        const cp = CAPS[side], n = Math.min(14, Math.round(g.c[side].reserve / 6000));
+        for (let i = 0; i < n; i++) { const r = i % 5, q = Math.floor(i / 5);
+          drawUnit(ctx, { x: cp.x * FX.W + (side === 'A' ? 1 : -1) * (30 + q * 17), y: cp.y * FX.H - 34 + r * 13, kind: 'inf', a: 0.55 + 0.25 * Math.sin(FX.clock * 3 + i) }, side, s * 0.85); }
+      }
+    }
+    FX.flashes = FX.flashes.filter(f => {
+      const age = FX.clock - f.t0, dur = 0.9; if (age > dur) return false;
+      const x = frontX(f.yf), y = f.yf * FX.H, k = age / dur, R = (f.big ? 30 : 20) * s * (0.4 + k);
+      const gr = ctx.createRadialGradient(x, y, 0, x, y, R);
+      gr.addColorStop(0, 'rgba(226,192,125,' + (0.75 * (1 - k)) + ')'); gr.addColorStop(1, 'rgba(226,192,125,0)');
+      ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+      return true;
+    });
+    FX.ripples = FX.ripples.filter(r => {
+      const age = FX.clock - r.t0, dur = RM ? 0.6 : 1.3; if (age > dur) return false;
+      const x = frontX(r.yf), y = r.yf * FX.H, k = age / dur;
+      ctx.strokeStyle = COL[r.side].main; ctx.globalAlpha = 0.7 * (1 - k); ctx.lineWidth = 2;
+      for (const m of [1, 0.6]) { ctx.beginPath(); ctx.arc(x, y, (8 + 42 * k) * m * s, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.globalAlpha = 1; return true;
+    });
+  }
+
+  // ---------- tooltip ----------
+  let tipTimer = null;
+  function showTip(el) {
+    const tip = $('tip'), sr = stage.getBoundingClientRect(), r = el.getBoundingClientRect();
+    tip.textContent = el.dataset.full; tip.hidden = false;
+    let x = (r.left + r.width / 2 - sr.left) / scale, y = (r.top - sr.top) / scale - 6;
+    const w = tip.offsetWidth, W = stage.offsetWidth;
+    x = Math.max(w / 2 + 6, Math.min(W - w / 2 - 6, x)); if (y < tip.offsetHeight + 4) y = (r.bottom - sr.top) / scale + tip.offsetHeight + 8;
+    tip.style.left = x + 'px'; tip.style.top = y + 'px';
+  }
+  stage.addEventListener('pointerover', e => { const el = e.target.closest('[data-full]'); if (el && el.dataset.full && e.pointerType === 'mouse') showTip(el); });
+  stage.addEventListener('pointerout', e => { if (e.target.closest('[data-full]') && e.pointerType === 'mouse') $('tip').hidden = true; });
+  stage.addEventListener('pointerdown', e => {
+    const el = e.target.closest('[data-full]');
+    if (el && el.dataset.full && e.pointerType !== 'mouse') { showTip(el); clearTimeout(tipTimer); tipTimer = setTimeout(() => $('tip').hidden = true, 2200); }
+  });
+
+  // ---------- modal plumbing ----------
+  function showModal(html, cls) { const m = $('mc'); m.className = 'mc' + (cls ? ' ' + cls : ''); m.innerHTML = html; $('modal').hidden = false; $('tip').hidden = true; m.scrollTop = 0; }
+  function hideModal() { $('modal').hidden = true; }
+
+  // ---------- action dossiers ----------
+  function openAct(kind, cid) {
+    if (!started || g.over || g.modal) return;
+    const first = ['equip', 'merc', 'food'].find(k => g.inv[k] > 0);
+    act = { kind, cid, item: first || (act && act.item) || 'equip', m: 1, msg: '', ok: true, log: [], blocked: false };
+    g.paused = true; renderAct(true); render();
+  }
+  function closeAct() {
+    if (!act) return;
+    act = null; hideModal(); g.paused = false; render();
+  }
+  function mbar(pct, color, ticks, left) {
+    return `<div class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%;left:${left || 0}%;background:${color}"></i>${(ticks || []).map(t => `<span class="tk" style="left:${t}%"></span>`).join('')}</div>`;
+  }
+  function mrow(label, pct, color, val, ticks, left, vcolor) { return `<span class="ml">${label}</span>${mbar(pct, color, ticks, left)}<span class="mv"${vcolor ? ` style="color:${vcolor}"` : ''}>${val}</span>`; }
+  function susRow(c) { const v = c.susp; return mrow('疑惑度', Math.abs(v) / 2, v >= 80 ? 'var(--bad)' : v >= 50 ? 'var(--warn)' : v < 0 ? 'var(--good)' : 'var(--brass)', (v > 0 ? '+' : '') + v.toFixed(0), [50, 75, 90], v >= 0 ? 50 : 50 + v / 2, v >= 50 ? '#e2a764' : v < 0 ? 'var(--good)' : ''); }
+  function flagsOf(c) {
+    const fl = [], s = S.shareOf(g, c.id), dem = S.demand(g, c);
+    if (c.susp <= -40) fl.push('<span class="flag good">厚い信頼</span>'); else if (c.susp <= -15) fl.push('<span class="flag good">信頼</span>'); else if (c.funds >= S.CFG.richLine) fl.push('<span class="flag good">資金潤沢</span>');
+    if (c.susp >= 80) fl.push('<span class="flag bad">取引停止</span>'); else if (c.susp >= 50) fl.push('<span class="flag bad">値引き要求</span>');
+    if (c.morale < 25) fl.push('<span class="flag bad">購入意思なし</span>'); else if (s > 0.65 && c.antiwar > 50) fl.push('<span class="flag good">早期終結を望む</span>'); else if (c.noNeed) fl.push('<span class="flag">武器は不要</span>');
+    if (c.foodLv < 100) fl.push('<span class="flag' + (c.foodLv < 90 ? ' bad' : '') + '">兵糧' + (c.foodLv < 70 ? '欠乏' : c.foodLv < 90 ? '不足・高値' : '不足') + '</span>');
+    fl.push('<span class="flag">方針: ' + S.POLICY[c.policy].name + (c.policy !== 'normal' ? '(あと' + Math.ceil((c.policyUntil - g.t) / 3) + '週)' : '') + '</span>');
+    if (c.massing) fl.push('<span class="flag bad">首都に集結中</span>');
+    if (c.transit.some(x => x.wave)) fl.push('<span class="flag bad">大規模増援 移動中</span>');
+    return fl.length ? `<div class="mflags">${fl.join('')}</div>` : '';
+  }
+  function panel(c, kind) {
+    const oc = g.c[S.other(c.id)], s = S.shareOf(g, c.id), ss = S.selfSuff(g, c), lc = c.id === 'A' ? 'var(--a2)' : 'var(--b2)';
+    const morale = mrow('戦意', c.morale, c.morale < 25 ? 'var(--bad)' : 'var(--good)', c.morale.toFixed(0), [25], 0, c.morale < 25 ? 'var(--bad2)' : '');
+    const anti = mrow('反戦感情', c.antiwar, '#b8b3a6', c.antiwar.toFixed(0), [50]);
+    const fund = mrow('資金', c.funds / fundRef(c) * 100, c.funds < S.CFG.loanLimit ? 'var(--bad)' : c.funds >= S.CFG.richLine ? 'var(--good)' : 'var(--brass)', short(c.funds), [S.CFG.loanLimit / fundRef(c) * 100, Math.min(100, S.CFG.richLine / fundRef(c) * 100)], 0, c.funds < S.CFG.loanLimit ? 'var(--bad2)' : '');
+    const tr = S.territory(g, c.id), front = mrow('国土(戦況)', tr * 100, lc, Math.round(tr * 100) + '%', [50, 35, 65]);
+    const food = mrow('兵糧', Math.min(c.foodLv, 130) / 130 * 100, c.foodLv < 70 ? 'var(--bad)' : c.foodLv < 90 ? 'var(--warn)' : 'var(--good)', Math.round(c.foodLv) + '%', [53.8, 69.2, 76.9], 0, c.foodLv < 90 ? 'var(--bad2)' : '');
+    const troops = mrow('前線/予備', c.front / (c.initSoldiers * 0.9) * 100, lc, short(c.front) + '/' + short(c.reserve));
+    const sortie = mrow('出動の勢い', c.sortieRate * 3 / 1200 * 100, c.sortieRate * 3 < 250 ? 'var(--bad)' : 'var(--brass)', short(c.sortieRate * 3) + '/週');
+    const cp = S.comp(c);
+    const comp = `<span class="ml">編成</span><div class="mstk"><i style="width:${c.eq.front / c.power * 100}%;background:var(--${c.id.toLowerCase()}2)"></i><i style="width:${c.eq.ranged / c.power * 100}%;background:var(--${c.id.toLowerCase()})"></i><i style="width:${c.eq.armor / c.power * 100}%;background:var(--${c.id.toLowerCase()}3)"></i></div><span class="mv"${cp < 0.9 ? ' style="color:var(--bad2)"' : ''}>効率${Math.round(cp * 100)}%</span>`;
+    let rows;
+    const cf = S.crewFill(c), crew = mrow('人員充足率', Math.min(cf, 3) / 3 * 100, cf < 0.95 ? 'var(--bad)' : cf <= 1.1 ? 'var(--warn)' : 'var(--brass)', Math.round(cf * 100) + '%', [31.7, 36.7, 50], 0, cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : '');
+    const eqs = mrow('装備充足率', Math.min(S.eqSuff(g, c), 2) / 2 * 100, c.noNeed ? 'var(--muted)' : 'var(--brass)', Math.round(S.eqSuff(g, c) * 100) + '%', [50]);
+    const alert = mrow('警戒', c.threat, c.threat >= 60 ? 'var(--warn)' : '#b8b3a6', c.threat.toFixed(0), [50]);
+    if (kind === 'sell') rows = `<span class="mh">${c.name}の状態(販売の判断材料)</span>${eqs}${food}${front}${fund}${morale}${susRow(c)}${alert}${crew}${troops}${flagsOf(c)}`;
+    else if (kind === 'food') rows = `<span class="mh">${c.name}の状態(兵糧の判断材料)</span>${food}${fund}${morale}${anti}${susRow(c)}${troops}${flagsOf(c)}<span class="mh">${oc.name}(両国と契約すると疑惑度が上がる)</span>${susRow(oc)}<span class="ml">兵糧契約</span><span></span><span class="mv">${oc.contract ? 'あり ×' + oc.contract.mult.toFixed(1) : 'なし'}</span>`;
+    else rows = `<span class="mh">${c.name}の状態(暗躍の判断材料)</span>${morale}${anti}${susRow(c)}${fund}${front}${sortie}${flagsOf(c)}<span class="mh">${oc.name}(暗躍の疑惑は相手国にも波及する)</span>${susRow(oc)}`;
+    return `<div class="mg">${rows}</div>`;
+  }
+  function logHTML() { return act.log.length ? `<div class="stamp">この停止中の行動</div><ul class="mlog">${act.log.slice().reverse().map(l => `<li class="${l.ok ? 'ok' : 'ng'}">${esc(l.text)}</li>`).join('')}</ul>` : ''; }
+  const respHTML = () => `<div class="resp ${act.ok ? 'ok' : 'ng'}">${esc(act.msg)}</div>`;
+
+  function renderAct(focus) {
+    const c = g.c[act.cid], oc = g.c[S.other(act.cid)];
+    let h = '';
+    if (act.kind === 'sell') {
+      const picks = Object.values(I).map(it => {
+        const est = S.estimate(g, c, it.key);
+        return `<button class="pick${act.item === it.key ? ' sel' : ''}" data-pick="${it.key}">
+          <span class="pn"><span>${it.name.replace('一式', '')}</span><span class="num">×${g.inv[it.key]}</span></span>
+          <span class="pl tr">${it.trait}</span>
+          <span class="pl num">定価 ${fmt(S.listPrice(g, it.key))}</span>
+          <span class="pe">${it.key === 'food' ? '相場 ×' + est.toFixed(1) + '(兵糧' + Math.round(c.foodLv) + '%・1単位で+' + Math.round(S.foodRestore(c)) + '%)' : (c.lastDeal[it.key] ? '前回 ×' + c.lastDeal[it.key].m.toFixed(2) + '・' + Math.max(0, Math.round((g.t - c.lastDeal[it.key].t) / 3)) + '週前(' + c.lastDeal[it.key].label + ')' : '前回の取引なし')}${dbg ? '(実際×' + S.fairMult(g, c, it.key).toFixed(2) + ')' : ''}</span></button>`;
+      }).join('');
+      const has = g.inv[act.item] > 0;
+      h = `<div class="stamp">販売 / 時が止まっています ${S.dateOf(g.t)}</div><h2>${c.name}へ売り込む</h2>
+        <div class="picks">${picks}</div>
+        <div class="priceline"><span class="mult" id="mMult"></span><span class="yen" id="mYen"></span></div>
+        <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="価格倍率">
+        <div class="quick">${[[0, '無償供与'], [0.3, '×0.3'], [0.5, '×0.5'], [0.8, '×0.8'], [1, '×1.0'], [1.2, '×1.2'], [1.5, '×1.5'], [1.8, '×1.8'], [2, '×2.0']].map(([m, l]) => `<button class="btn" data-qm="${m}">${l}</button>`).join('')}</div>
+        <div class="foot"><button class="btn" data-do="close">閉じて再開</button><button class="btn primary" data-do="sell" ${has && !act.blocked ? '' : 'disabled'}>${!has ? '在庫なし' : act.blocked ? '価格を変えてください' : (act.m === 0 ? '無償で渡す' : '売り込む')}</button></div>
+        ${respHTML()}${panel(c, 'sell')}${logHTML()}`;
+    } else if (act.kind === 'food') {
+      const ss = S.selfSuff(g, c), sh = S.shortage(g, c);
+      const opts = [[0.8, '安く契約', '疑惑度が少しずつ下がる'], [1, '相場で契約', '疑惑度は変わらない'], [1.3, '高く契約', '疑惑度が少しずつ上がる']];
+      h = `<div class="stamp">兵糧契約 / 時が止まっています ${S.dateOf(g.t)}</div><h2>${c.name}と兵糧を契約する</h2>${panel(c, 'food')}
+        <div class="kv"><span>兵糧自給率 <b>${Math.round(ss * 100)}%</b></span><span>不足分 <b>${Math.round(sh * 100)}%</b></span><span>現在の契約 <b>${c.contract ? '×' + c.contract.mult.toFixed(1) : 'なし'}</b></span><span>${oc.name}との契約 <b>${oc.contract ? 'あり' : 'なし'}</b></span></div>
+        <p style="font-size:12px;color:var(--muted)">契約中は兵糧の不足分を供給し、毎週代金を受け取ります。代金は兵士数と不足分で決まり、${c.name}の資金が尽きると契約は終わります。不足を放置すると戦意が下がり反戦感情が上がります。両国と同時に契約すると、両国の疑惑度が少しずつ上がります。</p>
+        <div class="ctgrid">${opts.map(([m, l, d]) => `<button class="btn" data-ct="${m}" ${sh <= 0 ? 'disabled' : ''}><b>${l}</b><span class="num">毎週 ${fmt(S.foodIncome(g, c, m) * 3)}</span><small>${d}</small></button>`).join('')}</div>
+        ${sh <= 0 ? '<p style="font-size:12px;color:var(--bad2)">現在は自給できているため、契約を必要としていません。</p>' : ''}
+        ${respHTML()}${logHTML()}
+        <div class="foot"><button class="btn" data-ct="cancel" ${c.contract ? '' : 'disabled'}>契約を解除</button><button class="btn" data-do="close">閉じて再開</button></div>`;
+    } else if (act.kind === 'newgame') {
+      h = `<div class="stamp">新しい戦争 / 時が止まっています ${S.dateOf(g.t)}</div><h2>今の戦争を捨てて始めますか</h2>
+        <p>今の戦争は精算されず、記録も残りません。</p>
+        <div class="foot"><button class="btn" data-do="close">続ける</button><button class="btn primary" data-do="newgame">新しい戦争を始める</button></div>`;
+      showModal(h);
+      if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus(); }
+      return;
+    } else if (act.kind === 'retreat') {
+      h = `<div class="stamp">撤退 / 時が止まっています ${S.dateOf(g.t)}</div><h2>ここで手を引きますか</h2>
+        <p>現在の所持金で精算し、試合を終えます。倉庫の在庫は価値を失い、貸し付けた融資は回収できません。戦争はあなた抜きで続きます。</p>
+        <div class="kv"><span>所持金 <b>${fmt(g.money)}</b></span><span>利益 <b>${(g.money - S.CFG.startMoney >= 0 ? '+' : '') + fmt(g.money - S.CFG.startMoney)}</b></span><span>融資残高 <b>${short(loanOf('A') + loanOf('B'))}</b></span></div>
+        <div class="foot"><button class="btn" data-do="close">続ける</button><button class="btn primary" data-do="retreat">精算して撤退</button></div>`;
+      showModal(h);
+      if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus(); }
+      return;
+    } else {
+      const rows = [
+        ['assassin', `${c.name}の戦意 +15・反戦感情 -10/疑惑度 ${c.name}+30・${oc.name}+10`],
+        ['rumor', `${c.name}の戦意 +8/疑惑度 ${c.name}+10・${oc.name}+3`],
+        ['consult', `10週間${c.name}の司令部の方針を変える。疑惑度+5。積極: 相場+0.15・出動1.8倍・押す力+15%、反戦感情が上がり戦意が下がっていく/消極: 相場-0.1・出動0.5倍・押す力-12%(相手の増援への対抗は行う)、反戦感情が下がり戦意が上がっていく/現在: ${S.POLICY[c.policy].name}${c.policy !== 'normal' ? '(あと' + Math.ceil((c.policyUntil - g.t) / 3) + '週)' : ''}`],
+        ['loan', `${c.name}へ50万を貸す/各国1回まで・資金30万以下で受け入れ・1年目11月から/終戦時に利息20%で回収、崩壊したら回収不能`],
+      ].map(([k, d]) => {
+        let why = '';
+        if (g.cd[k] > 0) why = 'あと' + Math.ceil(g.cd[k] / 3) + '週で使える';
+        else if (k === 'loan' && g.t < O.loan.unlock) why = '1年目11月から使える';
+        else if (k === 'loan' && c.funds > S.CFG.loanLimit) why = c.name + 'の資金が30万を超えているため受け入れない';
+        else if (g.money < O[k].cost) why = '所持金が足りない';
+        return `<div class="oprow"><div><div class="on">${O[k].name} <span class="num" style="font-weight:400;color:var(--muted)">${fmt(O[k].cost)}</span></div><div class="od">${d}</div>${why ? `<div class="why">${why}</div>` : ''}</div>
+          ${k === 'consult' ? `<div style="display:grid;gap:4px"><button class="btn" data-op="consult" data-arg="aggr" ${why ? 'disabled' : ''}>積極に</button><button class="btn" data-op="consult" data-arg="pass" ${why ? 'disabled' : ''}>消極に</button></div>` : `<button class="btn" data-op="${k}" ${why ? 'disabled' : ''}>実行</button>`}</div>`;
+      }).join('');
+      h = `<div class="stamp">暗躍 / 時が止まっています ${S.dateOf(g.t)}</div><h2>${c.name}に対して動く</h2>${panel(c, 'ops')}<div>${rows}</div>${respHTML()}${logHTML()}
+        <div class="foot"><button class="btn" data-do="close">閉じて再開</button></div>`;
+    }
+    const keep = focus ? 0 : $('mc').scrollTop;
+    showModal(h, act.cid); $('mc').scrollTop = keep;
+    if (act.kind === 'sell') updatePrice();
+    if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus(); }
+  }
+  function updatePrice() {
+    const mM = $('mMult'), mY = $('mYen'); if (!mM) return;
+    mM.textContent = act.m === 0 ? '無償' : '×' + act.m.toFixed(2);
+    mY.textContent = act.m === 0 ? '0' : fmt(Math.round(S.listPrice(g, act.item) * act.m));
+    const b = $('mc').querySelector('[data-do="sell"]');
+    if (b && g.inv[act.item] > 0) { b.disabled = act.blocked; b.textContent = act.blocked ? '価格を変えてください' : act.m === 0 ? '無償で渡す' : '売り込む'; }
+  }
+
+  // ---------- engine modals ----------
+  function startScreen() {
+    showModal(`<div class="stamp">機密 / 取扱注意</div><h2>BOTH SIDES</h2>
+      <p>あなたは武器と傭兵を扱う商人です。戦争中のA国とB国の両方に売り、稼いだ額がスコアになります。まず、どちらの戦争に関わるかを選んでください。</p>
+      <ul>
+        <li>地図の破線が戦線です。兵は後方の予備から前線へ出動し、前線で消耗します。出動の勢いは予備の数・戦意・兵糧で決まり、押す力の差で戦線がじわじわ動きます。戦線は「これまでの結果」、各国の数値は「これからの予兆」です。</li>
+        <li>各国の司令部は、前線の数の差を見て大規模な増援を送り、相手の増援には遅れて対抗します。反戦感情が高まった国は、首都に兵を集結させて総攻撃を仕掛けます。集結や増援はニュースと札の表示で分かります。</li>
+        <li>各国の札の「販売」「暗躍」を押すと時が止まり、落ち着いて選べます。</li>
+        <li>装備を扱うには兵が必要です(人員充足率=全軍の兵÷必要人数、開戦時150%)。兵は戦闘で減り、徴兵では少ししか補えません。人手が足りなくなると装備を足しても戦力にならず、傭兵が高く売れます。数値は札の上で指を置く(カーソルを乗せる)と正確な値が出ます。</li>
+        <li>装備は戦わなくても少しずつ劣化します。資金が開戦時の25%を下回った国では前線から兵が離れ始め、5%以下で大量に離れます。降伏は、戦意20未満かつ国土35%未満が約12週続いた時です。</li>
+        <li>片方の国に届いた装備は、もう片方の国にも見えます。届くたびに相手国の疑惑度が上がるため(前線0.3・遠距離0.45・戦車0.75・傭兵0.9)、両方に売るほど両方から疑われます。</li>
+        <li>価格は自分で決めます。高すぎれば断られ、安く売れば感謝されて疑惑度が下がります。疑惑度50以上で値引き要求、80以上で取引停止。逆に疑惑度がマイナス(信頼)だと、相場より高くても快く買ってくれます。</li>
+        <li>相場(どれだけ高くても買うか)は、各国の危機感で決まります。押されている・相手国に武器が届いて警戒している(約4週後)・前線の兵が減っている国ほど高く買います。一方、買うかどうかは「装備充足率」で決まります。開戦時の装備を100%として、135%を超えると相場が高くても「武器は不要」になり、損耗で115%を下回ると再び買います。同じ品目を続けて買った国は、その品目の相場がすぐに下がります(続けるほど大きく下がり、高い品目ほど影響が大きい)。下がった相場は数週で戻ります。資金が500万以上ある国は、相場の1.2倍までなら普通に買い、1.4倍までしぶしぶ買います。</li>
+        <li>扱う品は「装備一式」「傭兵」「兵糧」の3つです。装備一式は装備充足率を、傭兵は人員充足率を、兵糧は兵糧を回復します。</li>
+        <li>兵糧は、農業で賄えない分だけ減っていきます。100%を切ると戦意と出動がなだらかに落ち、70%を下回ると目に見えて弱ります。130%未満なら相場どおりに買い(早めに売っておけば不足を防げます)、90%未満の国は高く買います(70〜90%は1.3倍、60〜70%は1.8倍、60%未満は2.0倍)。兵糧1単位で、軍人10万人あたり30%回復します(軍人が多い国ほど回復は少ない)。兵糧は初めは生産停止で、作ってから3か月売れないと傷んで廃棄されます。</li>
+        <li>3秒で1週間が過ぎます。定価は2年目3月・2年目9月・3年目4月に見直され、その時点でどちらの国も戦意を失っていなければ0.1倍ずつ上がります。</li>
+        <li>劣勢に追い込まれた国から、期限付きで高値の緊急発注が届くことがあります。</li>
+        <li>両国の戦意が25未満のまま約6週続くと講和、片方の首都が陥落するか降伏すると終戦。3年目12月で強制講和です。売れ残りは価値がありません。</li>
+        <li>上部の「撤退」で、いつでもその時点の所持金で精算して終えられます。</li>
+      </ul>
+      <div class="scn">${Object.values(S.SCENARIOS).map(sc => `<button class="btn${sc.key === curSc ? ' primary' : ''}" data-scn="${sc.key}"><b>${sc.name}</b><span>${esc(sc.desc)}</span></button>`).join('')}</div>`);
+    $('mc').querySelectorAll('[data-scn]').forEach(b => b.onclick = () => { setupGame(b.dataset.scn); hideModal(); started = true; g.paused = false; render(); });
+    $('mc').querySelector('[data-scn].primary').focus();
+  }
+  function eventModal(m) {
+    showModal(`<div class="stamp">${m.stamp || (m.pre ? '事前情報 / 国内未発表' : '速報')} ${S.dateOf(g.t)}</div><h2>${m.title}</h2><p>${esc(m.text)}</p>
+      <div class="foot"><button class="btn primary" id="mGo">確認して再開</button></div>`);
+    $('mGo').onclick = () => { hideModal(); g.modal = null; g.paused = false; render(); };
+    $('mGo').focus();
+  }
+  function orderModal(m) {
+    const c = g.c[m.cid], it = I[m.item];
+    showModal(`<div class="stamp">緊急発注 / ${S.dateOf(g.t)}</div><h2>${c.name}から至急の依頼</h2>
+      <p>${c.name}が${it.name}(${it.sub})を${m.qty}セット、${m.weeks}週以内に求めています。価格は定価の${m.mult.toFixed(2)}倍です(現在の相場は約${m.fair.toFixed(2)}倍)。</p>
+      <div class="kv"><span>1セット <b>${fmt(m.unit)}</b></span><span>合計 <b>${fmt(m.unit * m.qty)}</b></span><span>現在の在庫 <b>×${g.inv[m.item]}</b></span><span>${c.name}の戦況 <b>${Math.round(S.territory(g, m.cid) * 100)}%</b></span></div>
+      <p style="font-size:12px;color:var(--muted)">引き受けると、在庫ができ次第自動で納品し、1セットごとに代金を受け取ります。納品のたびに疑惑度が少し下がります。すべて期限内に納品すると、疑惑度-8・戦意+3の報酬があります。期限までに揃わなければ、約束を破ったとして疑惑度が10上がります。大口の納品は、相手国にも伝わります。</p>
+      <div class="foot"><button class="btn" id="mNo">見送る</button><button class="btn primary" id="mGo">引き受ける</button></div>`, m.cid);
+    $('mGo').onclick = () => { hideModal(); S.answerOrder(g, true); render(); };
+    $('mNo').onclick = () => { hideModal(); S.answerOrder(g, false); render(); };
+    $('mGo').focus();
+  }
+  function ledgerHTML(r) {
+    const sp = r.supplied, oc = r.opsCount, b = r.base;
+    const parts = [];
+    if (sp.equip) parts.push('装備一式' + sp.equip + '組');
+    if (sp.merc) parts.push('傭兵' + fmt(sp.merc * 10000) + '人');
+    if (sp.food) parts.push('兵糧' + sp.food + '単位');
+    const ops = [['assassin', '要人暗殺'], ['rumor', '悪評の流布'], ['consult', '戦闘コンサル'], ['loan', '融資']].filter(([k]) => oc[k] > 0).map(([k, n]) => n + oc[k] + '件');
+    const cas = Math.round(r.cas / 100) * 100;
+    let rows = `<div><span>供給したもの</span><b>${parts.length ? parts.join('、') : 'なし'}</b></div>
+      <div><span>裏で動いた記録</span><b>${ops.length ? ops.join('、') : 'なし'}</b></div>`;
+    let verdict = '', coda = '';
+    if (r.type === 'retreat') {
+      rows += `<div><span>あなたが関わった期間</span><b>${r.weeks}週</b></div><div><span>その間の推計死傷者</span><b>${fmt(cas)}人</b></div>`;
+      coda = 'あなたが去った後も、戦争は続いている。';
+    } else if (b) {
+      const dw = r.weeks - b.weeks, dc = Math.round((r.cas - b.cas) / 100) * 100;
+      rows += `<div><span>戦争の長さ</span><b>${r.weeks}週(あなたがいなければ 約${b.weeks}週)</b></div>
+        <div><span>推計死傷者</span><b>${fmt(cas)}人(あなたがいなければ 約${fmt(Math.round(b.cas / 100) * 100)}人)</b></div>`;
+      verdict = (dw > 0 ? `あなたの商売で、戦争は${dw}週長引いた。` : dw < 0 ? `あなたの商売で、戦争は${-dw}週早く終わった。` : 'あなたがいてもいなくても、戦争の長さは変わらなかった。')
+        + (dc > 0 ? `死傷者は約${fmt(dc)}人増えた。` : dc < 0 ? `死傷者は約${fmt(-dc)}人少なかった。` : '');
+      coda = dc > 0 ? `その${fmt(dc)}人の名は、あなたの帳簿には載らない。` : '利益は帳簿に残り、死者は数字として残る。';
+    }
+    return `<div class="stamp">戦果と罪状</div><div class="ledger">${rows}${verdict ? `<div class="verdict">${esc(verdict)}</div>` : ''}</div>${coda ? `<div class="coda">${esc(coda)}</div>` : ''}`;
+  }
+  function chart() {
+    const h = g.history; if (h.length < 2) return '';
+    const W = 560, H = 130, T = Math.max(60, h[h.length - 1].t), pad = 24;
+    const x = t => pad + (t / T) * (W - pad * 2), y = v => 8 + (1 - v) * (H - 28);
+    const line = f => h.map(p => x(p.t).toFixed(1) + ',' + y(f(p)).toFixed(1)).join(' ');
+    let ticks = ''; for (let t = 0; t <= T + 0.1; t += 144) ticks += `<text x="${x(t)}" y="${H - 4}" fill="var(--muted)" font-size="10" text-anchor="middle">${t / 144 + 1}年目</text>`;
+    return `<div class="chartbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="戦況と戦意の推移">
+      <line x1="${pad}" x2="${W - pad}" y1="${y(0.5)}" y2="${y(0.5)}" stroke="var(--line)" stroke-dasharray="3 3"></line>
+      <polyline points="${line(p => p.mA / 100)}" fill="none" stroke="var(--a)" stroke-width="1" opacity=".7" stroke-dasharray="4 3"></polyline>
+      <polyline points="${line(p => p.mB / 100)}" fill="none" stroke="var(--b)" stroke-width="1" opacity=".7" stroke-dasharray="4 3"></polyline>
+      <polyline points="${line(p => p.terr)}" fill="none" stroke="var(--brass)" stroke-width="2"></polyline>${ticks}</svg>
+      <div style="font-size:11px;color:var(--muted)">実線: A国の戦況(点線=拮抗)/破線: 戦意(青=A国・赤=B国)</div></div>`;
+  }
+  function finalHTML(r) {
+    if (!r.final) return '';
+    const col = id => {
+      const f = r.final[id], c = g.c[id], sb = f.sales || { equip: { n: 0, v: 0, free: 0 }, merc: { n: 0, v: 0, free: 0 }, food: { n: 0, v: 0, free: 0 } };
+      const sl = k => { const x = sb[k]; return x.n ? `${short(x.v)}(${x.n - x.free}回${x.free ? '・無償' + x.free : ''})` : '—'; };
+      const tot = sb.equip.v + sb.merc.v + sb.food.v;
+      return `<div class="fc ${id}"><h3><span>${c.name}</span>${r.loser === id ? '<small>敗北</small>' : ''}</h3>
+        <div><span>国土</span><b>${Math.round(f.terr * 100)}%</b></div>
+        <div><span>戦意 / 反戦</span><b>${Math.round(f.morale)} / ${Math.round(f.antiwar)}</b></div>
+        <div><span>前線 / 予備</span><b>${short(f.front)} / ${short(f.reserve)}</b></div>
+        <div><span>装備充足率</span><b>${Math.round(f.eq * 100)}%</b></div>
+        <div><span>兵糧</span><b>${Math.round(f.food)}%</b></div>
+        <div><span>資金</span><b>${short(f.funds)}</b></div>
+        <div><span>疑惑度</span><b>${Math.round(f.susp)}</b></div>
+        <div class="sep"><span>売上 装備</span><b>${sl('equip')}</b></div>
+        <div><span>売上 傭兵</span><b>${sl('merc')}</b></div>
+        <div><span>売上 兵糧</span><b>${sl('food')}</b></div>
+        <div><span>売上 合計</span><b>${short(tot)}</b></div></div>`;
+    };
+    return `<div class="stamp">終戦時の両国</div>
+      <div class="finhd"><span>戦争 <b>${esc(r.scName)}${r.random ? '(ランダム)' : ''}</b></span><span>${r.type === 'cap' ? '期限まで戦争が続いた' : `期限まで <b>あと${r.weeksLeft}週</b> を残して終結`}</span></div>
+      <div class="fin">${col('A')}${col('B')}</div>`;
+  }
+  function reviewItems(r) {
+    const st = r.stats, out = [];
+    const ln = r.loser ? g.c[r.loser].name : '', wn = r.loser ? g.c[r.loser === 'A' ? 'B' : 'A'].name : '', left = r.weeksLeft ? `(期限まであと${r.weeksLeft}週)` : '';
+    const keepMorale = '戦意は、無償供与や相場より安い売却、要人暗殺・悪評の流布、戦闘コンサルの「消極」の方針で保てます。兵糧を切らさないことも大切です。';
+    if (r.type === 'peace') out.push(`両国の戦意が保たれていれば、戦争は期限まで続いていました${left}。` + keepMorale);
+    else if (r.type === 'collapse' && /降伏/.test(r.text)) out.push(`${ln}の戦意が足りず、${ln}は降伏しました${left}。` + keepMorale);
+    else if (r.type === 'collapse') out.push(`${ln}と${wn}の戦力差が大きく、${ln}は戦線を押し返せないまま首都を失いました${left}。押す力は、劣勢側への装備・傭兵の供給、兵糧の確保、戦意の維持、戦闘コンサルの「積極」の方針で高められます。資金が尽きた国には融資も使えます。`);
+    if (r.wasted >= 150000) out.push(`売れ残った在庫に${short(r.wasted)}の生産費を払いました。売れない品目は倉庫で生産を止めると、無駄を減らせます。`);
+    if (st.noneed >= 4) out.push(`「今は必要ない」と${st.noneed}回断られました。優勢な国は武器を買いません。戦況を拮抗させると需要が生まれます。`);
+    if (st.refuse >= 3) out.push(`高すぎる価格で${st.refuse}回拒否されました。前回の成約価格と相手の反応を目安に、戦況や装備の変化を読んで値を決めてください。`);
+    if (st.nofunds >= 4) out.push(`資金不足で${st.nofunds}回買ってもらえませんでした。貧しい国には値引き・無償供与・融資が使えます。`);
+    if (st.stop >= 2 || st.maxSusp >= 80) out.push(`疑惑度が80を超え、取引が止まる場面がありました。安く売る・無償供与で疑惑度を下げられます。`);
+    if ((st.spoiled || 0) >= 2) out.push(`兵糧を${st.spoiled}単位、売れないまま傷ませて廃棄しました。兵糧は、どこかの国が100%を切りそうな時だけ作ると無駄が出ません。`);
+    if (r.loanLost > 0) out.push(`融資した国が崩壊し、${short(r.loanLost)}が回収できませんでした。`);
+    if (!out.length && r.profit > 0) out.push({ good: true, text: '目立った無駄のない立ち回りでした。次は相場より少し高く売る、締め時を狙うなどで、さらに上を目指せます。' });
+    if (!out.length) out.push('次は、各国のゲージ(装備・兵糧・国土・警戒)と前回の成約価格を見てから売ってみてください。');
+    return out.slice(0, 4).map(t => typeof t === 'string' ? `<div>${esc(t)}</div>` : `<div class="good">${esc(t.text)}</div>`).join('');
+  }
+  function resultModal() {
+    const r = g.result, label = { collapse: '戦線崩壊', peace: '講和', cap: '強制講和', retreat: '撤退' }[r.type];
+    showModal(`<div class="stamp">終戦報告 / ${label} / ${S.dateOf(r.t)}(${r.weeks}週)</div><h2>${esc(r.text)}</h2>
+      <div><div class="stamp">利益(スコア)</div><div class="big" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad2)'}">${r.profit >= 0 ? '+' : ''}${fmt(r.profit)}</div></div>
+      ${finalHTML(r)}
+      <div class="stamp">帳簿</div>
+      <div class="res">
+        <div><span>販売の売上</span><b class="num">${fmt(r.revenue)}</b></div>
+        <div><span>うち兵糧</span><b class="num">${fmt(r.foodRev)}</b></div>
+        <div><span>原価より高く売った売上</span><b class="num">${fmt(r.acct ? r.acct.gainRev : 0)}</b></div>
+        <div><span>その利益</span><b class="num">${fmt(r.acct ? r.acct.gain : 0)}</b></div>
+        <div><span>原価以下で売った売上</span><b class="num">${fmt(r.acct ? r.acct.lossRev : 0)}</b></div>
+        <div><span>その赤字(無償供与を含む)</span><b class="num">${fmt(r.acct ? r.acct.loss : 0)}</b></div>
+        <div><span>生産費</span><b class="num">${fmt(r.spent)}</b></div>
+        <div><span>暗躍費</span><b class="num">${fmt(r.opsSpent)}</b></div>
+        <div><span>融資 回収/貸倒れ</span><b class="num">${short(r.loanRepaid)} / ${short(r.loanLost)}</b></div>
+        <div><span>売れ残りの生産費</span><b class="num">${fmt(r.wasted)}</b></div>
+        <div><span>取引回数</span><b class="num">${r.sales}回</b></div>
+        <div><span>断られた回数</span><b class="num">${r.stats.noneed + r.stats.refuse + r.stats.nofunds + r.stats.stop + r.stats.nomorale}回</b></div>
+      </div>
+      ${ledgerHTML(r)}
+      <div class="stamp">経緯(何が起きて、どうなったか)</div>
+      <ul class="tline">${(r.timeline || []).map(e => `<li class="${e.kind}"><span class="d">${S.dateOf(e.t)}</span><span><span class="w">${esc(e.what)}</span>${e.why ? `<span class="y">${esc(e.why)}</span>` : ''}</span></li>`).join('')}</ul>
+      <div class="stamp">振り返り</div>
+      <div class="review">${reviewItems(r)}</div>
+      ${chart()}
+      <div class="foot"><button class="btn primary" id="mGo">もう一度</button></div>`);
+    $('mGo').onclick = () => { hideModal(); newGame(); };
+    $('mGo').focus();
+  }
+  let curSc = 's1';
+  function newGame() { setupGame(curSc); startScreen(); }
+  function setupGame(sc) {
+    curSc = sc || curSc;
+    g = S.newGame(null, { scenario: curSc }); g.paused = true; started = false; act = null; wireKey = '';
+    FX.units = { A: [], B: [] }; FX.flashes = []; FX.ripples = []; FX.prevPipe = { A: [], B: [] }; FX.shareLog = []; FX.lastCas = { A: null, B: null }; FX.killAcc = { A: 0, B: 0 }; FX.arrAcc = { A: 0, B: 0 }; FX.prevTransit = { A: [], B: [] };
+    render();
+  }
+
+  // ---------- input ----------
+  stage.addEventListener('click', e => {
+    const mo = e.target.closest('[data-more]'); if (mo) { $('c' + mo.dataset.more).classList.toggle('open'); return; }
+    const op = e.target.closest('[data-open]'); if (op) { openAct(op.dataset.open, op.dataset.c); return; }
+    const fq = e.target.closest('[data-food]'); if (fq) { if (fq.dataset.food === 'add') g.foodQueue = Math.min(10, g.foodQueue + 1); else g.foodQueue = Math.max(0, g.foodQueue - 1); render(); return; }
+    const tog = e.target.closest('[data-tog]'); if (tog) { const k = tog.dataset.tog; g.prodOn[k] = !g.prodOn[k]; render(); return; }
+    if (!act) return;
+    const pk = e.target.closest('[data-pick]'); if (pk) { act.item = pk.dataset.pick; renderAct(); return; }
+    const q = e.target.closest('[data-qm]'); if (q) { if (+q.dataset.qm !== act.m) act.blocked = false; act.m = +q.dataset.qm; $('mRange').value = act.m; updatePrice(); return; }
+    const d = e.target.closest('[data-do]');
+    if (d && d.dataset.do === 'close') { closeAct(); return; }
+    if (d && d.dataset.do === 'newgame') { act = null; hideModal(); newGame(); return; }
+    if (d && d.dataset.do === 'retreat') { act = null; hideModal(); g.paused = false; S.retreat(g); render(); return; }
+    if (d && d.dataset.do === 'sell') {
+      if (act.blocked) return;
+      const it = I[act.item], r = S.sell(g, act.cid, act.item, act.m); act.msg = r.text; act.ok = r.ok;
+      act.log.push({ ok: r.ok, text: it.name.replace('一式', '') + ' ' + (act.m === 0 ? '無償' : '×' + act.m.toFixed(2)) + ' → ' + r.text });
+      if (!r.ok && r.tier !== 'none') act.blocked = true;
+      renderAct(); render(); return; }
+    const ct = e.target.closest('[data-ct]'); if (ct) { const r = S.contract(g, act.cid, ct.dataset.ct === 'cancel' ? null : +ct.dataset.ct); act.msg = r.text; act.ok = r.ok; act.log.push({ ok: r.ok, text: '兵糧: ' + r.text }); renderAct(); render(); return; }
+    const o = e.target.closest('[data-op]'); if (o) { const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); act.msg = r.text; act.ok = r.ok; act.log.push({ ok: r.ok, text: O[o.dataset.op].name + ': ' + r.text }); renderAct(); render(); return; }
+  });
+  stage.addEventListener('input', e => { if (act && e.target.id === 'mRange') { if (+e.target.value !== act.m) act.blocked = false; act.m = +e.target.value; updatePrice(); } });
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && act) { closeAct(); return; }
+    if (e.code === 'Space' && !act && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && started && !g.over && !g.modal) { e.preventDefault(); g.paused = !g.paused; render(); }
+  });
+  $('bPause').onclick = () => { if (!started || g.over || g.modal || act) return; g.paused = !g.paused; render(); };
+  $('bNew').onclick = () => { if (!started || g.over) { act = null; newGame(); return; } if (g.modal || act) return; openAct('newgame', null); };
+  $('bRetreat').onclick = () => openAct('retreat', null);
+  $('bDbg').onclick = () => { dbg = !dbg; $('bDbg').classList.toggle('on', dbg); render(); if (act) renderAct(); };
+
+  // ---------- loop ----------
+  let last = performance.now(), acc = 0, rAcc = 0, shown = null;
+  function loop(now) {
+    const dt = Math.min(0.25, (now - last) / 1000); last = now;
+    if (g && started && !act) {
+      acc += dt;
+      while (acc >= 0.1) { S.step(g, 0.1); acc -= 0.1; if (g.paused) { acc = 0; break; } }
+      if (g.modal && shown !== g.modal) { shown = g.modal; if (g.modal.kind === 'event') eventModal(g.modal); else if (g.modal.kind === 'order') orderModal(g.modal); else if (g.modal.kind === 'result') resultModal(); }
+    }
+    rAcc += dt; if (rAcc >= 0.1) { rAcc = 0; if (g) render(); }
+    if (g) { if (!frontArr.length) render(); fxFrame(dt); }
+    requestAnimationFrame(loop);
+  }
+  buildCard('A'); buildCard('B'); buildStock(); fit(); newGame();
+  requestAnimationFrame(loop);
+})();
+</script>
