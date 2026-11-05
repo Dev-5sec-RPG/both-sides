@@ -1,3 +1,8 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Both Sides</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Text:wght@600;800&family=BIZ+UDPGothic:wght@400;700&family=IBM+Plex+Mono:wght@500;600&display=swap">
@@ -282,6 +287,8 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
 .tline li.end .w { color: var(--brass2); font-weight: 700; }
 @media (prefers-reduced-motion: reduce) { .bar i, .pill, .comp .stk i { transition: none; } .bar.danger i { animation: none; } }
 </style>
+</head>
+<body>
 
 <div id="stage" class="full">
   <div class="topbar">
@@ -296,6 +303,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     <div class="hv"><small>利益(スコア)</small><b id="hProfit" data-full="">0</b></div>
     <button class="ibtn" id="bPause" aria-label="一時停止"><svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect></svg></button>
     <button class="ibtn" id="bDbg" title="隠し値の表示(検証用)">検証</button>
+    <button class="ibtn" id="bFull" aria-label="全画面" title="全画面" hidden><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"></path></svg></button>
     <span class="hsep" aria-hidden="true"></span>
     <button class="ibtn" id="bRetreat">撤退</button>
     <button class="ibtn" id="bNew">新しい戦争</button>
@@ -372,7 +380,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     loan:     { key:'loan',     name:'融資',             cost:500000, cd:20, unlock:120 },
   };
   const CFG = {
-    startMoney: 3000000, batLow: -0.06, batDef: 0.02, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, satSold: false, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, needOff: 0.3, needOn: 0.45, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.35, suffOff: 1.15, satWin: 18, satTau: 12, satK: 0.15, wLose: 0.45, wAlarm: 0.6, wSat: 1.2, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, initLoan: 0, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, endA: 210, endB: 270, prodCost: 0.4, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
+    startMoney: 3000000, batLow: -0.06, batDef: 0.02, minIdleWeeks: 35, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, satSold: false, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, needOff: 0.3, needOn: 0.45, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.35, suffOff: 1.15, satWin: 18, satTau: 12, satK: 0.15, wLose: 0.45, wAlarm: 0.6, wSat: 1.2, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, initLoan: 0, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, endA: 210, endB: 270, prodCost: 0.4, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
     lossS: 0.0001, lossP: 0.0009, upkeep: 0.03, richLine: 5000000,
     peaceLine: 25, peaceHold: 18, threatLag: 12,
     sortieBase: 0.004, transitTime: 12, frontSpeed: 0.006, capitalLine: 0.12,
@@ -418,20 +426,27 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
       B: { frontInit:58000, farmCap:126000, taxBase:11000, recruitBase:170, soldiers:120000, morale:70, antiwar:20, funds:3500000, eq:{ front:1000000, ranged:650000, armor:400000 }, susp:0, threat:50 } },
   };
   const BASE = SCENARIOS.s1;
-  // 国の条件のゆらぎ(乱数): 兵・装備 ±15%、資金 ±40%、税収 ±25%、農業 ±15%、戦意 ±10、開戦時の戦線 ±4%
+  // 国の条件のゆらぎ(乱数): 兵・装備 ±15%、資金 ±30%、税収 ±25%、農業 ±15%、戦意 ±10、開戦時の戦線 ±4%
   function spec(id, rr, sc) {
     const b = sc[id], o = JSON.parse(JSON.stringify(b));
     if (!rr) return o;
     const u = (lo, hi) => lo + rr() * (hi - lo);
     const ks = u(0.85, 1.15); o.soldiers = Math.round(b.soldiers * ks); o.frontInit = Math.round(b.frontInit * ks);
     const ke = u(0.85, 1.15); for (const k in o.eq) o.eq[k] = Math.round(b.eq[k] * ke * u(0.9, 1.1));
-    o.funds = Math.round(b.funds * u(0.6, 1.4) / 10000) * 10000; o.taxBase = Math.round(b.taxBase * u(0.75, 1.25));
+    o.funds = Math.round(b.funds * u(0.7, 1.3) / 10000) * 10000; o.taxBase = Math.round(b.taxBase * u(0.75, 1.25));
     o.farmCap = Math.round(b.farmCap * u(0.85, 1.15)); o.morale = Math.round(b.morale + u(-10, 10)); o.antiwar = Math.round(b.antiwar + u(-5, 5));
     return o;
   }
+  // ランダムな国の条件(デイリー)の安全装置: 何もしない場合の戦争が35週未満で終わる一方的な条件は、シードを進めて作り直す
   function newGame(seed, opts) {
     seed = seed == null ? Math.floor(Math.random() * 1e9) : seed;
     opts = opts || {};
+    if ((opts.random || CFG.randomCountries) && !opts.noCheck && !opts.rr) {
+      for (let i = 0; i < 50; i++) { if (baseline(seed, true, opts.scenario, true).weeks >= CFG.minIdleWeeks) break; seed = (seed * 7 + 1013) % 1000000007; }
+    }
+    return makeGame(seed, opts);
+  }
+  function makeGame(seed, opts) {
     const rr = (opts.random || CFG.randomCountries) ? rng(seed * 7 + 13) : null;
     const sc = SCENARIOS[opts.scenario || CFG.scenario || 's1'];
     const g = {
@@ -816,8 +831,8 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   }
 
   // 介入しなかった場合の戦争(同じ開戦条件で何もしない)
-  function baseline(seed, rnd, sc) {
-    const b = newGame(seed, { random: rnd, scenario: sc }); b.noBase = true; for (const k in b.prodOn) b.prodOn[k] = false;
+  function baseline(seed, rnd, sc, noCheck) {
+    const b = makeGame(seed, { random: rnd, scenario: sc }); b.noBase = true; for (const k in b.prodOn) b.prodOn[k] = false;
     let guard = 0;
     while (!b.over && guard++ < 6000) { if (b.modal && b.modal.kind !== 'result') { b.modal = null; b.paused = false; } step(b, 0.1); }
     return { t: b.t, weeks: weekOf(b.t), cas: b.cas.A + b.cas.B, type: b.result ? b.result.type : 'cap' };
@@ -1118,7 +1133,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
 
   // ---------- fit ----------
   function fit() {
-    const vw = window.innerWidth, vh = window.innerHeight;
+    const vv = window.visualViewport, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight; // スマホではURLバーを除いた見えている範囲に合わせる
     const compact = vh < 560 || vw < 1000;
     stage.className = compact ? 'compact' : 'full';
     const W = compact ? 900 : 1280, H = compact ? 420 : 720;
@@ -1130,6 +1145,18 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
     if (typeof fxResize === 'function') fxResize();
   }
   window.addEventListener('resize', fit);
+  window.addEventListener('orientationchange', () => setTimeout(fit, 200));
+  if (window.visualViewport) window.visualViewport.addEventListener('resize', fit);
+  // 全画面: 対応している端末(Androidなど)だけボタンを出す。スマホでは戦争を選んだ時に自動で全画面にする
+  const fsOK = !!(document.fullscreenEnabled && document.documentElement.requestFullscreen);
+  const touch = window.matchMedia && window.matchMedia('(pointer: coarse)').matches;
+  function goFull() {
+    if (!fsOK || document.fullscreenElement) return;
+    document.documentElement.requestFullscreen({ navigationUI: 'hide' }).then(() => { if (screen.orientation && screen.orientation.lock) screen.orientation.lock('landscape').catch(() => {}); setTimeout(fit, 200); }).catch(() => {});
+  }
+  $('bFull').hidden = !fsOK;
+  $('bFull').onclick = () => { if (document.fullscreenElement) document.exitFullscreen().catch(() => {}); else goFull(); };
+  document.addEventListener('fullscreenchange', () => { $('bFull').classList.toggle('on', !!document.fullscreenElement); setTimeout(fit, 200); });
   $('bRotOk').onclick = () => { rotDismissed = true; fit(); };
 
   // ---------- build ----------
@@ -1694,7 +1721,7 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
         <li>上部の「撤退」で、いつでもその時点の所持金で精算して終えられます。</li>
       </ul>
       <div class="scn">${Object.values(S.SCENARIOS).map(sc => `<button class="btn${sc.key === curSc ? ' primary' : ''}" data-scn="${sc.key}"><b>${sc.name}</b><span>${esc(sc.desc)}</span></button>`).join('')}</div>`);
-    $('mc').querySelectorAll('[data-scn]').forEach(b => b.onclick = () => { setupGame(b.dataset.scn); hideModal(); started = true; g.paused = false; render(); });
+    $('mc').querySelectorAll('[data-scn]').forEach(b => b.onclick = () => { if (touch) goFull(); setupGame(b.dataset.scn); hideModal(); started = true; g.paused = false; render(); });
     $('mc').querySelector('[data-scn].primary').focus();
   }
   function eventModal(m) {
@@ -1880,3 +1907,5 @@ input[type=range] { width: 100%; accent-color: var(--brass); margin: 0; }
   requestAnimationFrame(loop);
 })();
 </script>
+</body>
+</html>
