@@ -1,0 +1,2 @@
+# both-sides
+Both Sidesのゲーム
