@@ -6,7 +6,7 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const stage = $('stage');
-  let g = null, started = false, act = null, dbg = false, scale = 1, rotDismissed = false, mode = 'home', curSc = 's1';
+  let g = null, started = false, act = null, scale = 1, rotDismissed = false, mode = 'home', curSc = 's1';
 
   // ---------- settings (kept in this browser only) ----------
   const SET = { lang: 'ja', fx: true, reduce: false, autoFull: true };
@@ -16,7 +16,7 @@
 
   // ---------- static texts ----------
   const T = {
-    cal: ['暦', 'Date'], money: ['所持金', 'Cash'], profit: ['利益(スコア)', 'Profit (score)'], dbg: ['検証', 'Debug'],
+    cal: ['暦', 'Date'], money: ['所持金', 'Cash'], profit: ['利益(スコア)', 'Profit (score)'],
     retreat: ['撤退', 'Withdraw'], home: ['ホームに戻る', 'Home'], capA: ['A国 首都', 'Capital A'], capB: ['B国 首都', 'Capital B'],
     frontline: ['戦線', 'front'], stockTitle: ['倉庫(装備・傭兵は自動生産で押すと停止/再開。兵糧は押した回数だけ作る。各12まで)', 'Warehouse (arms and mercs auto-produce; tap to pause. Rations: one per tap. Max 12 each)'],
     newsTitle: ['戦況ニュース', 'War news'], hNew: ['新しい戦争', 'New War'], hTut: ['チュートリアル', 'Tutorial'], hSet: ['設定', 'Settings'],
@@ -128,7 +128,6 @@
         ${row(id, 'sus', 'sus', lb.sus, false, [50, 75, 90], true)}
       </div>
       <div class="sub"><span>${L('兵糧1単位', '1 ration')} <b id="${id}ct">—</b></span><span>${L('融資', 'Loan')} <b id="${id}ln">—</b></span></div>
-      <div class="dbg" id="${id}dbg" hidden></div>
       <div class="acts">
         <button data-open="sell" data-c="${id}" id="${id}bSell">${ico('sell', '')}${L('販売', 'Sell')}</button>
         <button data-open="ops" data-c="${id}" id="${id}bOps">${ico('ops', '')}${L('暗躍', 'Covert')}</button>
@@ -142,7 +141,7 @@
         <span class="cnt" id="sc_food">×0</span>
         <span class="pg"><i id="sp_food" style="width:0"></i></span>
       </button><button class="fcan" data-food="sub" id="fcan" hidden>${L('取消', 'Undo')}</button></div>` : `
-      <button class="slot" id="sl_${it.key}" data-tog="${it.key}" title="${esc(it.name + '(' + it.sub + ')・' + it.trait)}">
+      <button class="slot" id="sl_${it.key}" data-tog="${it.key}" title="${esc(it.name + L('(' + it.sub + ')・', ' (' + it.sub + ') · ') + it.trait)}">
         <span class="sn"><span>${sh[it.key]}</span><span class="st" id="ss_${it.key}"></span></span>
         <span class="cnt" id="sc_${it.key}">×0</span>
         <span class="pg"><i id="sp_${it.key}" style="width:0"></i></span>
@@ -243,15 +242,13 @@
       else if (c.noNeed) fl.push(['', L('武器は不要', 'No arms needed')]);
       if (c.foodLv < 100) fl.push([c.foodLv < 90 ? 'bad' : '', c.foodLv < 70 ? L('兵糧欠乏', 'Starving') : c.foodLv < 90 ? L('兵糧不足・高値', 'Food short, pays more') : L('兵糧不足', 'Food short')]);
       if (S.desertRate(c) > 0) fl.push(['bad', c.funds < c.initFunds * S.CFG.desertHeavy ? L('兵の大量離脱', 'Mass desertion') : L('兵の離脱', 'Desertion')]);
-      if (c.funds < S.CFG.loanLimit && g.t >= O.loan.unlock && !g.loans.some(l => l.cid === id)) fl.push(['', L('融資可', 'Loan OK')]);
+      if (c.funds < S.CFG.loanLimit && !g.loans.some(l => l.cid === id)) fl.push(['', L('融資可', 'Loan OK')]);
       if (c.susp <= -40) fl.push(['good', L('厚い信頼', 'Strong trust')]); else if (c.susp <= -15) fl.push(['good', L('信頼', 'Trust')]); else if (c.funds >= S.CFG.richLine) fl.push(['good', L('資金潤沢', 'Rich')]);
       if (c.policy !== 'normal') fl.push(['', L('方針: ', 'Policy: ') + S.POLICY[c.policy].name]);
       if (c.massing) fl.push(['bad', L('首都に集結中', 'Massing troops')]);
       if (c.transit.some(x => x.wave)) fl.push(['bad', L('大規模増援 移動中', 'Surge en route')]);
       const flh = fl.slice(0, 4).map(([k, t]) => `<span class="flag${k ? ' ' + k : ''}">${esc(t)}</span>`).join('');
       if ($(id + 'fl').innerHTML !== flh) $(id + 'fl').innerHTML = flh;
-      const db = $(id + 'dbg'); db.hidden = !dbg;
-      if (dbg) db.innerHTML = `<span>${L('需要', 'Demand')} <b>${dem.toFixed(2)}</b></span><span>${L('警戒', 'Alarm')} <b>${c.threat.toFixed(0)}</b></span><span>${L('基本倍率', 'Base')} <b>×${S.fairMult(g, c).toFixed(2)}</b></span><span>${L('押す力の比', 'Push')} <b>${Math.round(S.pressure(g, id) * 100)}%</b></span>`;
       document.querySelectorAll('[data-open][data-c="' + id + '"]').forEach(b => b.disabled = busy);
       const shp = $('ship' + id), items = c.pipeline.slice().sort((a, b) => a.at - b.at), sh = SHORT();
       const shh = items.slice(0, 3).map(p => `<span>${sh[p.item]} ${L('到着まで' + wk(p.at - g.t) + '週', 'in ' + wk(p.at - g.t) + ' wk')}</span>`).join('') + (items.length > 3 ? `<span>${L('ほか' + (items.length - 3) + '件', '+' + (items.length - 3) + ' more')}</span>` : '');
@@ -568,11 +565,6 @@
     g.paused = true; render(); renderAct(true);
   }
   function closeAct() { if (!act) return; act = null; hideModal(); g.paused = false; render(); }
-  function mbar(pct, color, ticks, left) {
-    return `<div class="bar"><i style="width:${Math.max(0, Math.min(100, pct))}%;left:${left || 0}%;background:${color}"></i>${(ticks || []).map(t => `<span class="tk" style="left:${t}%"></span>`).join('')}</div>`;
-  }
-  function mrow(label, pct, color, val, ticks, left, vcolor) { return `<span class="ml">${label}</span>${mbar(pct, color, ticks, left)}<span class="mv"${vcolor ? ` style="color:${vcolor}"` : ''}>${val}</span>`; }
-  function susRow(c) { const v = c.susp; return mrow(L('疑惑度', 'Suspicion'), Math.abs(v) / 2, v >= 80 ? 'var(--bad)' : v >= 50 ? 'var(--warn)' : v < 0 ? 'var(--good)' : 'var(--brass)', (v > 0 ? '+' : '') + v.toFixed(0), [50, 75, 90], v >= 0 ? 50 : 50 + v / 2, v >= 50 ? '#e2a764' : v < 0 ? 'var(--good)' : ''); }
   function flagsOf(c) {
     const fl = [], s = S.shareOf(g, c.id);
     if (c.susp <= -40) fl.push(['good', L('厚い信頼', 'Strong trust')]); else if (c.susp <= -15) fl.push(['good', L('信頼', 'Trust')]); else if (c.funds >= S.CFG.richLine) fl.push(['good', L('資金潤沢', 'Rich')]);
@@ -612,7 +604,7 @@
           <span class="pn"><span>${sh[it.key]}</span><span class="num">×${g.inv[it.key]}</span></span>
           <span class="pl tr">${esc(it.trait)}</span>
           <span class="pl num">${L('定価 ', 'List ')}${fmt(S.listPrice(g, it.key))}</span>
-          <span class="pe">${esc(info)}${dbg ? L('(実際×', ' (true x') + S.fairMult(g, c, it.key).toFixed(2) + ')' : ''}</span>${priceTags(c)}</button>`;
+          <span class="pe">${esc(info)}</span>${priceTags(c)}</button>`;
       }).join('');
       const has = g.inv[act.item] > 0;
       h = `<div class="stamp">${stampOf(L('販売', 'Sell'))}</div><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name)}</h2>
@@ -901,7 +893,7 @@
       <div class="foot"><button class="btn" data-hclose>${L('戻る', 'Back')}</button></div></div>`);
     $('hpop').querySelector('[data-tut]').focus();
   }
-  function startTutorial(n) { if (!window.BSTut) return; closeHome(); if (touch && SET.autoFull) goFull(); window.BSTut.start(n); }
+  function startTutorial(n) { if (!window.BSTut) return; if (touch && SET.autoFull) goFull(); window.BSTut.enter(n); } // the home screen stays until the screen is black
   $('hTut').onclick = homeTutorials;
   $('hpop').addEventListener('click', e => {
     if (e.target === $('hpop') || e.target.closest('[data-hclose]')) { $('hpop').hidden = true; return; }

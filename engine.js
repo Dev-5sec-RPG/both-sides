@@ -23,7 +23,7 @@
     assassin: { key:'assassin', cost:30000, cd:20 },
     rumor:    { key:'rumor',    cost:10000, cd:20 },
     consult:  { key:'consult',  cost:10000, cd:20 },
-    loan:     { key:'loan',     cost:500000, cd:20, unlock:0 },
+    loan:     { key:'loan',     cost:500000, cd:20 },
   };
   // 名前などの文言は、言語に合わせてその場で引く
   function applyLang() {
@@ -35,11 +35,11 @@
   function setLang(l) { LANG.cur = l === 'en' ? 'en' : 'ja'; applyLang(); }
   const cname = id => L(id + '国', 'Nation ' + id);
   const CFG = {
-    startMoney: 3000000, batLow: -0.06, batDef: 0.02, minIdleWeeks: 35, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, satSold: false, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, needOff: 0.3, needOn: 0.45, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.5, suffOff: 1.3, satWin: 18, satTau: 12, satK: 0.15, wLose: 0.45, wAlarm: 0.6, wSat: 1.2, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, initLoan: 0, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, endA: 210, endB: 270, prodCost: 0.4, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
+    startMoney: 3000000, batLow: -0.06, batDef: 0.02, minIdleWeeks: 35, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.5, suffOff: 1.3, wLose: 0.45, wAlarm: 0.6, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
     lossS: 0.0001, lossP: 0.0009, upkeep: 0.03, incomeK: 0.0022, richLine: 5000000,
     absMode: true, crewK: 1.58, eqStd: 23.5, eqPriceK: 0.5, compK: 1.08, peaceLine: 25, peaceHold: 18, threatLag: 12,
     sortieBase: 0.004, transitTime: 12, frontSpeed: 0.006, capitalLine: 0.12,
-    foodRate: 0.05, farmDecay: 0.0018, loanLimit: 300000, loanAmount: 500000, loanInterest: 0.2,
+    farmDecay: 0.0018, loanLimit: 300000, loanInterest: 0.2,
   };
 
   function rng(seed) {
@@ -107,7 +107,7 @@
     const sc = SCENARIOS[opts.scenario || CFG.scenario || 's1'];
     const g = {
       seed, r: rng(seed), t: 0, over: false, paused: false, modal: null,
-      money: CFG.startMoney - CFG.initLoan * 2, revenue: 0, spent: 0, opsSpent: 0, sales: 0, foodRev: 0, loans: CFG.initLoan ? [{ cid: 'A', amount: CFG.initLoan, t: 0, rate: 0, init: true }, { cid: 'B', amount: CFG.initLoan, t: 0, rate: 0, init: true }] : [], loanOut: CFG.initLoan * 2, lastStep: 1, stats: { refuse: 0, noneed: 0, nofunds: 0, stop: 0, nomorale: 0, foodNeglect: 0, maxSusp: 0, free: 0 },
+      money: CFG.startMoney, revenue: 0, spent: 0, opsSpent: 0, sales: 0, foodRev: 0, loans: [], loanOut: 0, lastStep: 1, stats: { refuse: 0, noneed: 0, nofunds: 0, stop: 0, nomorale: 0, foodNeglect: 0, maxSusp: 0, free: 0 },
       cas: { A: 0, B: 0 }, supplied: { equip: 0, merc: 0, food: 0 }, opsCount: { assassin: 0, rumor: 0, consult: 0, loan: 0 },
       order: null, orderCount: 0, lastOrderT: -999,
       inv: { equip: 2, merc: 0, food: 0 }, foodLots: [], foodQueue: 0, pending: [],
@@ -409,8 +409,7 @@
     }
     if (op === 'loan') {
       g.money += o.cost; g.opsSpent -= o.cost; g.cd[op] = 0; g.opsCount[op]--;
-      if (g.t < o.unlock) return { ok:false, text: L('融資は開戦40週目(1年目11月)から行えます。', 'Loans open from week 40 (Y1 Nov).') };
-      if (g.loans.some(l => l.cid === cid && !l.init)) return { ok:false, text: L(c.name + 'への融資は1回までです。', 'Only one loan per nation.') };
+      if (g.loans.some(l => l.cid === cid)) return { ok:false, text: L(c.name + 'への融資は1回までです。', 'Only one loan per nation.') };
       if (c.funds > CFG.loanLimit) return { ok:false, text: L(c.name + 'は資金に余裕があり、融資を必要としていない(資金30万以下で受け入れ)。', c.name + ' has money and needs no loan (accepts at 300K or less).') };
       g.money -= o.cost; g.cd[op] = o.cd; c.funds += o.cost; g.loanOut += o.cost;
       g.loans.push({ cid, amount: o.cost, t: g.t }); g.opsCount.loan++;

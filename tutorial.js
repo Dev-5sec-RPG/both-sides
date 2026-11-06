@@ -20,7 +20,7 @@
     { t: '.topbar', ja: ['画面上部', '日付と戦争の進み具合、所持金、利益が並びます。3秒で1週間が進みます。'], en: ['Top bar', 'Date, war progress, cash and profit. Every 3 seconds is one week.'] },
     { t: '#hMoney,#hProfit', pad: 6, ja: ['所持金と利益', '販売で増え、生産や暗躍で減ります。利益がそのままスコアになります。'], en: ['Cash and profit', 'Sales add to it; production and covert work cost money. Profit is your score.'] },
     { t: '#hStep', pad: 4, ja: ['定価', '品物の定価です。時期によって見直されます。売値は定価に倍率を掛けて決まります。'], en: ['List price', 'The list price of goods, reviewed over time. Your selling price is a multiple of it.'] },
-    { t: '.terrain,#pill', pad: 0, ja: ['戦線', '左がA国、右がB国の領土です。押す力の強い側へ戦線が動き、首都まで押し込まれた国が負けます。駒は前線の兵、首都から伸びる点線は輸送中の品です。'], en: ['The front', 'A holds the left, B the right. The front moves toward the weaker side; a nation pushed back to its capital loses. Markers are troops; dotted lines from the capitals are goods in transit.'] },
+    { t: '.terrain,#pill', pad: 0, ja: ['戦線', '左がA国、右がB国の領土です。押す力の強い側へ戦線が動き、首都まで押し込まれた国が負けます。光点は前線の部隊(輪が歩兵、菱形が機甲)、首都から伸びる点線は輸送中の品です。'], en: ['The front', 'A holds the left, B the right. The front moves toward the weaker side; a nation pushed back to its capital loses. Points of light are troops (rings: infantry, diamonds: armour); dotted lines from the capitals are goods in transit.'] },
     { t: '#cA', ja: ['国の状態', '各国のカードに、その国の状態が並びます。上の札は今の様子です(値引き要求・武器は不要など)。'], en: ['Nation status', 'Each card shows a nation\'s state. The tags at the top tell you its current mood (wants discount, no arms needed, and so on).'] },
     { t: 'A:mor', grp: 'rows', ja: ['戦意', '戦争を続ける気力です。戦意が低いと武器を買わず、両国とも下がれば講和に向かいます。安売りや無償供与、暗躍で上がります。'], en: ['Morale', 'The will to fight. Low morale means no buying, and if both drop, peace talks begin. Cheap sales, gifts and covert work raise it.'] },
     { t: 'A:frt', grp: 'rows', ja: ['前線', '戦っている兵の数です。多いほど戦線を押す力が強くなり、戦闘や離脱で減ります。'], en: ['Front', 'Soldiers in combat. More soldiers push harder; battle and desertion wear them down.'] },
@@ -180,15 +180,18 @@
   function stop() { if (!on) return; on = false; clearInterval(poll); $('tut').hidden = true; $('tut').innerHTML = ''; ui().openCard('A', false); }
   function home() { stop(); ui().home(); }
   // switching tutorials: black out, swap, fade back in
-  function toT2() {
-    if (busy) return; busy = true;
+  // entering a tutorial (from home or from tutorial 1): black out with its title, swap, fade back in
+  function enter(n) {
+    if (on && busy) return;
     const f = $('fade'), rm = RM();
-    $('fadeT').textContent = L('チュートリアル2', 'Tutorial 2'); $('fadeS').textContent = L('操作説明', 'How to Play');
-    f.className = 'on tutc';
-    setTimeout(() => { stop(); start(2); busy = true; }, rm ? 150 : 600);
+    $('fadeT').textContent = n === 2 ? L('チュートリアル2', 'Tutorial 2') : L('チュートリアル1', 'Tutorial 1');
+    $('fadeS').textContent = n === 2 ? L('操作説明', 'How to Play') : L('画面説明', 'The Screen');
+    busy = true; f.className = 'on tutc';
+    setTimeout(() => { stop(); start(n); busy = true; }, rm ? 150 : 600);
     setTimeout(() => { f.className = 'tutc'; }, rm ? 400 : 1500);
     setTimeout(() => { f.className = ''; busy = false; shownAt = performance.now(); }, rm ? 600 : 2100);
   }
+  const toT2 = () => enter(2);
   $('tut').addEventListener('click', e => {
     if (e.target.closest('[data-th]')) { home(); return; }
     if (e.target.closest('[data-t2]')) { toT2(); return; }
@@ -201,5 +204,5 @@
     else if (e.key === 'ArrowLeft') back();
     else if (e.key === 'Escape') home();
   });
-  window.BSTut = { start, stop, relayout() { if (on && !busy) fill(); } };
+  window.BSTut = { start, enter, stop, relayout() { if (on && !busy) fill(); } };
 })();
