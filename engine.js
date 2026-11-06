@@ -227,6 +227,7 @@
     return lack + suff;
   }
   function fairMult(g, c, item) {
+    if (g.fairOverride && g.fairOverride[c.id + item] != null) return g.fairOverride[c.id + item]; // チュートリアル用に相場を固定する
     if (item === 'food') { let f = foodMult(c); if (c.susp >= 50) f *= 0.8; if (g.t < c.priceModUntil) f *= c.priceMod; return f; }
     const D = demand(g, c);
     const wealth = CFG.wWealth * clamp((c.funds - 1000000) / 3000000, 0, 1);

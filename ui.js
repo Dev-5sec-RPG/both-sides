@@ -601,13 +601,13 @@
     if (act.kind === 'sell') {
       const picks = Object.values(I).map(it => {
         const est = S.estimate(g, c, it.key), ld = c.lastDeal[it.key];
-        const info = it.key === 'food' ? L('相場 ×' + est.toFixed(1) + '(兵糧' + Math.round(c.foodLv) + '%・1単位で+' + Math.round(S.foodRestore(c)) + '%)', 'Market x' + est.toFixed(1) + ' (food ' + Math.round(c.foodLv) + '%, +' + Math.round(S.foodRestore(c)) + '% per unit)')
+        const info = it.key === 'food' ? foodInfo(c, est)
           : ld ? L('前回 ×' + ld.m.toFixed(2) + '・' + Math.max(0, Math.round((g.t - ld.t) / 3)) + '週前(' + ld.label + ')', 'Last x' + ld.m.toFixed(2) + ', ' + Math.max(0, Math.round((g.t - ld.t) / 3)) + ' wk ago (' + ld.label + ')') : L('前回の取引なし', 'No deal yet');
         return `<button class="pick${act.item === it.key ? ' sel' : ''}" data-pick="${it.key}">
           <span class="pn"><span>${sh[it.key]}</span><span class="num">×${g.inv[it.key]}</span></span>
           <span class="pl tr">${esc(it.trait)}</span>
           <span class="pl num">${L('定価 ', 'List ')}${fmt(S.listPrice(g, it.key))}</span>
-          <span class="pe">${esc(info)}${dbg ? L('(実際×', ' (true x') + S.fairMult(g, c, it.key).toFixed(2) + ')' : ''}</span></button>`;
+          <span class="pe">${esc(info)}${dbg ? L('(実際×', ' (true x') + S.fairMult(g, c, it.key).toFixed(2) + ')' : ''}</span>${priceTags(c)}</button>`;
       }).join('');
       const has = g.inv[act.item] > 0;
       h = `<div class="stamp">${stampOf(L('販売', 'Sell'))}</div><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name)}</h2>
@@ -658,6 +658,17 @@
     showModal(h, act.cid); $('mc').scrollTop = keep;
     if (act.kind === 'sell') updatePrice();
     if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus(); }
+  }
+  // food market shown to two decimals; what lowers prices is shown as tags on each item
+  function foodInfo(c, est) {
+    return L('相場 ×' + est.toFixed(2) + '(兵糧' + Math.round(c.foodLv) + '%・1単位で+' + Math.round(S.foodRestore(c)) + '%)', 'Market x' + est.toFixed(2) + ' (food ' + Math.round(c.foodLv) + '%, +' + Math.round(S.foodRestore(c)) + '% per unit)');
+  }
+  function priceTags(c) {
+    const t = [];
+    if (g.t < c.priceModUntil) t.push(L('競合の参入 -20%', 'Rival dealer -20%'));
+    if (c.susp >= 50) t.push(L('疑惑度50以上 -20%', 'Suspicion 50+ -20%'));
+    if (c.susp >= 80) t.push(L('疑惑度80以上 取引停止', 'Suspicion 80+ trade halted'));
+    return t.length ? `<span class="ptags">${t.map(x => `<span class="ptag">${esc(x)}</span>`).join('')}</span>` : '';
   }
   const sellLabel = has => !has ? L('在庫なし', 'Out of stock') : act.blocked ? L('価格を変えてください', 'Change the price') : act.m === 0 ? L('無償で渡す', 'Give for free') : L('売り込む', 'Offer');
   function updatePrice() {
@@ -847,8 +858,8 @@
   function homeScenarios() {
     S.setLang(SET.lang);
     homePop(`<div class="hpanel"><h2>${L('どの戦争に関わるか', 'Choose your war')}</h2>
-      <div class="scards">${['s1', 's2'].map(k => { const d = SCN_DESC[k][SET.lang === 'en' ? 'en' : 'ja']; return `<button class="scard" data-scn="${k}"><span class="st"><i></i>${esc(S.SCENARIOS[k].name)}</span>
-        <span class="sd">${d.map((l, i) => `<p${i === d.length - 1 ? ' class="warn"' : ''}>${esc(l)}</p>`).join('')}</span><span class="go">${L('この戦争を始める ▶', 'Start this war ▶')}</span></button>`; }).join('')}</div>
+      <div class="scards">${['s1', 's2'].map(k => { const d = SCN_DESC[k][SET.lang === 'en' ? 'en' : 'ja']; return `<div class="scard"><span class="st"><i></i>${esc(S.SCENARIOS[k].name)}</span>
+        <span class="sd">${d.map((l, i) => `<p${i === d.length - 1 ? ' class="warn"' : ''}>${esc(l)}</p>`).join('')}</span><button class="btn primary go" data-scn="${k}">${L('この戦争を始める', 'Start this war')}</button></div>`; }).join('')}</div>
       <div class="foot"><button class="btn" data-hclose>${L('戻る', 'Back')}</button></div></div>`);
     $('hpop').querySelector('[data-scn]').focus();
   }
@@ -870,10 +881,21 @@
   $('hNew').onclick = homeScenarios;
   $('hSet').onclick = homeSettings;
   $('hLang').onclick = homeLang;
-  $('hTut').onclick = () => { if (window.BSTut) { closeHome(); if (touch && SET.autoFull) goFull(); window.BSTut.start(); } };
+  function homeTutorials() {
+    homePop(`<div class="hpanel small"><h2>${L('チュートリアル', 'Tutorial')}</h2>
+      <div class="tchoice">
+        <button class="btn" data-tut="1"><b>${L('チュートリアル1 画面説明', 'Tutorial 1: The Screen')}</b><span>${L('ゲームの目的と、画面の見方', 'The goal, and how to read the screen')}</span></button>
+        <button class="btn" data-tut="2"><b>${L('チュートリアル2 操作説明', 'Tutorial 2: How to Play')}</b><span>${L('販売・暗躍・生産を実際に操作する', 'Try selling, covert work and production')}</span></button>
+      </div>
+      <div class="foot"><button class="btn" data-hclose>${L('戻る', 'Back')}</button></div></div>`);
+    $('hpop').querySelector('[data-tut]').focus();
+  }
+  function startTutorial(n) { if (!window.BSTut) return; closeHome(); if (touch && SET.autoFull) goFull(); window.BSTut.start(n); }
+  $('hTut').onclick = homeTutorials;
   $('hpop').addEventListener('click', e => {
     if (e.target === $('hpop') || e.target.closest('[data-hclose]')) { $('hpop').hidden = true; return; }
     const sc = e.target.closest('[data-scn]'); if (sc) { startGame(sc.dataset.scn); return; }
+    const tu = e.target.closest('[data-tut]'); if (tu) { startTutorial(+tu.dataset.tut); return; }
     const st = e.target.closest('[data-set]'); if (st) { const k = st.dataset.set; SET[k] = !SET[k]; saveSet(); homeSettings(); return; }
     const lg = e.target.closest('[data-lang]'); if (lg) { SET.lang = lg.dataset.lang; saveSet(); S.setLang(SET.lang); applyStatic(); homeLang(); return; }
   });
@@ -882,7 +904,7 @@
   stage.addEventListener('click', e => {
     if (mode === 'home' || !g) return;
     const mo = e.target.closest('[data-more]'); if (mo) { $('c' + mo.dataset.more).classList.toggle('open'); return; }
-    if (mode !== 'game') return;
+    if (mode !== 'game' && mode !== 'tut') return;
     const op = e.target.closest('[data-open]'); if (op) { openAct(op.dataset.open, op.dataset.c); return; }
     const fq = e.target.closest('[data-food]'); if (fq) { if (fq.dataset.food === 'add') g.foodQueue = Math.min(10, g.foodQueue + 1); else g.foodQueue = Math.max(0, g.foodQueue - 1); render(); return; }
     const tog = e.target.closest('[data-tog]'); if (tog) { const k = tog.dataset.tog; g.prodOn[k] = !g.prodOn[k]; render(); return; }
@@ -928,12 +950,28 @@
   // ---------- API for the tutorial ----------
   window.BSUI = {
     get g() { return g; }, stage, L, short, setScales,
-    tutorialGame() {
-      mode = 'tut'; clearFades(); closeHome(); setupGame('s1');
+    tutorialGame(kind) {
+      mode = 'tut'; clearFades(); closeHome(); act = null; hideModal(); setupGame('s1');
       // advance a few weeks so the map has troops and the gauges have moved
       g.prodOn.equip = true; g.paused = false; let n = 0; while (g.t < 15 && n++ < 400) { if (g.modal) { g.modal = null; g.paused = false; } S.step(g, 0.1); }
-      g.paused = true; render(); fxFrame(0.016);
+      g.modal = null; g.alertQ = []; g.paused = false; started = true; // time stays frozen: the loop only steps in game mode
+      const A = g.c.A, B = g.c.B;
+      // sample notices for the top centre and the news feed
+      A.policy = 'aggr'; A.policyUntil = g.t + 24; B.priceMod = 0.8; B.priceModUntil = g.t + 27;
+      const nw = [[L('B国の補給線が延び、前線への物資の到着が遅れている。', "B's supply lines are stretched; deliveries to the front are slow."), 'info'],
+        [L('A国の司令部が方針を「積極」に切り替えた。', 'A HQ switched to an "Aggressive" strategy.'), 'op'],
+        [L('B国の兵糧が減り始めている。', "B's food is starting to run low."), 'bad']];
+      for (const [text, k] of nw) g.news.unshift({ t: g.t, text, kind: k });
+      if (kind === 2) {
+        g.inv.equip = 3; g.inv.merc = 2; g.inv.food = 0; g.foodQueue = 0; g.prodOn.equip = true; g.prodOn.merc = true; g.prodOn.food = false;
+        g.money = Math.max(g.money, S.CFG.startMoney); for (const k in g.cd) g.cd[k] = 0;
+        A.susp = 0; B.susp = 0; A.noNeed = false; A.estNoise = 0; A.morale = Math.max(A.morale, 50); B.morale = Math.max(B.morale, 50);
+        A.funds = Math.max(A.funds, 3000000); A.policy = 'normal'; A.policyUntil = 0;
+        g.fairOverride = { Aequip: 1.2, Amerc: 1.2, Afood: 1.0 }; // the tutorial sale at x1.2 is bought at market
+      }
+      wireKey = ''; render(); fxFrame(0.016);
     },
+    get act() { return act; },
     openCard(id, open) { $('c' + id).classList.toggle('open', open); },
     home: showHome, render, get scale() { return scale; }, get lang() { return SET.lang; },
   };

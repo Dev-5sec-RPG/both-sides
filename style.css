@@ -386,3 +386,48 @@ html[lang="en"] .compact .gg .lb.em { font-size: 11px; }
 #mRange::-webkit-slider-runnable-track { background: linear-gradient(to right, var(--brass) 0 var(--fill), var(--panel2) var(--fill) 100%); }
 #mRange::-moz-range-track { background: var(--panel2); }
 #mRange::-moz-range-progress { height: 12px; background: var(--brass); border-radius: 6px; }
+
+/* price-cut tags on each item in the sell screen (bottom right) */
+.pick .ptags { justify-self: end; display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 3px; margin-top: 3px; }
+.pick .ptag { font-size: 10.5px; line-height: 1.3; padding: 1px 6px; border-radius: 3px; border: 1px solid #b0594b; background: rgba(176, 89, 75, .16); color: #eba293; white-space: nowrap; }
+.compact .pick .ptag { font-size: 9.5px; padding: 0 4px; }
+
+/* ---------- tutorial v2 ---------- */
+#tut { pointer-events: none; }
+#tut .blk, #tut .tbox, #tut button { pointer-events: auto; }
+#tut .blk { position: absolute; background: transparent; }
+#tut .spot { transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease; }
+/* parchment window: clearly not part of the game screen */
+#tut .tbox { width: 430px; background: #efe6cf; color: #1f1b14; border: 2px solid #c8a14c; border-top: 2px solid #c8a14c; border-radius: 8px; padding: 14px 16px 10px; gap: 8px;
+  box-shadow: 0 0 0 4px rgba(200, 161, 76, .28), 0 14px 34px rgba(0, 0, 0, .65); transform-origin: center; transition: transform .2s ease, opacity .2s ease; cursor: pointer; }
+#tut .tbox.glide { transition: transform .2s ease, opacity .2s ease, left .25s ease, top .25s ease; }
+#tut .tbox.out { transform: scale(0); opacity: 0; }
+.compact #tut .tbox { width: 350px; padding: 9px 11px 7px; gap: 5px; }
+#tut .tbox .tlab { font-size: 10px; letter-spacing: .14em; color: #8a6a28; font-weight: 700; }
+#tut .tbox h3 { color: #5c3f0c; font-size: 17px; }
+.compact #tut .tbox h3 { font-size: 14px; }
+#tut .tbox p { color: #2a251c; }
+#tut .tfoot { display: flex; align-items: center; gap: 8px; }
+#tut .thint { font-size: 12px; color: #7a5b1e; font-weight: 700; animation: tblink 1.8s ease-in-out infinite; }
+#tut .thint.act { color: #9b3b26; }
+#tut .tfoot .pg { margin-left: auto; font-family: var(--f-num); font-size: 11px; color: #8d806a; }
+.compact #tut .thint { font-size: 10.5px; }
+@keyframes tblink { 0%, 100% { opacity: 1; } 50% { opacity: .3; } }
+@media (prefers-reduced-motion: reduce) { #tut .thint { animation: none; } #tut .tbox, #tut .spot { transition: none; } }
+#tut .tend { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+#tut .tend:empty { display: none; }
+#tut .tend .btn { background: #fff8e6; color: #3a2c10; border-color: #c8a14c; }
+#tut .tend .btn.primary { background: #c8a14c; color: #19140a; }
+#tut .tback { position: absolute; right: 14px; top: 56px; z-index: 2; min-width: 44px; font-size: 18px; }
+.compact #tut .tback { right: 8px; top: 44px; }
+/* tutorial chooser */
+.tchoice { display: grid; gap: 8px; }
+.tchoice .btn { display: grid; gap: 3px; text-align: left; padding: 12px 14px; min-height: 60px; }
+.tchoice .btn b { font-size: 15px; color: var(--fg); }
+.tchoice .btn span { font-size: 12px; color: var(--muted); }
+.tchoice .btn:hover { border-color: var(--brass); }
+/* scenario cards: the start line is a real button */
+.scard { cursor: default; }
+.scard:hover { border-color: var(--line); }
+.scard .go.btn { justify-self: end; font-size: 14px; letter-spacing: .04em; color: #19140a; padding: 8px 18px; min-height: 40px; }
+.compact .scard .go.btn { font-size: 12.5px; min-height: 34px; padding: 5px 14px; }
