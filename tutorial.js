@@ -42,7 +42,7 @@
     { t: null, ja: ['操作説明', '実際に操作してみましょう。チュートリアル中は時間が止まっています。'], en: ['How to play', 'Let\'s try it for real. Time is stopped during the tutorial.'] },
     { t: '#AbSell', pad: 4, wait: () => sellOpen('A'), ja: ['販売を開く', 'A国の「販売」を押してください。'], en: ['Open Sell', 'Tap "Sell" on Nation A.'] },
     { t: '.picks', need: () => sellOpen('A'), ja: ['品目を選ぶ', '売る品目を選ぶ欄です。在庫の数、定価、前回の取引や相場が出ます。今回は選ばれている装備一式を売ります。'], en: ['Pick an item', 'Choose what to sell here. It shows stock, list price, the last deal and the market. This time, sell the selected Arms Kit.'] },
-    { t: '#mRange,.quick', need: () => sellOpen('A'), wait: () => { const a = act(); return !!a && a.kind === 'sell' && Math.abs(a.m - 1.2) < 0.001; }, ja: ['価格を決める', '価格を定価の1.2倍にしてください。スライダーを動かすか、「×1.2」を押します。'], en: ['Set the price', 'Set the price to x1.2 of list. Drag the slider or tap "x1.2".'] },
+    { t: '#mc .priceline,#mRange,#mc .quick', need: () => sellOpen('A'), wait: () => { const a = act(); return !!a && a.kind === 'sell' && Math.abs(a.m - 1.2) < 0.001; }, ja: ['価格を決める', '価格を定価の1.2倍にしてください。スライダーを動かすか、「×1.2」を押します。'], en: ['Set the price', 'Set the price to x1.2 of list. Drag the slider or tap "x1.2".'] },
     { t: '#mc [data-do="sell"]', pad: 4, need: () => sellOpen('A'), wait: soldOnce, ja: ['売り込む', '「売り込む」を押してください。'], en: ['Make the offer', 'Tap "Offer".'] },
     { t: '#mc .resp', need: () => sellOpen('A') && soldOnce(), ja: ['相場どおりに売れた', '相場どおりの価格だったので、A国は普通に買いました。相場より高すぎると断られ、安く売ると疑惑度が下がり戦意が上がります。'], en: ['Sold at market', 'The price matched the market, so A bought it. Price too high and they refuse; sell cheap and suspicion falls while morale rises.'] },
     { t: '#mc .mstat', need: () => sellOpen('A'), ja: ['相手国の状態', '下には売り込む国の状態が出ます。カードと同じ並びなので、売りながら確かめられます。'], en: ['Buyer status', 'The buyer\'s status is shown below, in the same order as its card, so you can check it while you sell.'] },
@@ -86,7 +86,7 @@
   }
 
   function build() {
-    $('tut').innerHTML = `<div class="spot none"></div><div class="blk b0"></div><div class="blk b1"></div><div class="blk b2"></div><div class="blk b3"></div>
+    $('tut').innerHTML = `<div class="spot none"></div><div class="ring" hidden></div><div class="blk b0"></div><div class="blk b1"></div><div class="blk b2"></div><div class="blk b3"></div>
       <button class="btn thome" data-th>${L('ホームに戻る', 'Home')}</button>
       <button class="btn tback" data-tp aria-label="${L('戻る', 'Back')}">←</button>
       <div class="tbox" role="dialog" aria-live="polite"><span class="tlab">${cur === 1 ? L('チュートリアル1 画面説明', 'TUTORIAL 1 · THE SCREEN') : L('チュートリアル2 操作説明', 'TUTORIAL 2 · HOW TO PLAY')}</span>
@@ -94,9 +94,12 @@
   }
   // dark mask with a hole: the four blockers leave only the target clickable in hands-on steps
   function mask(r, open) {
-    const W = ui().stage.offsetWidth, H = ui().stage.offsetHeight, b = [...$('tut').querySelectorAll('.blk')], spot = $('tut').querySelector('.spot');
-    if (r) { spot.classList.remove('none'); Object.assign(spot.style, { left: r.x + 'px', top: r.y + 'px', width: r.w + 'px', height: r.h + 'px' }); }
+    const W = ui().stage.offsetWidth, H = ui().stage.offsetHeight, b = [...$('tut').querySelectorAll('.blk')], spot = $('tut').querySelector('.spot'), ring = $('tut').querySelector('.ring');
+    const box = { left: r ? r.x + 'px' : 0, top: r ? r.y + 'px' : 0, width: r ? r.w + 'px' : 0, height: r ? r.h + 'px' : 0 };
+    if (r) { spot.classList.remove('none'); Object.assign(spot.style, box); }
     else spot.classList.add('none');
+    // hands-on: the lit frame pulses (grows slowly, snaps back)
+    spot.classList.toggle('act', !!(r && open)); ring.hidden = !(r && open); if (r && open) Object.assign(ring.style, box);
     const set = (el, x, y, w, h) => Object.assign(el.style, { left: x + 'px', top: y + 'px', width: Math.max(0, w) + 'px', height: Math.max(0, h) + 'px' });
     if (r && open) {
       set(b[0], 0, 0, W, r.y); set(b[1], 0, r.y + r.h, W, H - r.y - r.h);
@@ -135,14 +138,20 @@
   }
   function go(ni) {
     if (ni < 0 || ni >= STEPS.length || busy) return;
-    const prev = STEPS[i], next = STEPS[ni], tb = $('tut').querySelector('.tbox');
+    const prev = STEPS[i], next = STEPS[ni], box = $('tut'), tb = box.querySelector('.tbox');
     const glide = prev !== next && prev.grp && prev.grp === next.grp;
-    if (glide || RM()) { tb.classList.toggle('glide', !!glide); i = ni; fill(); shownAt = performance.now(); return; }
-    // pop: shrink away (0.2 s), then grow from nothing at the new place (0.2 s)
-    busy = true; tb.classList.remove('glide'); tb.classList.add('out');
+    const x0 = tb.offsetLeft, y0 = tb.offsetTop;
+    const ghost = tb.cloneNode(true); ghost.classList.add('ghost'); ghost.classList.remove('glide', 'out');
+    tb.classList.toggle('glide', !!glide);
+    i = ni; fill();
+    const same = (!prev.t && !next.t) || (Math.abs(tb.offsetLeft - x0) < 24 && Math.abs(tb.offsetTop - y0) < 24);
+    if (glide || same || RM()) { shownAt = performance.now(); return; }
+    // the old window shrinks away (0.2 s), then the new one grows from nothing at its place (0.2 s)
+    busy = true; box.appendChild(ghost);
+    tb.style.transition = 'none'; tb.classList.add('out'); void tb.offsetWidth; tb.style.transition = '';
+    requestAnimationFrame(() => ghost.classList.add('out'));
     setTimeout(() => {
-      i = ni; fill();
-      void tb.offsetWidth; tb.classList.remove('out');
+      ghost.remove(); tb.classList.remove('out');
       setTimeout(() => { busy = false; shownAt = performance.now(); }, 200);
     }, 200);
   }
@@ -170,9 +179,19 @@
   }
   function stop() { if (!on) return; on = false; clearInterval(poll); $('tut').hidden = true; $('tut').innerHTML = ''; ui().openCard('A', false); }
   function home() { stop(); ui().home(); }
+  // switching tutorials: black out, swap, fade back in
+  function toT2() {
+    if (busy) return; busy = true;
+    const f = $('fade'), rm = RM();
+    $('fadeT').textContent = L('チュートリアル2', 'Tutorial 2'); $('fadeS').textContent = L('操作説明', 'How to Play');
+    f.className = 'on tutc';
+    setTimeout(() => { stop(); start(2); busy = true; }, rm ? 150 : 600);
+    setTimeout(() => { f.className = 'tutc'; }, rm ? 400 : 1500);
+    setTimeout(() => { f.className = ''; busy = false; shownAt = performance.now(); }, rm ? 600 : 2100);
+  }
   $('tut').addEventListener('click', e => {
     if (e.target.closest('[data-th]')) { home(); return; }
-    if (e.target.closest('[data-t2]')) { stop(); start(2); return; }
+    if (e.target.closest('[data-t2]')) { toT2(); return; }
     if (e.target.closest('[data-tp]')) { back(); return; }
     if (e.target.closest('.blk') || e.target.closest('.tbox')) next();
   });

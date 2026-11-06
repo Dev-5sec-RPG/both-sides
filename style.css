@@ -431,3 +431,39 @@ html[lang="en"] .compact .gg .lb.em { font-size: 11px; }
 .scard:hover { border-color: var(--line); }
 .scard .go.btn { justify-self: end; font-size: 14px; letter-spacing: .04em; color: #19140a; padding: 8px 18px; min-height: 40px; }
 .compact .scard .go.btn { font-size: 12.5px; min-height: 34px; padding: 5px 14px; }
+
+/* fade above the home screen while switching to a war */
+#fade.cover { z-index: 66; }
+#fade { transition: opacity .55s ease; }
+
+/* phones: covert list and the close button fit on one screen (the status below may scroll) */
+.compact .mc { gap: 6px; }
+.compact .mc .stamp { font-size: 9.5px; }
+.compact .oprow { padding: 3px 0; gap: 8px; }
+.compact .oprow .on { font-size: 12px; }
+.compact .oprow .oc { font-size: 10.5px; }
+.compact .oprow .od { font-size: 10px; line-height: 1.3; margin-top: 1px; }
+.compact .oprow .onow, .compact .oprow .why { font-size: 9.5px; margin-top: 1px; }
+.compact .oprow .btn { min-height: 28px; min-width: 64px; font-size: 12px; padding: 2px 8px; }
+.compact .mc .foot .btn { min-height: 30px; padding: 3px 12px; }
+
+/* ---------- tutorial v3 ---------- */
+/* dark brown window (warm, unlike the grey game panels) */
+#tut .tbox { background: linear-gradient(180deg, #33261a, #241a12); color: #eadfc6; border-color: #b8913f; box-shadow: 0 0 0 4px rgba(200, 161, 76, .2), 0 14px 34px rgba(0, 0, 0, .7); }
+#tut .tbox .tlab { color: #c9a45a; }
+#tut .tbox h3 { color: #f0cf86; }
+#tut .tbox p { color: #e6dcc6; }
+#tut .thint { color: #d9b56a; }
+#tut .thint.act { color: #ff9b7e; }
+#tut .tfoot .pg { color: #9c8d72; }
+#tut .tend .btn { background: #3d2e1f; color: #eadfc6; border-color: #b8913f; }
+#tut .tend .btn.primary { background: #c8a14c; color: #19140a; }
+#tut .tbox.ghost { pointer-events: none; transition: transform .2s ease, opacity .2s ease; }
+/* hands-on: the lit frame grows slowly while it blinks, then snaps back */
+#tut .spot.act { outline: 0; }
+#tut .ring { position: absolute; border-radius: 6px; border: 2px solid #ffd27a; box-shadow: 0 0 12px rgba(255, 210, 122, .55); pointer-events: none; transform-origin: center;
+  transition: left .25s ease, top .25s ease, width .25s ease, height .25s ease; animation: tpulse 1.1s linear infinite; }
+@keyframes tpulse { 0% { transform: scale(1); opacity: 1; } 99.9% { transform: scale(1.15); opacity: .15; } 100% { transform: scale(1); opacity: 1; } }
+@media (prefers-reduced-motion: reduce) { #tut .ring { animation: none; } }
+/* black-out between tutorials, above the tutorial layer */
+#fade.tutc { z-index: 75; }

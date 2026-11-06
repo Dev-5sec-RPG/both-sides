@@ -27,7 +27,6 @@
     document.documentElement.lang = S.LANG.cur;
     document.querySelectorAll('[data-t]').forEach(el => { const k = el.dataset.t; if (T[k]) el.textContent = tx(k); });
     $('bFull').setAttribute('aria-label', L('全画面', 'Full screen')); $('bFull').title = L('全画面', 'Full screen');
-    $('bDbg').title = L('隠し値の表示(検証用)', 'Show hidden values (debug)');
   }
   const SHORT = () => ({ equip: L('装備一式', 'Arms'), merc: L('傭兵', 'Mercs'), food: L('兵糧', 'Rations') });
   function short(n) {
@@ -402,19 +401,25 @@
       for (const u of live.sort((a, b) => a.slot - b.slot)) { const tgt = u.slot - n; if (tgt >= 0 && !used.has(tgt)) { used.delete(u.slot); u.slot = tgt; used.add(tgt); return; } }
     }
   }
+  // markers: points of light on the operations table (infantry = ring, armour = diamond)
+  const LIGHT = { A: '#c9dcf0', B: '#f3cdc3' };
   function drawUnit(ctx, u, side, s) {
-    const col = COL[side], w = (u.kind === 'armor' ? 17 : 14) * s, h = (u.kind === 'armor' ? 11 : 9) * s;
-    const grow = u.st === 'dead' ? 1 + (FX.clock - u.t0) * 0.6 : 1;
-    ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, u.a)); ctx.translate(u.x, u.y); ctx.scale(grow, grow);
-    ctx.shadowColor = 'rgba(0,0,0,.45)'; ctx.shadowBlur = 3 * s; ctx.shadowOffsetY = 1;
-    ctx.fillStyle = col.fill; ctx.fillRect(-w / 2, -h / 2, w, h);
-    ctx.shadowColor = 'transparent';
-    ctx.strokeStyle = u.st === 'dead' ? '#ff7a5f' : col.main; ctx.lineWidth = 1.3;
-    ctx.strokeRect(-w / 2 + 0.5, -h / 2 + 0.5, w - 1, h - 1);
-    ctx.beginPath();
-    if (u.kind === 'armor') ctx.ellipse(0, 0, w * 0.3, h * 0.24, 0, 0, Math.PI * 2);
-    else { ctx.moveTo(-w / 2 + 1, -h / 2 + 1); ctx.lineTo(w / 2 - 1, h / 2 - 1); ctx.moveTo(w / 2 - 1, -h / 2 + 1); ctx.lineTo(-w / 2 + 1, h / 2 - 1); }
-    ctx.stroke(); ctx.restore();
+    const col = COL[side], dead = u.st === 'dead', main = dead ? '#ff7a5f' : col.main, armor = u.kind === 'armor';
+    const grow = dead ? 1 + (FX.clock - u.t0) * 0.8 : 1, R = (armor ? 9 : 7) * s * grow;
+    ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, u.a)); ctx.translate(u.x, u.y);
+    const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.6);
+    gl.addColorStop(0, main + 'aa'); gl.addColorStop(1, main + '00');
+    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, R * 1.6, 0, Math.PI * 2); ctx.fill();
+    ctx.strokeStyle = main; ctx.lineWidth = 1; ctx.fillStyle = dead ? '#ffd2c6' : LIGHT[side];
+    const k = s * grow;
+    if (armor) {
+      ctx.beginPath(); ctx.moveTo(0, -5 * k); ctx.lineTo(5 * k, 0); ctx.lineTo(0, 5 * k); ctx.lineTo(-5 * k, 0); ctx.closePath(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -2.2 * k); ctx.lineTo(2.2 * k, 0); ctx.lineTo(0, 2.2 * k); ctx.lineTo(-2.2 * k, 0); ctx.closePath(); ctx.fill();
+    } else {
+      ctx.beginPath(); ctx.arc(0, 0, 3.6 * k, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 1.6 * k, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
   }
   function convoyPoint(side, p) {
     const lag = I[p.item].lag, prog = Math.max(0, Math.min(1, 1 - (p.at - g.t) / lag));
@@ -621,14 +626,14 @@
       showModal(`<div class="stamp">${stampOf(L('ホームに戻る', 'Home'))}</div><h2>${L('今の戦争を捨ててホームに戻りますか', 'Abandon this war and go home?')}</h2>
         <p>${L('今の戦争は精算されず、記録も残りません。', 'This war will not be settled or recorded.')}</p>
         <div class="foot"><button class="btn" data-do="close">${L('続ける', 'Keep playing')}</button><button class="btn primary" data-do="home">${L('ホームに戻る', 'Go home')}</button></div>`);
-      if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus(); }
+      if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus({ preventScroll: true }); $('mc').scrollTop = 0; }
       return;
     } else if (act.kind === 'retreat') {
       showModal(`<div class="stamp">${stampOf(L('撤退', 'Withdraw'))}</div><h2>${L('ここで手を引きますか', 'Pull out now?')}</h2>
         <p>${L('現在の所持金で精算し、試合を終えます。倉庫の在庫は価値を失い、貸し付けた融資は回収できません。戦争はあなた抜きで続きます。', 'You settle with the cash you hold and end the match. Stock is lost and loans are not repaid. The war goes on without you.')}</p>
         <div class="kv"><span>${L('所持金', 'Cash')} <b>${fmt(g.money)}</b></span><span>${L('利益', 'Profit')} <b>${(g.money - S.CFG.startMoney >= 0 ? '+' : '') + fmt(g.money - S.CFG.startMoney)}</b></span><span>${L('融資残高', 'Loans out')} <b>${short(loanOf('A') + loanOf('B'))}</b></span></div>
         <div class="foot"><button class="btn" data-do="close">${L('続ける', 'Keep playing')}</button><button class="btn primary" data-do="retreat">${L('精算して撤退', 'Settle and withdraw')}</button></div>`);
-      if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus(); }
+      if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus({ preventScroll: true }); $('mc').scrollTop = 0; }
       return;
     } else {
       const cn = c.name, on = oc.name, wkLeft = c.policy !== 'normal' ? wk(c.policyUntil - g.t) : 0;
@@ -657,7 +662,7 @@
     const keep = focus ? 0 : $('mc').scrollTop;
     showModal(h, act.cid); $('mc').scrollTop = keep;
     if (act.kind === 'sell') updatePrice();
-    if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus(); }
+    if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus({ preventScroll: true }); $('mc').scrollTop = 0; }
   }
   // food market shown to two decimals; what lowers prices is shown as tags on each item
   function foodInfo(c, est) {
@@ -823,13 +828,19 @@
   function clearFades() { fadeTimers.forEach(clearTimeout); fadeTimers = []; }
   function later(fn, ms) { fadeTimers.push(setTimeout(fn, ms)); }
   // start of a war: fade in from black with the war's name and date
+  // start of a war: first fade the current screen to black, then switch, then fade in with the war's name and date
   function startGame(sc) {
-    clearFades(); hideModal(); closeHome();
+    clearFades();
     if (touch && SET.autoFull) goFull();
-    mode = 'game'; setupGame(sc);
-    const f = $('fade'); f.className = 'on'; $('fadeT').textContent = S.SCENARIOS[curSc].name; $('fadeS').textContent = S.dateOf(0);
-    later(() => { f.className = ''; }, RM() ? 300 : 1300);
-    later(() => { started = true; g.paused = false; render(); }, RM() ? 500 : 2100);
+    const f = $('fade'), rm = RM(), out = rm ? 150 : 550;
+    $('fadeT').textContent = ''; $('fadeS').textContent = '';
+    f.className = 'on cover';
+    later(() => {
+      hideModal(); closeHome(); mode = 'game'; setupGame(sc);
+      $('fadeT').textContent = S.SCENARIOS[curSc].name; $('fadeS').textContent = S.dateOf(0);
+    }, out);
+    later(() => { f.className = 'cover'; }, out + (rm ? 300 : 1300));
+    later(() => { f.className = ''; started = true; g.paused = false; render(); }, out + (rm ? 500 : 2100));
   }
   // end of a war: the screen dims in the ending's colour, then the report appears
   function endSequence() {
@@ -931,7 +942,6 @@
   $('bPause').onclick = () => { if (mode !== 'game' || !started || g.over || g.modal || act) return; g.paused = !g.paused; render(); };
   $('bHome').onclick = () => { if (mode === 'tut') { showHome(); return; } if (mode !== 'game') return; if (!started || g.over) { showHome(); return; } if (g.modal || act) return; openAct('home', null); };
   $('bRetreat').onclick = () => { if (mode === 'game') openAct('retreat', null); };
-  $('bDbg').onclick = () => { dbg = !dbg; $('bDbg').classList.toggle('on', dbg); render(); if (act && act.kind !== 'home' && act.kind !== 'retreat') renderAct(); };
 
   // ---------- loop ----------
   let last = performance.now(), acc = 0, rAcc = 0, shown = null;
