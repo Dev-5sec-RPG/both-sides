@@ -2,7 +2,7 @@
 (function () {
   'use strict';
   const S = window.BothSides, I = S.ITEMS, O = S.OPS, fmt = S.fmt;
-  const L = (ja, en) => S.L(ja, en);
+  const L = (...a) => S.L(...a);
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const stage = $('stage');
@@ -16,19 +16,25 @@
 
   // ---------- static texts ----------
   const T = {
-    cal: ['暦', 'Date'], money: ['所持金', 'Cash'], profit: ['利益(スコア)', 'Profit (score)'],
-    retreat: ['撤退', 'Withdraw'], home: ['ホームに戻る', 'Home'], capA: ['A国 首都', 'Capital A'], capB: ['B国 首都', 'Capital B'],
-    frontline: ['戦線', 'front'], stockTitle: ['倉庫(装備・傭兵は自動生産で押すと停止/再開。兵糧は押した回数だけ作る。各12まで)', 'Warehouse (arms and mercs auto-produce; tap to pause. Rations: one per tap. Max 12 each)'],
-    newsTitle: ['戦況ニュース', 'War news'], hNew: ['新しい戦争', 'New War'], hTut: ['チュートリアル', 'Tutorial'], hSet: ['設定', 'Settings'],
-    rotate: ['このゲームは横画面向けです。端末を横向きにしてお楽しみください。', 'This game is made for landscape. Please turn your device sideways.'], rotateOk: ['このまま遊ぶ', 'Play anyway'],
+    cal: ['暦', 'Date', '日期'], money: ['所持金', 'Cash', '现金'], profit: ['利益(スコア)', 'Profit (score)', '利润(得分)'],
+    retreat: ['撤退', 'Withdraw', '撤离'], home: ['ホームに戻る', 'Home', '返回主页'], capA: ['A国 首都', 'Capital A', 'A国 首都'], capB: ['B国 首都', 'Capital B', 'B国 首都'],
+    frontline: ['戦線', 'front', '战线'], stockTitle: ['倉庫(装備・傭兵は自動生産で押すと停止/再開。兵糧は押した回数だけ作る。各12まで)', 'Warehouse (arms and mercs auto-produce; tap to pause. Rations: one per tap. Max 12 each)', '仓库(装备与雇佣兵自动生产，点击可停止/恢复。军粮按点击次数生产。各最多12)'],
+    newsTitle: ['戦況ニュース', 'War news', '战况新闻'], hNew: ['新しい戦争', 'New War', '新的战争'], hTut: ['チュートリアル', 'Tutorial', '教程'], hSet: ['設定', 'Settings', '设置'],
+    rotate: ['このゲームは横画面向けです。端末を横向きにしてお楽しみください。', 'This game is made for landscape. Please turn your device sideways.', '本游戏适合横屏。请将设备横向放置后游玩。'], rotateOk: ['このまま遊ぶ', 'Play anyway', '直接游玩'],
   };
-  const tx = k => L(T[k][0], T[k][1]);
+  const tx = k => L(T[k][0], T[k][1], T[k][2]);
   function applyStatic() {
-    document.documentElement.lang = S.LANG.cur;
+    document.documentElement.lang = S.LANG.cur === 'zh' ? 'zh-CN' : S.LANG.cur; loadZhFont();
     document.querySelectorAll('[data-t]').forEach(el => { const k = el.dataset.t; if (T[k]) el.textContent = tx(k); });
-    $('bFull').setAttribute('aria-label', L('全画面', 'Full screen')); $('bFull').title = L('全画面', 'Full screen');
+    $('bFull').setAttribute('aria-label', L('全画面', 'Full screen', '全屏')); $('bFull').title = L('全画面', 'Full screen', '全屏');
   }
-  const SHORT = () => ({ equip: L('装備一式', 'Arms'), merc: L('傭兵', 'Mercs'), food: L('兵糧', 'Rations') });
+  // Chinese glyphs: load a Simplified Chinese font only when that language is chosen
+  let zhFont = false;
+  function loadZhFont() {
+    if (zhFont || S.LANG.cur !== 'zh') return; zhFont = true;
+    const l = document.createElement('link'); l.rel = 'stylesheet'; l.href = 'https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@400;700&display=swap'; document.head.appendChild(l);
+  }
+  const SHORT = () => ({ equip: L('装備一式', 'Arms', '成套装备'), merc: L('傭兵', 'Mercs', '雇佣兵'), food: L('兵糧', 'Rations', '军粮') });
   function short(n) {
     const a = Math.abs(n), sg = n < 0 ? '-' : '';
     if (S.LANG.cur === 'en') {
@@ -36,7 +42,7 @@
       if (a >= 1e3) return sg + Math.round(a / 1e3) + 'K';
       return sg + Math.round(a);
     }
-    if (a >= 1e8) return sg + (a / 1e8).toFixed(1) + '億';
+    if (a >= 1e8) return sg + (a / 1e8).toFixed(1) + (S.LANG.cur === 'zh' ? '亿' : '億');
     if (a >= 1e6) return sg + Math.round(a / 1e4) + '万';
     if (a >= 1e4) return sg + (a / 1e4).toFixed(1) + '万';
     return sg + Math.round(a);
@@ -107,12 +113,12 @@
       <div class="bar${c}" id="${id}${key}B"><i></i>${(ticks || []).map(t => `<span class="tk" style="left:${t}%"></span>`).join('')}</div>
       <span class="v${c}" id="${id}${key}V"></span>`;
   }
-  const LB = () => ({ mor: L('戦意', 'Morale'), ant: L('反戦', 'Anti-war'), frt: L('前線', 'Front'), res: L('予備', 'Reserve'), sor: L('出動', 'Deploy'), eqs: L('装備', 'Arms'), crw: L('充足', 'Crew'), food: L('兵糧', 'Food'), fund: L('資金', 'Funds'), sus: L('疑惑', 'Suspic.') });
+  const LB = () => ({ mor: L('戦意', 'Morale', '士气'), ant: L('反戦', 'Anti-war', '反战'), frt: L('前線', 'Front', '前线'), res: L('予備', 'Reserve', '预备'), sor: L('出動', 'Deploy', '出动'), eqs: L('装備', 'Arms', '装备'), crw: L('充足', 'Crew', '充足'), food: L('兵糧', 'Food', '军粮'), fund: L('資金', 'Funds', '资金'), sus: L('疑惑', 'Suspic.', '怀疑') });
   function buildCard(id) {
     const lb = LB(), nm = S.LANG.cur === 'en' ? id : id + '国';
     $('c' + id).setAttribute('aria-label', nm);
     $('c' + id).innerHTML = `
-      <div class="ch"><span class="nm">${nm}</span><div class="flags" id="${id}fl"></div><button class="more" data-more="${id}">${L('詳細', 'More')}</button></div>
+      <div class="ch"><span class="nm">${nm}</span><div class="flags" id="${id}fl"></div><button class="more" data-more="${id}">${L('詳細', 'More', '详情')}</button></div>
       <div class="trait" id="${id}tr"></div>
       <div class="risk" id="${id}rk" hidden></div>
       <div class="gg">
@@ -127,21 +133,21 @@
         ${row(id, 'fund', 'fund', lb.fund, false, null, true)}
         ${row(id, 'sus', 'sus', lb.sus, false, [50, 75, 90], true)}
       </div>
-      <div class="sub"><span>${L('兵糧1単位', '1 ration')} <b id="${id}ct">—</b></span><span>${L('融資', 'Loan')} <b id="${id}ln">—</b></span></div>
+      <div class="sub"><span>${L('兵糧1単位', '1 ration', '军粮1单位')} <b id="${id}ct">—</b></span><span>${L('融資', 'Loan', '贷款')} <b id="${id}ln">—</b></span></div>
       <div class="acts">
-        <button data-open="sell" data-c="${id}" id="${id}bSell">${ico('sell', '')}${L('販売', 'Sell')}</button>
-        <button data-open="ops" data-c="${id}" id="${id}bOps">${ico('ops', '')}${L('暗躍', 'Covert')}</button>
+        <button data-open="sell" data-c="${id}" id="${id}bSell">${ico('sell', '')}${L('販売', 'Sell', '出售')}</button>
+        <button data-open="ops" data-c="${id}" id="${id}bOps">${ico('ops', '')}${L('暗躍', 'Covert', '暗中行动')}</button>
       </div>`;
   }
   function buildStock() {
     const sh = SHORT();
     $('stock').innerHTML = Object.values(I).map(it => it.key === 'food' ? `
-      <div class="slotw"><button class="slot" id="sl_food" data-food="add" title="${esc(L('押した回数だけ兵糧を作る(1回で1単位)。作ってから3か月売れないと廃棄', 'Makes one ration per tap. Spoils if unsold for 3 months'))}">
+      <div class="slotw"><button class="slot" id="sl_food" data-food="add" title="${esc(L('押した回数だけ兵糧を作る(1回で1単位)。作ってから3か月売れないと廃棄', 'Makes one ration per tap. Spoils if unsold for 3 months', '每按一次生产1单位军粮。生产后3个月未售出就会废弃'))}">
         <span class="sn"><span>${sh.food}</span><span class="st" id="ss_food"></span></span>
         <span class="cnt" id="sc_food">×0</span>
         <span class="pg"><i id="sp_food" style="width:0"></i></span>
-      </button><button class="fcan" data-food="sub" id="fcan" hidden>${L('取消', 'Undo')}</button></div>` : `
-      <button class="slot" id="sl_${it.key}" data-tog="${it.key}" title="${esc(it.name + L('(' + it.sub + ')・', ' (' + it.sub + ') · ') + it.trait)}">
+      </button><button class="fcan" data-food="sub" id="fcan" hidden>${L('取消', 'Undo', '取消')}</button></div>` : `
+      <button class="slot" id="sl_${it.key}" data-tog="${it.key}" title="${esc(it.name + L('(' + it.sub + ')・', ' (' + it.sub + ') · ', '(' + it.sub + ')、') + it.trait)}">
         <span class="sn"><span>${sh[it.key]}</span><span class="st" id="ss_${it.key}"></span></span>
         <span class="cnt" id="sc_${it.key}">×0</span>
         <span class="pg"><i id="sp_${it.key}" style="width:0"></i></span>
@@ -177,13 +183,13 @@
     $('hDate').textContent = S.dateOf(g.t);
     $('hTrack').style.width = Math.min(100, g.t / S.CFG.cap * 100) + '%';
     const ps = S.priceStep(g);
-    { const nx = S.nextPriceCheck(g); $('hStep').textContent = L('定価 ×', 'List x') + ps.toFixed(1) + (nx ? L('(次の見直し: ' + monthOf(nx) + ')', ' (next review: ' + monthOf(nx) + ')') : ''); }
-    setV('hMoney', short(g.money), L('所持金 ', 'Cash ') + fmt(g.money));
+    { const nx = S.nextPriceCheck(g); $('hStep').textContent = L('定価 ×', 'List x', '标价 ×') + ps.toFixed(1) + (nx ? L('(次の見直し: ' + monthOf(nx) + ')', ' (next review: ' + monthOf(nx) + ')', '(下次复审: ' + monthOf(nx) + ')') : ''); }
+    setV('hMoney', short(g.money), L('所持金 ', 'Cash ', '现金 ') + fmt(g.money));
     const p = g.money - S.CFG.startMoney;
-    setV('hProfit', (p >= 0 ? '+' : '') + short(p), L('利益 ', 'Profit ') + (p >= 0 ? '+' : '') + fmt(p), p >= 0 ? 'var(--good)' : 'var(--bad2)');
+    setV('hProfit', (p >= 0 ? '+' : '') + short(p), L('利益 ', 'Profit ', '利润 ') + (p >= 0 ? '+' : '') + fmt(p), p >= 0 ? 'var(--good)' : 'var(--bad2)');
     $('bPause').disabled = busy; $('bRetreat').disabled = busy;
     const playing = g.paused && started && !busy;
-    $('bPause').setAttribute('aria-label', playing ? L('再開', 'Resume') : L('一時停止', 'Pause'));
+    $('bPause').setAttribute('aria-label', playing ? L('再開', 'Resume', '继续') : L('一時停止', 'Pause', '暂停'));
     const want = playing ? 'play' : 'pause';
     if ($('bPause').dataset.s !== want) { $('bPause').dataset.s = want; $('bPause').innerHTML = playing ? PLAY_SVG : PAUSE_SVG; }
 
@@ -193,35 +199,35 @@
     $('polyB').setAttribute('points', '1000,0 ' + pts + ' 1000,500');
     $('pill').style.left = (sA * 100) + '%';
     { const hist = g.history, ref = hist.length > 6 ? hist[hist.length - 7].terr : sA, d = sA - ref;
-      $('pA').textContent = d > 0.004 ? L('A国が押している ▶', 'A advancing ▶') : ''; $('pB').textContent = d < -0.004 ? L('◀ B国が押している', '◀ B advancing') : '';
-      if (Math.abs(d) <= 0.004) $('pA').textContent = L('膠着', 'Stalemate'); }
+      $('pA').textContent = d > 0.004 ? L('A国が押している ▶', 'A advancing ▶', 'A国正在推进 ▶') : ''; $('pB').textContent = d < -0.004 ? L('◀ B国が押している', '◀ B advancing', '◀ B国正在推进') : '';
+      if (Math.abs(d) <= 0.004) $('pA').textContent = L('膠着', 'Stalemate', '僵持'); }
 
     for (const id of ['A', 'B']) {
       const c = g.c[id], s = S.shareOf(g, id);
       const tr = S.transitSum(c);
       setBar(id + 'frtB', c.front / SC.troop * 100, 'var(--troop)');
-      setV(id + 'frtV', short(c.front), L('前線の部隊 ' + fmt(c.front) + '人(移動中 ' + fmt(tr) + '人)', 'Front ' + fmt(c.front) + ' (moving ' + fmt(tr) + ')'));
+      setV(id + 'frtV', short(c.front), L('前線の部隊 ' + fmt(c.front) + '人(移動中 ' + fmt(tr) + '人)', 'Front ' + fmt(c.front) + ' (moving ' + fmt(tr) + ')', '前线部队 ' + fmt(c.front) + '人(移动中 ' + fmt(tr) + '人)'));
       setBar(id + 'resB', c.reserve / SC.troop * 100, 'var(--troop2)');
-      setV(id + 'resV', short(c.reserve), L('後方の予備 ' + fmt(c.reserve) + '人', 'Reserve ' + fmt(c.reserve)));
+      setV(id + 'resV', short(c.reserve), L('後方の予備 ' + fmt(c.reserve) + '人', 'Reserve ' + fmt(c.reserve), '后方预备 ' + fmt(c.reserve) + '人'));
       const sw = c.sortieRate * 3;
       setBar(id + 'sorB', sw / 1200 * 100, sw < 250 ? 'var(--bad)' : 'var(--brass)');
       { const q = S.eqSuff(g, c), nn = c.noNeed; setBar(id + 'eqsB', Math.min(q, SC.eq) / SC.eq * 100, nn ? 'var(--muted)' : 'var(--eq)');
-        setV(id + 'eqsV', Math.min(999, Math.round(q * 100)) + '%', L('装備充足率 ' + Math.round(q * 100) + '%(兵1人あたりの装備を、どの国も同じ基準で測った値。低いほど装備を高く買い、150%を超えると武器を買わなくなり、130%を下回ると再び買う)', 'Equipment ' + Math.round(q * 100) + '% (arms per soldier, same scale for all. Lower pays more; over 150% stops buying until below 130%)'), nn ? 'var(--muted)' : ''); }
+        setV(id + 'eqsV', Math.min(999, Math.round(q * 100)) + '%', L('装備充足率 ' + Math.round(q * 100) + '%(兵1人あたりの装備を、どの国も同じ基準で測った値。低いほど装備を高く買い、150%を超えると武器を買わなくなり、130%を下回ると再び買う)', 'Equipment ' + Math.round(q * 100) + '% (arms per soldier, same scale for all. Lower pays more; over 150% stops buying until below 130%)', '装备充足率 ' + Math.round(q * 100) + '%(以同一标准衡量每名士兵的装备量。越低越愿意高价购买装备，超过150%就不再购买武器，降到130%以下会再次购买)'), nn ? 'var(--muted)' : ''); }
       { const cf = S.crewFill(c); setBar(id + 'crwB', Math.min(cf, SC.crew) / SC.crew * 100, cf < 0.95 ? 'var(--bad)' : cf <= 1.1 ? 'var(--warn)' : 'var(--crew)');
-        setV(id + 'crwV', Math.min(999, Math.round(cf * 100)) + '%', L('人員充足率 ' + (cf * 100).toFixed(0) + '%(全軍の兵÷装備を扱う必要人数。110%以下で傭兵の相場が上がり、95%を切ると装備の相場が落ちる)', 'Crew ' + (cf * 100).toFixed(0) + '% (soldiers / crew needed for arms. At 110% or less mercs pay more; under 95% arms pay less)'), cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : ''); }
-      setV(id + 'sorV', short(sw) + L('/週', '/wk'), L('出動の勢い 毎週' + fmt(sw) + '人(予備の数・戦意・兵糧で決まる)', 'Deployment ' + fmt(sw) + '/week (set by reserve, morale and food)'), sw < 250 ? 'var(--bad2)' : '');
+        setV(id + 'crwV', Math.min(999, Math.round(cf * 100)) + '%', L('人員充足率 ' + (cf * 100).toFixed(0) + '%(全軍の兵÷装備を扱う必要人数。110%以下で傭兵の相場が上がり、95%を切ると装備の相場が落ちる)', 'Crew ' + (cf * 100).toFixed(0) + '% (soldiers / crew needed for arms. At 110% or less mercs pay more; under 95% arms pay less)', '人员充足率 ' + (cf * 100).toFixed(0) + '%(全军兵力÷操作装备所需人数。110%以下雇佣兵行情价上涨，跌破95%装备行情价下跌)'), cf < 0.95 ? 'var(--bad2)' : cf <= 1.1 ? '#e2a764' : ''); }
+      setV(id + 'sorV', short(sw) + L('/週', '/wk', '/周'), L('出動の勢い 毎週' + fmt(sw) + '人(予備の数・戦意・兵糧で決まる)', 'Deployment ' + fmt(sw) + '/week (set by reserve, morale and food)', '出动势头 每周' + fmt(sw) + '人(由预备兵数、士气、军粮决定)'), sw < 250 ? 'var(--bad2)' : '');
       setBar(id + 'morB', c.morale, c.morale < 25 ? 'var(--bad)' : 'var(--good)');
       setV(id + 'morV', c.morale.toFixed(0), null, c.morale < 25 ? 'var(--bad2)' : '');
       setBar(id + 'antB', c.antiwar, '#b8b3a6');
       setV(id + 'antV', c.antiwar.toFixed(0));
       const v = c.susp;
       setBar(id + 'susB', Math.abs(v) / 2, v >= 80 ? 'var(--bad)' : v >= 50 ? 'var(--warn)' : v < 0 ? 'var(--good)' : 'var(--brass)', v >= 0 ? 50 : 50 + v / 2);
-      setV(id + 'susV', (v > 0 ? '+' : '') + v.toFixed(0), L('疑惑度 ' + v.toFixed(1) + '(-100 信頼 〜 100 疑惑/50で値引き要求・80で取引停止)', 'Suspicion ' + v.toFixed(1) + ' (-100 trust to 100 doubt; 50 wants discounts, 80 stops trade)'), v >= 50 ? '#e2a764' : v < 0 ? 'var(--good)' : '');
+      setV(id + 'susV', (v > 0 ? '+' : '') + v.toFixed(0), L('疑惑度 ' + v.toFixed(1) + '(-100 信頼 〜 100 疑惑/50で値引き要求・80で取引停止)', 'Suspicion ' + v.toFixed(1) + ' (-100 trust to 100 doubt; 50 wants discounts, 80 stops trade)', '怀疑度 ' + v.toFixed(1) + '(-100 信任 ~ 100 怀疑/50要求降价、80中断交易)'), v >= 50 ? '#e2a764' : v < 0 ? 'var(--good)' : '');
       const fl0 = c.foodLv, fcol = fl0 < 70 ? 'var(--bad)' : fl0 < 90 ? 'var(--warn)' : fl0 < 100 ? 'var(--brass)' : 'var(--good)';
       setBar(id + 'foodB', Math.min(fl0, 130) / 130 * 100, fcol);
-      setV(id + 'foodV', Math.round(fl0) + '%', L('兵糧 ' + Math.round(fl0) + '%(100%を切ると戦意と出動が落ち始め、70%を下回ると目に見えて弱る。90%未満で高く買う。自給率 ' + Math.round(S.selfSuff(g, c) * 100) + '%)', 'Food ' + Math.round(fl0) + '% (below 100% morale and deployment slip; below 70% sharply. Pays more under 90%. Self-sufficiency ' + Math.round(S.selfSuff(g, c) * 100) + '%)'), fl0 < 70 ? 'var(--bad2)' : fl0 < 90 ? '#e2a764' : '');
+      setV(id + 'foodV', Math.round(fl0) + '%', L('兵糧 ' + Math.round(fl0) + '%(100%を切ると戦意と出動が落ち始め、70%を下回ると目に見えて弱る。90%未満で高く買う。自給率 ' + Math.round(S.selfSuff(g, c) * 100) + '%)', 'Food ' + Math.round(fl0) + '% (below 100% morale and deployment slip; below 70% sharply. Pays more under 90%. Self-sufficiency ' + Math.round(S.selfSuff(g, c) * 100) + '%)', '军粮 ' + Math.round(fl0) + '%(跌破100%后士气与出动开始下降，低于70%明显衰弱。低于90%时高价购买。自给率 ' + Math.round(S.selfSuff(g, c) * 100) + '%)'), fl0 < 70 ? 'var(--bad2)' : fl0 < 90 ? '#e2a764' : '');
       setBar(id + 'fundB', c.funds / SC.fund * 100, c.funds < S.CFG.loanLimit ? 'var(--bad)' : 'var(--brass)');
-      setV(id + 'fundV', short(c.funds), L('資金 ', 'Funds ') + fmt(c.funds), c.funds < S.CFG.loanLimit ? 'var(--bad2)' : '');
+      setV(id + 'fundV', short(c.funds), L('資金 ', 'Funds ', '资金 ') + fmt(c.funds), c.funds < S.CFG.loanLimit ? 'var(--bad2)' : '');
       const dz = { mor: c.morale < 35, sus: c.susp >= 50, food: c.foodLv < 90, fund: c.funds < S.CFG.loanLimit, sor: c.sortieRate * 3 < 250, crw: S.crewFill(c) < 0.95 };
       let anyD = false;
       for (const k in dz) { $(id + k + 'B').classList.toggle('danger', dz[k]); $(id + k + 'V').classList.toggle('danger', dz[k]); if (dz[k]) anyD = true; }
@@ -229,36 +235,36 @@
       { const tr = $(id + 'tr'), t = c.trait || ''; if (tr.textContent !== t) tr.textContent = t; tr.hidden = !t; }
       { const rk = S.collapseRisk(g, c), el = $(id + 'rk');
         if (rk.lv > 0) {
-          const t = (rk.lv === 2 ? L('崩壊の危険', 'Collapse danger') : L('崩壊の注意', 'Collapse risk')) + ': ' + rk.why.join(L('・', ', ')) + (rk.weeks != null ? L('(あと約' + rk.weeks + '週で降伏)', ' (surrender in ~' + rk.weeks + ' wk)') : '');
+          const t = (rk.lv === 2 ? L('崩壊の危険', 'Collapse danger', '崩溃危险') : L('崩壊の注意', 'Collapse risk', '崩溃警戒')) + ': ' + rk.why.join(L('・', ', ', '、')) + (rk.weeks != null ? L('(あと約' + rk.weeks + '週で降伏)', ' (surrender in ~' + rk.weeks + ' wk)', '(约' + rk.weeks + '周后投降)') : '');
           if (el.textContent !== t) el.textContent = t;
           el.className = 'risk lv' + rk.lv; el.hidden = false;
         } else el.hidden = true; }
       $(id + 'ct').textContent = '+' + Math.round(S.foodRestore(c)) + '%';
       const ln = loanOf(id); $(id + 'ln').textContent = ln ? short(ln) : '—';
       const fl = [], dem = S.demand(g, c);
-      if (c.susp >= 80) fl.push(['bad', L('取引停止', 'Trade halted')]); else if (c.susp >= 50) fl.push(['bad', L('値引き要求', 'Wants discount')]);
-      if (c.morale < 25) fl.push(['bad', L('購入意思なし', 'Not buying')]);
-      else if (s > 0.65 && c.antiwar > 50) fl.push(['good', L('早期終結を望む', 'Wants it over')]);
-      else if (c.noNeed) fl.push(['', L('武器は不要', 'No arms needed')]);
-      if (c.foodLv < 100) fl.push([c.foodLv < 90 ? 'bad' : '', c.foodLv < 70 ? L('兵糧欠乏', 'Starving') : c.foodLv < 90 ? L('兵糧不足・高値', 'Food short, pays more') : L('兵糧不足', 'Food short')]);
-      if (S.desertRate(c) > 0) fl.push(['bad', c.funds < c.initFunds * S.CFG.desertHeavy ? L('兵の大量離脱', 'Mass desertion') : L('兵の離脱', 'Desertion')]);
-      if (c.funds < S.CFG.loanLimit && !g.loans.some(l => l.cid === id)) fl.push(['', L('融資可', 'Loan OK')]);
-      if (c.susp <= -40) fl.push(['good', L('厚い信頼', 'Strong trust')]); else if (c.susp <= -15) fl.push(['good', L('信頼', 'Trust')]); else if (c.funds >= S.CFG.richLine) fl.push(['good', L('資金潤沢', 'Rich')]);
-      if (c.policy !== 'normal') fl.push(['', L('方針: ', 'Policy: ') + S.POLICY[c.policy].name]);
-      if (c.massing) fl.push(['bad', L('首都に集結中', 'Massing troops')]);
-      if (c.transit.some(x => x.wave)) fl.push(['bad', L('大規模増援 移動中', 'Surge en route')]);
+      if (c.susp >= 80) fl.push(['bad', L('取引停止', 'Trade halted', '中断交易')]); else if (c.susp >= 50) fl.push(['bad', L('値引き要求', 'Wants discount', '要求降价')]);
+      if (c.morale < 25) fl.push(['bad', L('購入意思なし', 'Not buying', '无购买意愿')]);
+      else if ((s > 0.65 && c.antiwar > 50) || S.rush(g, c) > 0.3) fl.push(['good', L('決着を急ぐ', 'Pushing to win', '急于决胜')]);
+      else if (c.noNeed) fl.push(['', L('武器は不要', 'No arms needed', '不需要武器')]);
+      if (c.foodLv < 100) fl.push([c.foodLv < 90 ? 'bad' : '', c.foodLv < 70 ? L('兵糧欠乏', 'Starving', '军粮匮乏') : c.foodLv < 90 ? L('兵糧不足・高値', 'Food short, pays more', '军粮不足、高价') : L('兵糧不足', 'Food short', '军粮不足')]);
+      if (S.desertRate(c) > 0) fl.push(['bad', c.funds < c.initFunds * S.CFG.desertHeavy ? L('兵の大量離脱', 'Mass desertion', '士兵大量逃离') : L('兵の離脱', 'Desertion', '士兵逃离')]);
+      if (c.funds < S.CFG.loanLimit && !g.loans.some(l => l.cid === id)) fl.push(['', L('融資可', 'Loan OK', '可贷款')]);
+      if (c.susp <= -40) fl.push(['good', L('厚い信頼', 'Strong trust', '深厚信任')]); else if (c.susp <= -15) fl.push(['good', L('信頼', 'Trust', '信任')]); else if (c.funds >= S.CFG.richLine) fl.push(['good', L('資金潤沢', 'Rich', '资金充裕')]);
+      if (c.policy !== 'normal') fl.push(['', L('方針: ', 'Policy: ', '方针: ') + S.POLICY[c.policy].name]);
+      if (c.massing) fl.push(['bad', L('首都に集結中', 'Massing troops', '首都集结中')]);
+      if (c.transit.some(x => x.wave)) fl.push(['bad', L('大規模増援 移動中', 'Surge en route', '大规模增援 移动中')]);
       const flh = fl.slice(0, 4).map(([k, t]) => `<span class="flag${k ? ' ' + k : ''}">${esc(t)}</span>`).join('');
       if ($(id + 'fl').innerHTML !== flh) $(id + 'fl').innerHTML = flh;
       document.querySelectorAll('[data-open][data-c="' + id + '"]').forEach(b => b.disabled = busy);
       const shp = $('ship' + id), items = c.pipeline.slice().sort((a, b) => a.at - b.at), sh = SHORT();
-      const shh = items.slice(0, 3).map(p => `<span>${sh[p.item]} ${L('到着まで' + wk(p.at - g.t) + '週', 'in ' + wk(p.at - g.t) + ' wk')}</span>`).join('') + (items.length > 3 ? `<span>${L('ほか' + (items.length - 3) + '件', '+' + (items.length - 3) + ' more')}</span>` : '');
+      const shh = items.slice(0, 3).map(p => `<span>${sh[p.item]} ${L('到着まで' + wk(p.at - g.t) + '週', 'in ' + wk(p.at - g.t) + ' wk', '还有' + wk(p.at - g.t) + '周到达')}</span>`).join('') + (items.length > 3 ? `<span>${L('ほか' + (items.length - 3) + '件', '+' + (items.length - 3) + ' more', '另有' + (items.length - 3) + '件')}</span>` : '');
       if (shp.innerHTML !== shh) shp.innerHTML = shh;
     }
     for (const k in I) {
       $('sc_' + k).textContent = '×' + g.inv[k];
       const on = k === 'food' ? g.foodQueue > 0 : g.prodOn[k];
       $('sp_' + k).style.width = on ? Math.min(100, g.prodT[k] / (I[k].interval / S.CFG.prodRate) * 100) + '%' : '0';
-      $('ss_' + k).textContent = k === 'food' ? (g.foodQueue > 0 ? L('作成 残り', 'Queued ') + g.foodQueue : L('押すと1単位作る', 'Tap to make')) : !on ? L('停止中', 'Paused') : g.inv[k] >= S.CFG.invCap ? L('満杯', 'Full') : L('生産中', 'Making');
+      $('ss_' + k).textContent = k === 'food' ? (g.foodQueue > 0 ? L('作成 残り', 'Queued ', '待生产 ') + g.foodQueue : L('押すと1単位作る', 'Tap to make', '按下生产1单位')) : !on ? L('停止中', 'Paused', '已停止') : g.inv[k] >= S.CFG.invCap ? L('満杯', 'Full', '已满') : L('生産中', 'Making', '生产中');
       $('sl_' + k).classList.toggle('off', !on);
       if (k === 'food') $('fcan').hidden = !(g.foodQueue > 0);
     }
@@ -269,27 +275,27 @@
   const effMemo = {};
   function renderEffects() {
     const list = [];
-    if (g.order) list.push({ k: 'ord', cls: 'ord', t: L('緊急発注: ' + g.c[g.order.cid].name + ' ' + I[g.order.item].name + ' 残り' + g.order.left + '/' + g.order.qty + '・あと' + wk(g.order.deadline - g.t) + '週', 'Rush order: ' + g.c[g.order.cid].name + ' ' + I[g.order.item].name + ' ' + g.order.left + '/' + g.order.qty + ' left, ' + wk(g.order.deadline - g.t) + ' wk') });
+    if (g.order) list.push({ k: 'ord', cls: 'ord', t: L('緊急発注: ' + g.c[g.order.cid].name + ' ' + I[g.order.item].name + ' 残り' + g.order.left + '/' + g.order.qty + '・あと' + wk(g.order.deadline - g.t) + '週', 'Rush order: ' + g.c[g.order.cid].name + ' ' + I[g.order.item].name + ' ' + g.order.left + '/' + g.order.qty + ' left, ' + wk(g.order.deadline - g.t) + ' wk', '紧急订单: ' + g.c[g.order.cid].name + ' ' + I[g.order.item].name + ' 剩余' + g.order.left + '/' + g.order.qty + ' 还剩' + wk(g.order.deadline - g.t) + '周') });
     for (const id of ['A', 'B']) {
       const c = g.c[id];
-      if (c.policy !== 'normal') list.push({ k: id + 'pol', cls: 'pol', t: L(c.name + ' 方針「' + S.POLICY[c.policy].name + '」 あと' + wk(c.policyUntil - g.t) + '週', c.name + ' "' + S.POLICY[c.policy].name + '" policy, ' + wk(c.policyUntil - g.t) + ' wk') });
-      if (g.t < c.priceModUntil) list.push({ k: id + 'pm', cls: 'mod', t: L(c.name + ' 競合の参入で相場 -20% あと' + wk(c.priceModUntil - g.t) + '週', c.name + ' rival dealer: prices -20%, ' + wk(c.priceModUntil - g.t) + ' wk') });
-      if (g.t < c.pushModUntil) list.push({ k: id + 'push', cls: 'mod', t: L(c.name + ' 突破作戦で押す力 +25% あと' + wk(c.pushModUntil - g.t) + '週', c.name + ' breakthrough: push +25%, ' + wk(c.pushModUntil - g.t) + ' wk') });
+      if (c.policy !== 'normal') list.push({ k: id + 'pol', cls: 'pol', t: L(c.name + ' 方針「' + S.POLICY[c.policy].name + '」 あと' + wk(c.policyUntil - g.t) + '週', c.name + ' "' + S.POLICY[c.policy].name + '" policy, ' + wk(c.policyUntil - g.t) + ' wk', c.name + ' 方针“' + S.POLICY[c.policy].name + '” 还剩' + wk(c.policyUntil - g.t) + '周') });
+      if (g.t < c.priceModUntil) list.push({ k: id + 'pm', cls: 'mod', t: L(c.name + ' 競合の参入で相場 -20% あと' + wk(c.priceModUntil - g.t) + '週', c.name + ' rival dealer: prices -20%, ' + wk(c.priceModUntil - g.t) + ' wk', c.name + ' 竞争者进入，行情价 -20% 还剩' + wk(c.priceModUntil - g.t) + '周') });
+      if (g.t < c.pushModUntil) list.push({ k: id + 'push', cls: 'mod', t: L(c.name + ' 突破作戦で押す力 +25% あと' + wk(c.pushModUntil - g.t) + '週', c.name + ' breakthrough: push +25%, ' + wk(c.pushModUntil - g.t) + ' wk', c.name + ' 突破作战，推进力 +25% 还剩' + wk(c.pushModUntil - g.t) + '周') });
     }
-    for (const p of (g.pending || [])) if (p.at > g.t) list.push({ k: 'pre' + p.at, cls: 'pre', t: L('予定: ' + p.label + ' あと' + wk(p.at - g.t) + '週', 'Coming: ' + p.label + ', ' + wk(p.at - g.t) + ' wk') });
+    for (const p of (g.pending || [])) if (p.at > g.t) list.push({ k: 'pre' + p.at, cls: 'pre', t: L('予定: ' + p.label + ' あと' + wk(p.at - g.t) + '週', 'Coming: ' + p.label + ', ' + wk(p.at - g.t) + ' wk', '预定: ' + p.label + ' 还剩' + wk(p.at - g.t) + '周') });
     const crit = [];
     for (const id of ['A', 'B']) {
       const c = g.c[id];
-      if (S.terrOf(S.shareOf(g, id)) < S.CFG.defeatAlert) crit.push({ k: id + 'def', cls: 'bad', t: L(c.name + ' 敗北の危機: これ以上押し込まれると敗北', c.name + ' on the brink: one more push means defeat') });
-      if (c.surT > 0) crit.push({ k: id + 'sur', cls: 'bad', t: L(c.name + ' 降伏を検討中 あと' + wk(S.CFG.surrHold - c.surT) + '週', c.name + ' considering surrender, ' + wk(S.CFG.surrHold - c.surT) + ' wk') });
+      if (S.terrOf(S.shareOf(g, id)) < S.CFG.defeatAlert) crit.push({ k: id + 'def', cls: 'bad', t: L(c.name + ' 敗北の危機: これ以上押し込まれると敗北', c.name + ' on the brink: one more push means defeat', c.name + ' 败北的危机: 再被推进就会战败') });
+      if (c.surT > 0) crit.push({ k: id + 'sur', cls: 'bad', t: L(c.name + ' 降伏を検討中 あと' + wk(S.CFG.surrHold - c.surT) + '週', c.name + ' considering surrender, ' + wk(S.CFG.surrHold - c.surT) + ' wk', c.name + ' 正在考虑投降 还剩' + wk(S.CFG.surrHold - c.surT) + '周') });
     }
-    if (g.peaceT > 0) crit.push({ k: 'peace', cls: 'bad', t: L('講和の動き 成立まで あと' + wk(S.CFG.peaceHold - g.peaceT) + '週', 'Peace talks: ' + wk(S.CFG.peaceHold - g.peaceT) + ' wk to a deal') });
+    if (g.peaceT > 0) crit.push({ k: 'peace', cls: 'bad', t: L('講和の動き 成立まで あと' + wk(S.CFG.peaceHold - g.peaceT) + '週', 'Peace talks: ' + wk(S.CFG.peaceHold - g.peaceT) + ' wk to a deal', '和谈动向 距离达成 还剩' + wk(S.CFG.peaceHold - g.peaceT) + '周') });
     list.unshift(...crit);
     const keys = new Set(list.map(x => x.k));
     for (const k in effMemo) if (!keys.has(k)) { if (!effMemo[k].endT) effMemo[k].endT = g.t; if (g.t - effMemo[k].endT > 6) delete effMemo[k]; }
     for (const x of list) effMemo[x.k] = { t: x.t, cls: x.cls };
-    const strip = t => t.replace(/ あと\d+週$/, '').replace(/, \d+ wk$/, '');
-    const ended = Object.entries(effMemo).filter(([k, v]) => v.endT != null).map(([k, v]) => `<span class="${v.cls} end">${esc(strip(v.t))} ${L('終了', 'ended')}</span>`);
+    const strip = t => t.replace(/ あと\d+週$/, '').replace(/, \d+ wk$/, '').replace(/ 还剩\d+周$/, '');
+    const ended = Object.entries(effMemo).filter(([k, v]) => v.endT != null).map(([k, v]) => `<span class="${v.cls} end">${esc(strip(v.t))} ${L('終了', 'ended', '结束')}</span>`);
     const h = list.map(x => `<span class="${x.cls}">${esc(x.t)}</span>`).concat(ended).slice(0, 6).join('');
     if ($('effs').innerHTML !== h) $('effs').innerHTML = h;
   }
@@ -567,13 +573,13 @@
   function closeAct() { if (!act) return; act = null; hideModal(); g.paused = false; render(); }
   function flagsOf(c) {
     const fl = [], s = S.shareOf(g, c.id);
-    if (c.susp <= -40) fl.push(['good', L('厚い信頼', 'Strong trust')]); else if (c.susp <= -15) fl.push(['good', L('信頼', 'Trust')]); else if (c.funds >= S.CFG.richLine) fl.push(['good', L('資金潤沢', 'Rich')]);
-    if (c.susp >= 80) fl.push(['bad', L('取引停止', 'Trade halted')]); else if (c.susp >= 50) fl.push(['bad', L('値引き要求', 'Wants discount')]);
-    if (c.morale < 25) fl.push(['bad', L('購入意思なし', 'Not buying')]); else if (s > 0.65 && c.antiwar > 50) fl.push(['good', L('早期終結を望む', 'Wants it over')]); else if (c.noNeed) fl.push(['', L('武器は不要', 'No arms needed')]);
-    if (c.foodLv < 100) fl.push([c.foodLv < 90 ? 'bad' : '', c.foodLv < 70 ? L('兵糧欠乏', 'Starving') : c.foodLv < 90 ? L('兵糧不足・高値', 'Food short, pays more') : L('兵糧不足', 'Food short')]);
-    fl.push(['', L('方針: ', 'Policy: ') + S.POLICY[c.policy].name + (c.policy !== 'normal' ? L('(あと' + wk(c.policyUntil - g.t) + '週)', ' (' + wk(c.policyUntil - g.t) + ' wk)') : '')]);
-    if (c.massing) fl.push(['bad', L('首都に集結中', 'Massing troops')]);
-    if (c.transit.some(x => x.wave)) fl.push(['bad', L('大規模増援 移動中', 'Surge en route')]);
+    if (c.susp <= -40) fl.push(['good', L('厚い信頼', 'Strong trust', '深厚信任')]); else if (c.susp <= -15) fl.push(['good', L('信頼', 'Trust', '信任')]); else if (c.funds >= S.CFG.richLine) fl.push(['good', L('資金潤沢', 'Rich', '资金充裕')]);
+    if (c.susp >= 80) fl.push(['bad', L('取引停止', 'Trade halted', '中断交易')]); else if (c.susp >= 50) fl.push(['bad', L('値引き要求', 'Wants discount', '要求降价')]);
+    if (c.morale < 25) fl.push(['bad', L('購入意思なし', 'Not buying', '无购买意愿')]); else if ((s > 0.65 && c.antiwar > 50) || S.rush(g, c) > 0.3) fl.push(['good', L('決着を急ぐ', 'Pushing to win', '急于决胜')]); else if (c.noNeed) fl.push(['', L('武器は不要', 'No arms needed', '不需要武器')]);
+    if (c.foodLv < 100) fl.push([c.foodLv < 90 ? 'bad' : '', c.foodLv < 70 ? L('兵糧欠乏', 'Starving', '军粮匮乏') : c.foodLv < 90 ? L('兵糧不足・高値', 'Food short, pays more', '军粮不足、高价') : L('兵糧不足', 'Food short', '军粮不足')]);
+    fl.push(['', L('方針: ', 'Policy: ', '方针: ') + S.POLICY[c.policy].name + (c.policy !== 'normal' ? L('(あと' + wk(c.policyUntil - g.t) + '週)', ' (' + wk(c.policyUntil - g.t) + ' wk)', '(还剩' + wk(c.policyUntil - g.t) + '周)') : '')]);
+    if (c.massing) fl.push(['bad', L('首都に集結中', 'Massing troops', '首都集结中')]);
+    if (c.transit.some(x => x.wave)) fl.push(['bad', L('大規模増援 移動中', 'Surge en route', '大规模增援 移动中')]);
     return `<div class="mflags">${fl.map(([k, t]) => `<span class="flag${k ? ' ' + k : ''}">${esc(t)}</span>`).join('')}</div>`;
   }
   // status block in the sell/covert screens: the same gauges as the nation's card, in the same order and look
@@ -586,12 +592,12 @@
   function panel(c, kind) {
     const oc = g.c[S.other(c.id)];
     let h = `<div class="mstat ${c.id}"><div class="msh"><span class="nm">${esc(c.name)}</span><span class="tr">${esc(c.trait || '')}</span></div>${flagsOf(c)}${gaugesOf(c.id)}</div>`;
-    if (kind === 'ops') h += `<div class="mstat ${oc.id}"><div class="msh"><span class="nm">${esc(oc.name)}</span><span class="tr">${L('暗躍の疑惑は相手国にも波及する', 'Covert work raises its suspicion too')}</span></div>${susOnly(oc.id)}</div>`;
+    if (kind === 'ops') h += `<div class="mstat ${oc.id}"><div class="msh"><span class="nm">${esc(oc.name)}</span><span class="tr">${L('暗躍の疑惑は相手国にも波及する', 'Covert work raises its suspicion too', '暗中行动引起的怀疑也会波及对方国家')}</span></div>${susOnly(oc.id)}</div>`;
     return h;
   }
-  function logHTML() { return act.log.length ? `<div class="stamp">${L('この停止中の行動', 'Actions this pause')}</div><ul class="mlog">${act.log.slice().reverse().map(l => `<li class="${l.ok ? 'ok' : 'ng'}">${esc(l.text)}</li>`).join('')}</ul>` : ''; }
+  function logHTML() { return act.log.length ? `<div class="stamp">${L('この停止中の行動', 'Actions this pause', '本次暂停中的行动')}</div><ul class="mlog">${act.log.slice().reverse().map(l => `<li class="${l.ok ? 'ok' : 'ng'}">${esc(l.text)}</li>`).join('')}</ul>` : ''; }
   const respHTML = () => `<div class="resp ${act.ok ? 'ok' : 'ng'}">${esc(act.msg)}</div>`;
-  const stampOf = k => k + L(' / 時が止まっています ', ' / Time is stopped ') + S.dateOf(g.t);
+  const stampOf = k => k + L(' / 時が止まっています ', ' / Time is stopped ', ' / 时间已停止 ') + S.dateOf(g.t);
   function renderAct(focus) {
     const c = g.c[act.cid], oc = act.cid ? g.c[S.other(act.cid)] : null, sh = SHORT();
     let h = '';
@@ -599,56 +605,56 @@
       const picks = Object.values(I).map(it => {
         const est = S.estimate(g, c, it.key), ld = c.lastDeal[it.key];
         const info = it.key === 'food' ? foodInfo(c, est)
-          : ld ? L('前回 ×' + ld.m.toFixed(2) + '・' + Math.max(0, Math.round((g.t - ld.t) / 3)) + '週前(' + ld.label + ')', 'Last x' + ld.m.toFixed(2) + ', ' + Math.max(0, Math.round((g.t - ld.t) / 3)) + ' wk ago (' + ld.label + ')') : L('前回の取引なし', 'No deal yet');
+          : ld ? L('前回 ×' + ld.m.toFixed(2) + '・' + Math.max(0, Math.round((g.t - ld.t) / 3)) + '週前(' + ld.label + ')', 'Last x' + ld.m.toFixed(2) + ', ' + Math.max(0, Math.round((g.t - ld.t) / 3)) + ' wk ago (' + ld.label + ')', '上次 ×' + ld.m.toFixed(2) + '、' + Math.max(0, Math.round((g.t - ld.t) / 3)) + '周前(' + ld.label + ')') : L('前回の取引なし', 'No deal yet', '尚无交易');
         return `<button class="pick${act.item === it.key ? ' sel' : ''}" data-pick="${it.key}">
           <span class="pn"><span>${sh[it.key]}</span><span class="num">×${g.inv[it.key]}</span></span>
           <span class="pl tr">${esc(it.trait)}</span>
-          <span class="pl num">${L('定価 ', 'List ')}${fmt(S.listPrice(g, it.key))}</span>
+          <span class="pl num">${L('定価 ', 'List ', '标价 ')}${fmt(S.listPrice(g, it.key))}</span>
           <span class="pe">${esc(info)}</span>${priceTags(c)}</button>`;
       }).join('');
       const has = g.inv[act.item] > 0;
-      h = `<div class="stamp">${stampOf(L('販売', 'Sell'))}</div><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name)}</h2>
+      h = `<div class="stamp">${stampOf(L('販売', 'Sell', '出售'))}</div><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name, '向' + c.name + '推销')}</h2>
         <div class="picks">${picks}</div>
         <div class="priceline"><span class="mult" id="mMult"></span><span class="yen" id="mYen"></span></div>
-        <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="${L('価格倍率', 'Price multiplier')}">
-        <div class="quick">${[[0, L('無償供与', 'Free')], [0.3, '×0.3'], [0.5, '×0.5'], [0.8, '×0.8'], [1, '×1.0'], [1.2, '×1.2'], [1.5, '×1.5'], [1.8, '×1.8'], [2, '×2.0']].map(([m, l]) => `<button class="btn" data-qm="${m}">${l}</button>`).join('')}</div>
-        <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume')}</button><button class="btn primary" data-do="sell" ${has && !act.blocked ? '' : 'disabled'}>${sellLabel(has)}</button></div>
+        <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="${L('価格倍率', 'Price multiplier', '价格倍率')}">
+        <div class="quick">${[[0, L('無償供与', 'Free', '无偿提供')], [0.3, '×0.3'], [0.5, '×0.5'], [0.8, '×0.8'], [1, '×1.0'], [1.2, '×1.2'], [1.5, '×1.5'], [1.8, '×1.8'], [2, '×2.0']].map(([m, l]) => `<button class="btn" data-qm="${m}">${l}</button>`).join('')}</div>
+        <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume', '关闭并继续')}</button><button class="btn primary" data-do="sell" ${has && !act.blocked ? '' : 'disabled'}>${sellLabel(has)}</button></div>
         ${respHTML()}${panel(c, 'sell')}${logHTML()}`;
     } else if (act.kind === 'home') {
-      showModal(`<div class="stamp">${stampOf(L('ホームに戻る', 'Home'))}</div><h2>${L('今の戦争を捨ててホームに戻りますか', 'Abandon this war and go home?')}</h2>
-        <p>${L('今の戦争は精算されず、記録も残りません。', 'This war will not be settled or recorded.')}</p>
-        <div class="foot"><button class="btn" data-do="close">${L('続ける', 'Keep playing')}</button><button class="btn primary" data-do="home">${L('ホームに戻る', 'Go home')}</button></div>`);
+      showModal(`<div class="stamp">${stampOf(L('ホームに戻る', 'Home', '返回主页'))}</div><h2>${L('今の戦争を捨ててホームに戻りますか', 'Abandon this war and go home?', '放弃当前战争并返回主页吗')}</h2>
+        <p>${L('今の戦争は精算されず、記録も残りません。', 'This war will not be settled or recorded.', '当前战争不会结算，也不会留下记录。')}</p>
+        <div class="foot"><button class="btn" data-do="close">${L('続ける', 'Keep playing', '继续')}</button><button class="btn primary" data-do="home">${L('ホームに戻る', 'Go home', '返回主页')}</button></div>`);
       if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus({ preventScroll: true }); $('mc').scrollTop = 0; }
       return;
     } else if (act.kind === 'retreat') {
-      showModal(`<div class="stamp">${stampOf(L('撤退', 'Withdraw'))}</div><h2>${L('ここで手を引きますか', 'Pull out now?')}</h2>
-        <p>${L('現在の所持金で精算し、試合を終えます。倉庫の在庫は価値を失い、貸し付けた融資は回収できません。戦争はあなた抜きで続きます。', 'You settle with the cash you hold and end the match. Stock is lost and loans are not repaid. The war goes on without you.')}</p>
-        <div class="kv"><span>${L('所持金', 'Cash')} <b>${fmt(g.money)}</b></span><span>${L('利益', 'Profit')} <b>${(g.money - S.CFG.startMoney >= 0 ? '+' : '') + fmt(g.money - S.CFG.startMoney)}</b></span><span>${L('融資残高', 'Loans out')} <b>${short(loanOf('A') + loanOf('B'))}</b></span></div>
-        <div class="foot"><button class="btn" data-do="close">${L('続ける', 'Keep playing')}</button><button class="btn primary" data-do="retreat">${L('精算して撤退', 'Settle and withdraw')}</button></div>`);
+      showModal(`<div class="stamp">${stampOf(L('撤退', 'Withdraw', '撤离'))}</div><h2>${L('ここで手を引きますか', 'Pull out now?', '要在这里收手吗')}</h2>
+        <p>${L('現在の所持金で精算し、試合を終えます。倉庫の在庫は価値を失い、貸し付けた融資は回収できません。戦争はあなた抜きで続きます。', 'You settle with the cash you hold and end the match. Stock is lost and loans are not repaid. The war goes on without you.', '以当前现金结算并结束本局。仓库库存将失去价值，已发放的贷款无法收回。战争会在你离开后继续。')}</p>
+        <div class="kv"><span>${L('所持金', 'Cash', '现金')} <b>${fmt(g.money)}</b></span><span>${L('利益', 'Profit', '利润')} <b>${(g.money - S.CFG.startMoney >= 0 ? '+' : '') + fmt(g.money - S.CFG.startMoney)}</b></span><span>${L('融資残高', 'Loans out', '贷款余额')} <b>${short(loanOf('A') + loanOf('B'))}</b></span></div>
+        <div class="foot"><button class="btn" data-do="close">${L('続ける', 'Keep playing', '继续')}</button><button class="btn primary" data-do="retreat">${L('精算して撤退', 'Settle and withdraw', '结算并撤离')}</button></div>`);
       if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus({ preventScroll: true }); $('mc').scrollTop = 0; }
       return;
     } else {
       const cn = c.name, on = oc.name, wkLeft = c.policy !== 'normal' ? wk(c.policyUntil - g.t) : 0;
-      const now = c.policy === 'normal' ? '' : L('現在の方針: ' + S.POLICY[c.policy].name + '(あと' + wkLeft + '週)', 'Current policy: ' + S.POLICY[c.policy].name + ' (' + wkLeft + ' wk left)');
+      const now = c.policy === 'normal' ? '' : L('現在の方針: ' + S.POLICY[c.policy].name + '(あと' + wkLeft + '週)', 'Current policy: ' + S.POLICY[c.policy].name + ' (' + wkLeft + ' wk left)', '当前方针: ' + S.POLICY[c.policy].name + '(还剩' + wkLeft + '周)');
       const rows = [
-        ['assassin', null, O.assassin.name, L(cn + 'の戦意 +15・反戦感情 -10。疑惑度 ' + cn + ' +30・' + on + ' +10。', cn + ' morale +15, anti-war -10. Suspicion ' + cn + ' +30, ' + on + ' +10.')],
-        ['rumor', null, O.rumor.name, L(cn + 'の戦意 +8。疑惑度 ' + cn + ' +10・' + on + ' +3。', cn + ' morale +8. Suspicion ' + cn + ' +10, ' + on + ' +3.')],
-        ['consult', 'aggr', L('戦争コンサル【積極・攻撃的】', 'War Consulting [Aggressive]'), L('10週間、' + cn + 'の司令部を攻撃的な方針にする。装備・傭兵の相場 +0.15、前線への出動 1.8倍、押す力 +15%。その間、反戦感情が上がり(計+4.5)戦意が下がっていく(計-3)。疑惑度 ' + cn + ' +5。', 'For 10 weeks ' + cn + ' HQ turns aggressive: arms and merc prices +0.15, deployment x1.8, push +15%. Meanwhile anti-war rises (+4.5 total) and morale falls (-3 total). Suspicion ' + cn + ' +5.')],
-        ['consult', 'pass', L('戦争コンサル【消極・保守的】', 'War Consulting [Cautious]'), L('10週間、' + cn + 'の司令部を保守的な方針にする。装備・傭兵の相場 -0.1、前線への出動 0.5倍、押す力 -12%(相手の大規模増援には対抗する)。その間、反戦感情が下がり(計-4.5)戦意が上がっていく(計+3)。疑惑度 ' + cn + ' +5。', 'For 10 weeks ' + cn + ' HQ turns cautious: arms and merc prices -0.1, deployment x0.5, push -12% (still counters surges). Meanwhile anti-war falls (-4.5 total) and morale rises (+3 total). Suspicion ' + cn + ' +5.')],
-        ['loan', null, O.loan.name, L(cn + 'へ50万を貸す。各国1回まで、資金30万以下の国だけが受け入れる。終戦時に利息20%を付けて回収、崩壊したら回収できない。', 'Lend 500K to ' + cn + '. Once per nation; only nations with 300K or less accept. Repaid +20% at war end; lost if it collapses.')],
+        ['assassin', null, O.assassin.name, L(cn + 'の戦意 +15・反戦感情 -10。疑惑度 ' + cn + ' +30・' + on + ' +10。', cn + ' morale +15, anti-war -10. Suspicion ' + cn + ' +30, ' + on + ' +10.', cn + '的士气 +15、反战情绪 -10。怀疑度 ' + cn + ' +30、' + on + ' +10。')],
+        ['rumor', null, O.rumor.name, L(cn + 'の戦意 +8。疑惑度 ' + cn + ' +10・' + on + ' +3。', cn + ' morale +8. Suspicion ' + cn + ' +10, ' + on + ' +3.', cn + '的士气 +8。怀疑度 ' + cn + ' +10、' + on + ' +3。')],
+        ['consult', 'aggr', L('戦争コンサル【積極・攻撃的】', 'War Consulting [Aggressive]', '战争顾问【积极·进攻】'), L('10週間、' + cn + 'の司令部を攻撃的な方針にする。装備・傭兵の相場 +0.15、前線への出動 1.8倍、押す力 +15%。その間、反戦感情が上がり(計+4.5)戦意が下がっていく(計-3)。疑惑度 ' + cn + ' +5。', 'For 10 weeks ' + cn + ' HQ turns aggressive: arms and merc prices +0.15, deployment x1.8, push +15%. Meanwhile anti-war rises (+4.5 total) and morale falls (-3 total). Suspicion ' + cn + ' +5.', '10周内，将' + cn + '的司令部改为进攻方针。装备与雇佣兵行情价 +0.15，向前线出动 1.8倍，推进力 +15%。期间反战情绪上升(共+4.5)，士气逐渐下降(共-3)。怀疑度 ' + cn + ' +5。')],
+        ['consult', 'pass', L('戦争コンサル【消極・保守的】', 'War Consulting [Cautious]', '战争顾问【消极·稳守】'), L('10週間、' + cn + 'の司令部を保守的な方針にする。装備・傭兵の相場 -0.1、前線への出動 0.5倍、押す力 -12%(相手の大規模増援には対抗する)。その間、反戦感情が下がり(計-4.5)戦意が上がっていく(計+3)。疑惑度 ' + cn + ' +5。', 'For 10 weeks ' + cn + ' HQ turns cautious: arms and merc prices -0.1, deployment x0.5, push -12% (still counters surges). Meanwhile anti-war falls (-4.5 total) and morale rises (+3 total). Suspicion ' + cn + ' +5.', '10周内，将' + cn + '的司令部改为稳守方针。装备与雇佣兵行情价 -0.1，向前线出动 0.5倍，推进力 -12%(仍会对抗敌方大规模增援)。期间反战情绪下降(共-4.5)，士气逐渐上升(共+3)。怀疑度 ' + cn + ' +5。')],
+        ['loan', null, O.loan.name, L(cn + 'へ50万を貸す。各国1回まで、資金30万以下の国だけが受け入れる。終戦時に利息20%を付けて回収、崩壊したら回収できない。', 'Lend 500K to ' + cn + '. Once per nation; only nations with 300K or less accept. Repaid +20% at war end; lost if it collapses.', '向' + cn + '贷款50万。每国限一次，仅资金30万以下的国家接受。战争结束时连同20%利息收回，若该国崩溃则无法收回。')],
       ].map(([k, arg, name, d]) => {
         let why = '';
-        if (g.cd[k] > 0) why = L('あと' + Math.ceil(g.cd[k] / 3) + '週で使える', 'Ready in ' + Math.ceil(g.cd[k] / 3) + ' wk') + (k === 'consult' ? L('(積極・消極で共通)', ' (shared by both)') : '');
-        else if (k === 'loan' && g.loans.some(l => l.cid === c.id)) why = L(cn + 'へは融資済み', 'Already lent to ' + cn);
-        else if (k === 'loan' && c.funds > S.CFG.loanLimit) why = L(cn + 'の資金が30万を超えているため受け入れない', cn + ' has over 300K and refuses');
-        else if (g.money < O[k].cost) why = L('所持金が足りない', 'Not enough cash');
+        if (g.cd[k] > 0) why = L('あと' + Math.ceil(g.cd[k] / 3) + '週で使える', 'Ready in ' + Math.ceil(g.cd[k] / 3) + ' wk', '还需' + Math.ceil(g.cd[k] / 3) + '周可用') + (k === 'consult' ? L('(積極・消極で共通)', ' (shared by both)', '(积极与消极共用)') : '');
+        else if (k === 'loan' && g.loans.some(l => l.cid === c.id)) why = L(cn + 'へは融資済み', 'Already lent to ' + cn, '已向' + cn + '贷款');
+        else if (k === 'loan' && c.funds > S.CFG.loanLimit) why = L(cn + 'の資金が30万を超えているため受け入れない', cn + ' has over 300K and refuses', cn + '的资金超过30万，不接受贷款');
+        else if (g.money < O[k].cost) why = L('所持金が足りない', 'Not enough cash', '现金不足');
         const note = k === 'consult' && now ? `<div class="onow">${esc(now)}</div>` : '';
         return `<div class="oprow"><div><div class="on">${esc(name)} <span class="oc num">${fmt(O[k].cost)}</span></div><div class="od">${esc(d)}</div>${note}${why ? `<div class="why">${esc(why)}</div>` : ''}</div>
-          <button class="btn" data-op="${k}"${arg ? ` data-arg="${arg}"` : ''} ${why ? 'disabled' : ''}>${L('実行', 'Do it')}</button></div>`;
+          <button class="btn" data-op="${k}"${arg ? ` data-arg="${arg}"` : ''} ${why ? 'disabled' : ''}>${L('実行', 'Do it', '执行')}</button></div>`;
       }).join('');
-      h = `<div class="stamp">${stampOf(L('暗躍', 'Covert'))}</div><h2>${L(cn + 'に対して動く', 'Act on ' + cn)}</h2>
+      h = `<div class="stamp">${stampOf(L('暗躍', 'Covert', '暗中行动'))}</div><h2>${L(cn + 'に対して動く', 'Act on ' + cn, '针对' + cn + '采取行动')}</h2>
         <div class="oplist">${rows}</div>
-        <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume')}</button></div>
+        <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume', '关闭并继续')}</button></div>
         ${respHTML()}${panel(c, 'ops')}${logHTML()}`;
     }
     const keep = focus ? 0 : $('mc').scrollTop;
@@ -658,19 +664,19 @@
   }
   // food market shown to two decimals; what lowers prices is shown as tags on each item
   function foodInfo(c, est) {
-    return L('相場 ×' + est.toFixed(2) + '(兵糧' + Math.round(c.foodLv) + '%・1単位で+' + Math.round(S.foodRestore(c)) + '%)', 'Market x' + est.toFixed(2) + ' (food ' + Math.round(c.foodLv) + '%, +' + Math.round(S.foodRestore(c)) + '% per unit)');
+    return L('相場 ×' + est.toFixed(2) + '(兵糧' + Math.round(c.foodLv) + '%・1単位で+' + Math.round(S.foodRestore(c)) + '%)', 'Market x' + est.toFixed(2) + ' (food ' + Math.round(c.foodLv) + '%, +' + Math.round(S.foodRestore(c)) + '% per unit)', '行情价 ×' + est.toFixed(2) + '(军粮' + Math.round(c.foodLv) + '%、每单位+' + Math.round(S.foodRestore(c)) + '%)');
   }
   function priceTags(c) {
     const t = [];
-    if (g.t < c.priceModUntil) t.push(L('競合の参入 -20%', 'Rival dealer -20%'));
-    if (c.susp >= 50) t.push(L('疑惑度50以上 -20%', 'Suspicion 50+ -20%'));
-    if (c.susp >= 80) t.push(L('疑惑度80以上 取引停止', 'Suspicion 80+ trade halted'));
+    if (g.t < c.priceModUntil) t.push(L('競合の参入 -20%', 'Rival dealer -20%', '竞争者进入 -20%'));
+    if (c.susp >= 50) t.push(L('疑惑度50以上 -20%', 'Suspicion 50+ -20%', '怀疑度50以上 -20%'));
+    if (c.susp >= 80) t.push(L('疑惑度80以上 取引停止', 'Suspicion 80+ trade halted', '怀疑度80以上 中断交易'));
     return t.length ? `<span class="ptags">${t.map(x => `<span class="ptag">${esc(x)}</span>`).join('')}</span>` : '';
   }
-  const sellLabel = has => !has ? L('在庫なし', 'Out of stock') : act.blocked ? L('価格を変えてください', 'Change the price') : act.m === 0 ? L('無償で渡す', 'Give for free') : L('売り込む', 'Offer');
+  const sellLabel = has => !has ? L('在庫なし', 'Out of stock', '无库存') : act.blocked ? L('価格を変えてください', 'Change the price', '请更改价格') : act.m === 0 ? L('無償で渡す', 'Give for free', '无偿提供') : L('売り込む', 'Offer', '推销');
   function updatePrice() {
     const mM = $('mMult'), mY = $('mYen'); if (!mM) return;
-    mM.textContent = act.m === 0 ? L('無償', 'Free') : '×' + act.m.toFixed(2);
+    mM.textContent = act.m === 0 ? L('無償', 'Free', '无偿') : '×' + act.m.toFixed(2);
     const rg = $('mRange'); if (rg) rg.style.setProperty('--fill', (act.m / 2 * 100) + '%');
     mY.textContent = act.m === 0 ? '0' : fmt(Math.round(S.listPrice(g, act.item) * act.m));
     const b = $('mc').querySelector('[data-do="sell"]');
@@ -679,18 +685,18 @@
 
   // ---------- engine modals ----------
   function eventModal(m) {
-    showModal(`<div class="stamp">${esc(m.stamp || (m.pre ? L('事前情報 / 国内未発表', 'Advance intel / not yet public') : L('速報', 'Breaking')))} ${S.dateOf(g.t)}</div><h2>${esc(m.title)}</h2><p>${esc(m.text)}</p>
-      <div class="foot"><button class="btn primary" id="mGo">${L('確認して再開', 'OK, resume')}</button></div>`);
+    showModal(`<div class="stamp">${esc(m.stamp || (m.pre ? L('事前情報 / 国内未発表', 'Advance intel / not yet public', '事前情报 / 国内尚未公开') : L('速報', 'Breaking', '快讯')))} ${S.dateOf(g.t)}</div><h2>${esc(m.title)}</h2><p>${esc(m.text)}</p>
+      <div class="foot"><button class="btn primary" id="mGo">${L('確認して再開', 'OK, resume', '确认并继续')}</button></div>`);
     $('mGo').onclick = () => { hideModal(); g.modal = null; g.paused = false; render(); };
     $('mGo').focus();
   }
   function orderModal(m) {
     const c = g.c[m.cid], it = I[m.item];
-    showModal(`<div class="stamp">${L('緊急発注', 'Rush order')} / ${S.dateOf(g.t)}</div><h2>${L(c.name + 'から至急の依頼', 'Urgent request from ' + c.name)}</h2>
-      <p>${esc(L(c.name + 'が' + it.name + '(' + it.sub + ')を' + m.qty + 'セット、' + m.weeks + '週以内に求めています。価格は定価の' + m.mult.toFixed(2) + '倍です(現在の相場は約' + m.fair.toFixed(2) + '倍)。', c.name + ' needs ' + m.qty + ' sets of ' + it.name + ' (' + it.sub + ') within ' + m.weeks + ' weeks at x' + m.mult.toFixed(2) + ' list (market is about x' + m.fair.toFixed(2) + ').'))}</p>
-      <div class="kv"><span>${L('1セット', 'Per set')} <b>${fmt(m.unit)}</b></span><span>${L('合計', 'Total')} <b>${fmt(m.unit * m.qty)}</b></span><span>${L('現在の在庫', 'In stock')} <b>×${g.inv[m.item]}</b></span><span>${L(c.name + 'の戦況', c.name + ' land')} <b>${Math.round(S.territory(g, m.cid) * 100)}%</b></span></div>
-      <p style="font-size:12px;color:var(--muted)">${L('引き受けると、在庫ができ次第自動で納品し、1セットごとに代金を受け取ります。納品のたびに疑惑度が少し下がります。すべて期限内に納品すると、疑惑度-8・戦意+3の報酬があります。期限までに揃わなければ、約束を破ったとして疑惑度が10上がります。', 'If you accept, sets ship automatically as stock allows and you are paid per set. Each delivery lowers suspicion a little. Delivering all in time gives suspicion -8 and morale +3. Missing the deadline raises suspicion by 10.')}</p>
-      <div class="foot"><button class="btn" id="mNo">${L('見送る', 'Decline')}</button><button class="btn primary" id="mGo">${L('引き受ける', 'Accept')}</button></div>`, m.cid);
+    showModal(`<div class="stamp">${L('緊急発注', 'Rush order', '紧急订单')} / ${S.dateOf(g.t)}</div><h2>${L(c.name + 'から至急の依頼', 'Urgent request from ' + c.name, c.name + '的紧急请求')}</h2>
+      <p>${esc(L(c.name + 'が' + it.name + '(' + it.sub + ')を' + m.qty + 'セット、' + m.weeks + '週以内に求めています。価格は定価の' + m.mult.toFixed(2) + '倍です(現在の相場は約' + m.fair.toFixed(2) + '倍)。', c.name + ' needs ' + m.qty + ' sets of ' + it.name + ' (' + it.sub + ') within ' + m.weeks + ' weeks at x' + m.mult.toFixed(2) + ' list (market is about x' + m.fair.toFixed(2) + ').', c.name + '希望在' + m.weeks + '周内获得' + m.qty + '套' + it.name + '(' + it.sub + ')。价格为标价的' + m.mult.toFixed(2) + '倍(当前行情价约为' + m.fair.toFixed(2) + '倍)。'))}</p>
+      <div class="kv"><span>${L('1セット', 'Per set', '每套')} <b>${fmt(m.unit)}</b></span><span>${L('合計', 'Total', '合计')} <b>${fmt(m.unit * m.qty)}</b></span><span>${L('現在の在庫', 'In stock', '当前库存')} <b>×${g.inv[m.item]}</b></span><span>${L(c.name + 'の戦況', c.name + ' land', c.name + '的战况')} <b>${Math.round(S.territory(g, m.cid) * 100)}%</b></span></div>
+      <p style="font-size:12px;color:var(--muted)">${L('引き受けると、在庫ができ次第自動で納品し、1セットごとに代金を受け取ります。納品のたびに疑惑度が少し下がります。すべて期限内に納品すると、疑惑度-8・戦意+3の報酬があります。期限までに揃わなければ、約束を破ったとして疑惑度が10上がります。', 'If you accept, sets ship automatically as stock allows and you are paid per set. Each delivery lowers suspicion a little. Delivering all in time gives suspicion -8 and morale +3. Missing the deadline raises suspicion by 10.', '接受后，有库存时会自动交货，每交付一套即收取货款。每次交货都会稍微降低怀疑度。在期限内全部交付，可获得怀疑度-8、士气+3的回报。若到期未能交齐，会被视为违约，怀疑度上升10。')}</p>
+      <div class="foot"><button class="btn" id="mNo">${L('見送る', 'Decline', '拒绝')}</button><button class="btn primary" id="mGo">${L('引き受ける', 'Accept', '接受')}</button></div>`, m.cid);
     $('mGo').onclick = () => { hideModal(); S.answerOrder(g, true); render(); };
     $('mNo').onclick = () => { hideModal(); S.answerOrder(g, false); render(); };
     $('mGo').focus();
@@ -698,109 +704,109 @@
   function ledgerHTML(r) {
     const sp = r.supplied, oc = r.opsCount, b = r.base, en = S.LANG.cur === 'en';
     const parts = [];
-    if (sp.equip) parts.push(L('装備一式' + sp.equip + '組', sp.equip + ' arms kits'));
-    if (sp.merc) parts.push(L('傭兵' + fmt(sp.merc * 10000) + '人', fmt(sp.merc * 10000) + ' mercenaries'));
-    if (sp.food) parts.push(L('兵糧' + sp.food + '単位', sp.food + ' ration units'));
-    const ops = [['assassin', L('要人暗殺', 'assassinations')], ['rumor', L('悪評の流布', 'smear campaigns')], ['consult', L('戦争コンサル', 'consultations')], ['loan', L('融資', 'loans')]].filter(([k]) => oc[k] > 0).map(([k, n]) => en ? oc[k] + ' ' + n : n + oc[k] + '件');
+    if (sp.equip) parts.push(L('装備一式' + sp.equip + '組', sp.equip + ' arms kits', '成套装备' + sp.equip + '套'));
+    if (sp.merc) parts.push(L('傭兵' + fmt(sp.merc * 10000) + '人', fmt(sp.merc * 10000) + ' mercenaries', '雇佣兵' + fmt(sp.merc * 10000) + '人'));
+    if (sp.food) parts.push(L('兵糧' + sp.food + '単位', sp.food + ' ration units', '军粮' + sp.food + '单位'));
+    const ops = [['assassin', L('要人暗殺', 'assassinations', '要人暗杀')], ['rumor', L('悪評の流布', 'smear campaigns', '散布恶评')], ['consult', L('戦争コンサル', 'consultations', '战争顾问')], ['loan', L('融資', 'loans', '贷款')]].filter(([k]) => oc[k] > 0).map(([k, n]) => en ? oc[k] + ' ' + n : n + oc[k] + L('件', '', '次'));
     const cas = Math.round(r.cas / 100) * 100;
-    let rows = `<div><span>${L('供給したもの', 'Supplied')}</span><b>${parts.length ? parts.join(L('、', ', ')) : L('なし', 'nothing')}</b></div>
-      <div><span>${L('裏で動いた記録', 'Covert record')}</span><b>${ops.length ? ops.join(L('、', ', ')) : L('なし', 'none')}</b></div>`;
+    let rows = `<div><span>${L('供給したもの', 'Supplied', '供应的物资')}</span><b>${parts.length ? parts.join(L('、', ', ', '、')) : L('なし', 'nothing', '无')}</b></div>
+      <div><span>${L('裏で動いた記録', 'Covert record', '暗中行动记录')}</span><b>${ops.length ? ops.join(L('、', ', ', '、')) : L('なし', 'none', '无')}</b></div>`;
     let verdict = '', coda = '';
     if (r.type === 'retreat') {
-      rows += `<div><span>${L('あなたが関わった期間', 'Weeks involved')}</span><b>${r.weeks}${L('週', ' wk')}</b></div><div><span>${L('その間の推計死傷者', 'Est. casualties')}</span><b>${fmt(cas)}</b></div>`;
-      coda = L('あなたが去った後も、戦争は続いている。', 'The war goes on after you leave.');
+      rows += `<div><span>${L('あなたが関わった期間', 'Weeks involved', '你参与的期间')}</span><b>${r.weeks}${L('週', ' wk', '周')}</b></div><div><span>${L('その間の推計死傷者', 'Est. casualties', '其间估计伤亡')}</span><b>${fmt(cas)}</b></div>`;
+      coda = L('あなたが去った後も、戦争は続いている。', 'The war goes on after you leave.', '你离开后，战争仍在继续。');
     } else if (b) {
       const dw = r.weeks - b.weeks, dc = Math.round((r.cas - b.cas) / 100) * 100;
-      rows += `<div><span>${L('戦争の長さ', 'War length')}</span><b>${L(r.weeks + '週(あなたがいなければ 約' + b.weeks + '週)', r.weeks + ' wk (about ' + b.weeks + ' without you)')}</b></div>
-        <div><span>${L('推計死傷者', 'Est. casualties')}</span><b>${L(fmt(cas) + '人(あなたがいなければ 約' + fmt(Math.round(b.cas / 100) * 100) + '人)', fmt(cas) + ' (about ' + fmt(Math.round(b.cas / 100) * 100) + ' without you)')}</b></div>`;
-      verdict = (dw > 0 ? L('あなたの商売で、戦争は' + dw + '週長引いた。', 'Your trade made the war ' + dw + ' weeks longer. ') : dw < 0 ? L('あなたの商売で、戦争は' + (-dw) + '週早く終わった。', 'Your trade ended the war ' + (-dw) + ' weeks sooner. ') : L('あなたがいてもいなくても、戦争の長さは変わらなかった。', 'With or without you, the war lasted as long. '))
-        + (dc > 0 ? L('死傷者は約' + fmt(dc) + '人増えた。', 'About ' + fmt(dc) + ' more were killed or wounded.') : dc < 0 ? L('死傷者は約' + fmt(-dc) + '人少なかった。', 'About ' + fmt(-dc) + ' fewer were killed or wounded.') : '');
-      coda = dc > 0 ? L('その' + fmt(dc) + '人の名は、あなたの帳簿には載らない。', 'Those ' + fmt(dc) + ' names will never appear in your ledger.') : L('利益は帳簿に残り、死者は数字として残る。', 'The profit stays in the ledger; the dead stay as numbers.');
+      rows += `<div><span>${L('戦争の長さ', 'War length', '战争时长')}</span><b>${L(r.weeks + '週(あなたがいなければ 約' + b.weeks + '週)', r.weeks + ' wk (about ' + b.weeks + ' without you)', r.weeks + '周(若没有你 约' + b.weeks + '周)')}</b></div>
+        <div><span>${L('推計死傷者', 'Est. casualties', '估计伤亡')}</span><b>${L(fmt(cas) + '人(あなたがいなければ 約' + fmt(Math.round(b.cas / 100) * 100) + '人)', fmt(cas) + ' (about ' + fmt(Math.round(b.cas / 100) * 100) + ' without you)', fmt(cas) + '人(若没有你 约' + fmt(Math.round(b.cas / 100) * 100) + '人)')}</b></div>`;
+      verdict = (dw > 0 ? L('あなたの商売で、戦争は' + dw + '週長引いた。', 'Your trade made the war ' + dw + ' weeks longer. ', '因为你的生意，战争延长了' + dw + '周。') : dw < 0 ? L('あなたの商売で、戦争は' + (-dw) + '週早く終わった。', 'Your trade ended the war ' + (-dw) + ' weeks sooner. ', '因为你的生意，战争提前' + (-dw) + '周结束。') : L('あなたがいてもいなくても、戦争の長さは変わらなかった。', 'With or without you, the war lasted as long. ', '无论有没有你，战争的时长都没有改变。'))
+        + (dc > 0 ? L('死傷者は約' + fmt(dc) + '人増えた。', 'About ' + fmt(dc) + ' more were killed or wounded.', '伤亡增加了约' + fmt(dc) + '人。') : dc < 0 ? L('死傷者は約' + fmt(-dc) + '人少なかった。', 'About ' + fmt(-dc) + ' fewer were killed or wounded.', '伤亡减少了约' + fmt(-dc) + '人。') : '');
+      coda = dc > 0 ? L('その' + fmt(dc) + '人の名は、あなたの帳簿には載らない。', 'Those ' + fmt(dc) + ' names will never appear in your ledger.', '那' + fmt(dc) + '人的名字，不会出现在你的账本上。') : L('利益は帳簿に残り、死者は数字として残る。', 'The profit stays in the ledger; the dead stay as numbers.', '利润留在账本上，死者则化为数字。');
     }
-    return `<div class="stamp">${L('戦果と罪状', 'Deeds and guilt')}</div><div class="ledger">${rows}${verdict ? `<div class="verdict">${esc(verdict)}</div>` : ''}</div>${coda ? `<div class="coda">${esc(coda)}</div>` : ''}`;
+    return `<div class="stamp">${L('戦果と罪状', 'Deeds and guilt', '战果与罪状')}</div><div class="ledger">${rows}${verdict ? `<div class="verdict">${esc(verdict)}</div>` : ''}</div>${coda ? `<div class="coda">${esc(coda)}</div>` : ''}`;
   }
   function chart() {
     const h = g.history; if (h.length < 2) return '';
     const W = 560, H = 130, Tm = Math.max(60, h[h.length - 1].t), pad = 24;
     const x = t => pad + (t / Tm) * (W - pad * 2), y = v => 8 + (1 - v) * (H - 28);
     const line = f => h.map(p => x(p.t).toFixed(1) + ',' + y(f(p)).toFixed(1)).join(' ');
-    let ticks = ''; for (let t = 0; t <= Tm + 0.1; t += 144) ticks += `<text x="${x(t)}" y="${H - 4}" fill="var(--muted)" font-size="10" text-anchor="middle">${L((t / 144 + 1) + '年目', 'Y' + (t / 144 + 1))}</text>`;
-    return `<div class="chartbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('戦況と戦意の推移', 'Front and morale over time')}">
+    let ticks = ''; for (let t = 0; t <= Tm + 0.1; t += 144) ticks += `<text x="${x(t)}" y="${H - 4}" fill="var(--muted)" font-size="10" text-anchor="middle">${L((t / 144 + 1) + '年目', 'Y' + (t / 144 + 1), '第' + (t / 144 + 1) + '年')}</text>`;
+    return `<div class="chartbox"><svg viewBox="0 0 ${W} ${H}" role="img" aria-label="${L('戦況と戦意の推移', 'Front and morale over time', '战况与士气的变化')}">
       <line x1="${pad}" x2="${W - pad}" y1="${y(0.5)}" y2="${y(0.5)}" stroke="var(--line)" stroke-dasharray="3 3"></line>
       <polyline points="${line(p => p.mA / 100)}" fill="none" stroke="var(--a)" stroke-width="1" opacity=".7" stroke-dasharray="4 3"></polyline>
       <polyline points="${line(p => p.mB / 100)}" fill="none" stroke="var(--b)" stroke-width="1" opacity=".7" stroke-dasharray="4 3"></polyline>
       <polyline points="${line(p => p.terr)}" fill="none" stroke="var(--brass)" stroke-width="2"></polyline>${ticks}</svg>
-      <div style="font-size:11px;color:var(--muted)">${L('実線: A国の戦況(点線=拮抗)/破線: 戦意(青=A国・赤=B国)', 'Solid: A land (dotted = even) / dashed: morale (blue = A, red = B)')}</div></div>`;
+      <div style="font-size:11px;color:var(--muted)">${L('実線: A国の戦況(点線=拮抗)/破線: 戦意(青=A国・赤=B国)', 'Solid: A land (dotted = even) / dashed: morale (blue = A, red = B)', '实线: A国的战况(虚点线=势均力敌)/虚线: 士气(蓝=A国、红=B国)')}</div></div>`;
   }
   function finalHTML(r) {
     if (!r.final) return '';
     const col = id => {
       const f = r.final[id], c = g.c[id], sb = f.sales || { equip: { n: 0, v: 0, free: 0 }, merc: { n: 0, v: 0, free: 0 }, food: { n: 0, v: 0, free: 0 } };
-      const sl = k => { const x = sb[k]; return x.n ? short(x.v) + L('(' + (x.n - x.free) + '回' + (x.free ? '・無償' + x.free : '') + ')', ' (' + (x.n - x.free) + (x.free ? ', ' + x.free + ' free' : '') + ')') : '—'; };
+      const sl = k => { const x = sb[k]; return x.n ? short(x.v) + L('(' + (x.n - x.free) + '回' + (x.free ? '・無償' + x.free : '') + ')', ' (' + (x.n - x.free) + (x.free ? ', ' + x.free + ' free' : '') + ')', '(' + (x.n - x.free) + '次' + (x.free ? '、无偿' + x.free : '') + ')') : '—'; };
       const tot = sb.equip.v + sb.merc.v + sb.food.v;
-      return `<div class="fc ${id}"><h3><span>${c.name}</span>${r.loser === id ? `<small>${L('敗北', 'Defeated')}</small>` : ''}</h3>
-        <div><span>${L('国土', 'Land')}</span><b>${Math.round(f.terr * 100)}%</b></div>
-        <div><span>${L('戦意 / 反戦', 'Morale / anti-war')}</span><b>${Math.round(f.morale)} / ${Math.round(f.antiwar)}</b></div>
-        <div><span>${L('前線 / 予備', 'Front / reserve')}</span><b>${short(f.front)} / ${short(f.reserve)}</b></div>
-        <div><span>${L('装備充足率', 'Arms')}</span><b>${Math.round(f.eq * 100)}%</b></div>
-        <div><span>${L('兵糧', 'Food')}</span><b>${Math.round(f.food)}%</b></div>
-        <div><span>${L('資金', 'Funds')}</span><b>${short(f.funds)}</b></div>
-        <div><span>${L('疑惑度', 'Suspicion')}</span><b>${Math.round(f.susp)}</b></div>
-        <div class="sep"><span>${L('売上 装備', 'Sales: arms')}</span><b>${sl('equip')}</b></div>
-        <div><span>${L('売上 傭兵', 'Sales: mercs')}</span><b>${sl('merc')}</b></div>
-        <div><span>${L('売上 兵糧', 'Sales: rations')}</span><b>${sl('food')}</b></div>
-        <div><span>${L('売上 合計', 'Sales: total')}</span><b>${short(tot)}</b></div></div>`;
+      return `<div class="fc ${id}"><h3><span>${c.name}</span>${r.loser === id ? `<small>${L('敗北', 'Defeated', '战败')}</small>` : ''}</h3>
+        <div><span>${L('国土', 'Land', '国土')}</span><b>${Math.round(f.terr * 100)}%</b></div>
+        <div><span>${L('戦意 / 反戦', 'Morale / anti-war', '士气 / 反战')}</span><b>${Math.round(f.morale)} / ${Math.round(f.antiwar)}</b></div>
+        <div><span>${L('前線 / 予備', 'Front / reserve', '前线 / 预备')}</span><b>${short(f.front)} / ${short(f.reserve)}</b></div>
+        <div><span>${L('装備充足率', 'Arms', '装备充足率')}</span><b>${Math.round(f.eq * 100)}%</b></div>
+        <div><span>${L('兵糧', 'Food', '军粮')}</span><b>${Math.round(f.food)}%</b></div>
+        <div><span>${L('資金', 'Funds', '资金')}</span><b>${short(f.funds)}</b></div>
+        <div><span>${L('疑惑度', 'Suspicion', '怀疑度')}</span><b>${Math.round(f.susp)}</b></div>
+        <div class="sep"><span>${L('売上 装備', 'Sales: arms', '销售额 装备')}</span><b>${sl('equip')}</b></div>
+        <div><span>${L('売上 傭兵', 'Sales: mercs', '销售额 雇佣兵')}</span><b>${sl('merc')}</b></div>
+        <div><span>${L('売上 兵糧', 'Sales: rations', '销售额 军粮')}</span><b>${sl('food')}</b></div>
+        <div><span>${L('売上 合計', 'Sales: total', '销售额 合计')}</span><b>${short(tot)}</b></div></div>`;
     };
-    return `<div class="stamp">${L('終戦時の両国', 'Both nations at the end')}</div>
-      <div class="finhd"><span>${L('戦争', 'War')} <b>${esc(S.SCENARIOS[r.scKey || curSc].name)}${r.random ? L('(ランダム)', ' (random)') : ''}</b></span><span>${r.type === 'cap' ? L('期限まで戦争が続いた', 'The war ran to the deadline') : L('期限まで <b>あと' + r.weeksLeft + '週</b> を残して終結', 'Ended <b>' + r.weeksLeft + ' weeks</b> before the deadline')}</span></div>
+    return `<div class="stamp">${L('終戦時の両国', 'Both nations at the end', '停战时的两国')}</div>
+      <div class="finhd"><span>${L('戦争', 'War', '战争')} <b>${esc(S.SCENARIOS[r.scKey || curSc].name)}${r.random ? L('(ランダム)', ' (random)', '(随机)') : ''}</b></span><span>${r.type === 'cap' ? L('期限まで戦争が続いた', 'The war ran to the deadline', '战争一直持续到期限') : L('期限まで <b>あと' + r.weeksLeft + '週</b> を残して終結', 'Ended <b>' + r.weeksLeft + ' weeks</b> before the deadline', '距期限 <b>还剩' + r.weeksLeft + '周</b> 时结束')}</span></div>
       <div class="fin">${col('A')}${col('B')}</div>`;
   }
   function reviewItems(r) {
     const st = r.stats, out = [];
-    const ln = r.loser ? g.c[r.loser].name : '', wn = r.loser ? g.c[r.loser === 'A' ? 'B' : 'A'].name : '', left = r.weeksLeft ? L('(期限まであと' + r.weeksLeft + '週)', ' (' + r.weeksLeft + ' weeks before the deadline)') : '';
-    const keepMorale = L('戦意は、無償供与や相場より安い売却、要人暗殺・悪評の流布、戦争コンサルの「消極」の方針で保てます。兵糧を切らさないことも大切です。', ' Morale is kept up by free gifts, selling below market, assassinations, smear campaigns and a "Cautious" policy. Do not let food run out.');
-    if (r.type === 'peace') out.push(L('両国の戦意が保たれていれば、戦争は期限まで続いていました' + left + '。', 'Had both sides kept their morale, the war would have run to the deadline' + left + '.') + keepMorale);
-    else if (r.type === 'collapse' && g.endKind === 'surrender') out.push(L(ln + 'の戦意が足りず、' + ln + 'は降伏しました' + left + '。', ln + ' ran out of morale and surrendered' + left + '.') + keepMorale);
-    else if (r.type === 'collapse') out.push(L(ln + 'と' + wn + 'の戦力差が大きく、' + ln + 'は戦線を押し返せないまま首都を失いました' + left + '。押す力は、劣勢側への装備・傭兵の供給、兵糧の確保、戦意の維持、戦争コンサルの「積極」の方針で高められます。資金が尽きた国には融資も使えます。', 'The gap between ' + ln + ' and ' + wn + ' was too wide; ' + ln + ' lost its capital' + left + '. Push grows with arms and mercs for the weaker side, enough food, steady morale and an "Aggressive" policy. Broke nations can take a loan.'));
-    if (r.wasted >= 150000) out.push(L('売れ残った在庫に' + short(r.wasted) + 'の生産費を払いました。売れない品目は倉庫で生産を止めると、無駄を減らせます。', 'You paid ' + short(r.wasted) + ' to make stock that never sold. Pause production of items that are not selling.'));
-    if (st.noneed >= 4) out.push(L('「今は必要ない」と' + st.noneed + '回断られました。優勢な国は武器を買いません。戦況を拮抗させると需要が生まれます。', 'Turned down ' + st.noneed + ' times as "not needed". Winning nations do not buy arms; a close war creates demand.'));
-    if (st.refuse >= 3) out.push(L('高すぎる価格で' + st.refuse + '回拒否されました。前回の成約価格と相手の反応を目安に、戦況や装備の変化を読んで値を決めてください。', 'Refused ' + st.refuse + ' times for overpricing. Use the last deal and the buyer\'s reaction, and read changes in the war and its arms, to set your price.'));
-    if (st.nofunds >= 4) out.push(L('資金不足で' + st.nofunds + '回買ってもらえませんでした。貧しい国には値引き・無償供与・融資が使えます。', st.nofunds + ' sales failed for lack of funds. Discounts, gifts and loans help poor nations.'));
-    if (st.stop >= 2 || st.maxSusp >= 80) out.push(L('疑惑度が80を超え、取引が止まる場面がありました。安く売る・無償供与で疑惑度を下げられます。', 'Suspicion passed 80 and trade stopped. Cheap sales and gifts lower suspicion.'));
-    if ((st.spoiled || 0) >= 2) out.push(L('兵糧を' + st.spoiled + '単位、売れないまま傷ませて廃棄しました。兵糧は、どこかの国が100%を切りそうな時だけ作ると無駄が出ません。', st.spoiled + ' ration units spoiled unsold. Make rations only when a nation is about to drop below 100%.'));
-    if (r.loanLost > 0) out.push(L('融資した国が崩壊し、' + short(r.loanLost) + 'が回収できませんでした。', 'A borrower collapsed and ' + short(r.loanLost) + ' was lost.'));
-    if (!out.length && r.profit > 0) out.push({ good: true, text: L('目立った無駄のない立ち回りでした。次は相場より少し高く売る、締め時を狙うなどで、さらに上を目指せます。', 'Clean play with little waste. Next, try selling a bit above market or timing the finish to score higher.') });
-    if (!out.length) out.push(L('次は、各国のゲージ(装備・兵糧・国土・警戒)と前回の成約価格を見てから売ってみてください。', 'Next time, check each nation\'s gauges and the last deal price before you sell.'));
+    const ln = r.loser ? g.c[r.loser].name : '', wn = r.loser ? g.c[r.loser === 'A' ? 'B' : 'A'].name : '', left = r.weeksLeft ? L('(期限まであと' + r.weeksLeft + '週)', ' (' + r.weeksLeft + ' weeks before the deadline)', '(距期限还剩' + r.weeksLeft + '周)') : '';
+    const keepMorale = L('戦意は、無償供与や相場より安い売却、要人暗殺・悪評の流布、戦争コンサルの「消極」の方針で保てます。兵糧を切らさないことも大切です。', ' Morale is kept up by free gifts, selling below market, assassinations, smear campaigns and a "Cautious" policy. Do not let food run out.', '士气可以通过无偿提供、低于行情价出售、要人暗杀、散布恶评、战争顾问的“消极”方针来维持。不让军粮断绝也很重要。');
+    if (r.type === 'peace') out.push(L('両国の戦意が保たれていれば、戦争は期限まで続いていました' + left + '。', 'Had both sides kept their morale, the war would have run to the deadline' + left + '.', '若两国保持住士气，战争本会持续到期限' + left + '。') + keepMorale);
+    else if (r.type === 'collapse' && g.endKind === 'surrender') out.push(L(ln + 'の戦意が足りず、' + ln + 'は降伏しました' + left + '。', ln + ' ran out of morale and surrendered' + left + '.', ln + '士气不足，' + ln + '投降了' + left + '。') + keepMorale);
+    else if (r.type === 'collapse') out.push(L(ln + 'と' + wn + 'の戦力差が大きく、' + ln + 'は戦線を押し返せないまま首都を失いました' + left + '。押す力は、劣勢側への装備・傭兵の供給、兵糧の確保、戦意の維持、戦争コンサルの「積極」の方針で高められます。資金が尽きた国には融資も使えます。', 'The gap between ' + ln + ' and ' + wn + ' was too wide; ' + ln + ' lost its capital' + left + '. Push grows with arms and mercs for the weaker side, enough food, steady morale and an "Aggressive" policy. Broke nations can take a loan.', ln + '与' + wn + '的战力差距太大，' + ln + '未能扭转战线便失去了首都' + left + '。推进力可以通过向劣势一方供应装备、雇佣兵、确保军粮、维持士气、战争顾问的“积极”方针来提高。对于资金耗尽的国家，也可以使用贷款。'));
+    if (r.wasted >= 150000) out.push(L('売れ残った在庫に' + short(r.wasted) + 'の生産費を払いました。売れない品目は倉庫で生産を止めると、無駄を減らせます。', 'You paid ' + short(r.wasted) + ' to make stock that never sold. Pause production of items that are not selling.', '你为卖剩的库存支付了' + short(r.wasted) + '的生产成本。卖不出去的品类在仓库停止生产，就能减少浪费。'));
+    if (st.noneed >= 4) out.push(L('「今は必要ない」と' + st.noneed + '回断られました。優勢な国は武器を買いません。戦況を拮抗させると需要が生まれます。', 'Turned down ' + st.noneed + ' times as "not needed". Winning nations do not buy arms; a close war creates demand.', '有' + st.noneed + '次被以“现在不需要”为由拒绝。占优势的国家不会购买武器。让战况保持胶着，就会产生需求。'));
+    if (st.refuse >= 3) out.push(L('高すぎる価格で' + st.refuse + '回拒否されました。前回の成約価格と相手の反応を目安に、戦況や装備の変化を読んで値を決めてください。', 'Refused ' + st.refuse + ' times for overpricing. Use the last deal and the buyer\'s reaction, and read changes in the war and its arms, to set your price.', '因价格过高被拒绝了' + st.refuse + '次。请以上次成交价和对方的反应为参考，结合战况与装备的变化来定价。'));
+    if (st.nofunds >= 4) out.push(L('資金不足で' + st.nofunds + '回買ってもらえませんでした。貧しい国には値引き・無償供与・融資が使えます。', st.nofunds + ' sales failed for lack of funds. Discounts, gifts and loans help poor nations.', '因资金不足有' + st.nofunds + '次没能卖出。对贫穷的国家可以使用降价、无偿提供和贷款。'));
+    if (st.stop >= 2 || st.maxSusp >= 80) out.push(L('疑惑度が80を超え、取引が止まる場面がありました。安く売る・無償供与で疑惑度を下げられます。', 'Suspicion passed 80 and trade stopped. Cheap sales and gifts lower suspicion.', '出现过怀疑度超过80、交易中断的局面。低价出售和无偿提供可以降低怀疑度。'));
+    if ((st.spoiled || 0) >= 2) out.push(L('兵糧を' + st.spoiled + '単位、売れないまま傷ませて廃棄しました。兵糧は、どこかの国が100%を切りそうな時だけ作ると無駄が出ません。', st.spoiled + ' ration units spoiled unsold. Make rations only when a nation is about to drop below 100%.', '有' + st.spoiled + '单位军粮因卖不出去而变质废弃。只在某个国家的军粮快要跌破100%时生产，就不会浪费。'));
+    if (r.loanLost > 0) out.push(L('融資した国が崩壊し、' + short(r.loanLost) + 'が回収できませんでした。', 'A borrower collapsed and ' + short(r.loanLost) + ' was lost.', '贷款的国家崩溃了，' + short(r.loanLost) + '无法收回。'));
+    if (!out.length && r.profit > 0) out.push({ good: true, text: L('目立った無駄のない立ち回りでした。次は相場より少し高く売る、締め時を狙うなどで、さらに上を目指せます。', 'Clean play with little waste. Next, try selling a bit above market or timing the finish to score higher.', '这一局几乎没有明显的浪费。下次可以尝试略高于行情价出售、把握收尾时机，争取更高的成绩。') });
+    if (!out.length) out.push(L('次は、各国のゲージ(装備・兵糧・国土・警戒)と前回の成約価格を見てから売ってみてください。', 'Next time, check each nation\'s gauges and the last deal price before you sell.', '下次请先查看各国的指标(装备、军粮、国土、警戒)和上次的成交价，再进行出售。'));
     return out.slice(0, 4).map(t => typeof t === 'string' ? `<div>${esc(t)}</div>` : `<div class="good">${esc(t.text)}</div>`).join('');
   }
-  const endLabel = r => r.type === 'collapse' ? (g.endKind === 'surrender' ? L('降伏', 'Surrender') : L('首都陥落', 'Capital fallen')) : { peace: L('講和', 'Peace'), cap: L('強制講和', 'Imposed peace'), retreat: L('撤退', 'Withdrawal') }[r.type];
+  const endLabel = r => r.type === 'collapse' ? (g.endKind === 'surrender' ? L('降伏', 'Surrender', '投降') : L('首都陥落', 'Capital fallen', '首都沦陷')) : { peace: L('講和', 'Peace', '和谈'), cap: L('強制講和', 'Imposed peace', '强制停战'), retreat: L('撤退', 'Withdrawal', '撤离') }[r.type];
   function resultModal() {
     const r = g.result;
-    showModal(`<div class="stamp">${L('終戦報告', 'War report')} / ${endLabel(r)} / ${S.dateOf(r.t)}${L('(' + r.weeks + '週)', ' (' + r.weeks + ' wk)')}</div><h2>${esc(r.text)}</h2>
-      <div><div class="stamp">${L('利益(スコア)', 'Profit (score)')}</div><div class="big" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad2)'}">${r.profit >= 0 ? '+' : ''}${fmt(r.profit)}</div></div>
+    showModal(`<div class="stamp">${L('終戦報告', 'War report', '停战报告')} / ${endLabel(r)} / ${S.dateOf(r.t)}${L('(' + r.weeks + '週)', ' (' + r.weeks + ' wk)', '(' + r.weeks + '周)')}</div><h2>${esc(r.text)}</h2>
+      <div><div class="stamp">${L('利益(スコア)', 'Profit (score)', '利润(得分)')}</div><div class="big" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad2)'}">${r.profit >= 0 ? '+' : ''}${fmt(r.profit)}</div></div>
       ${finalHTML(r)}
-      <div class="stamp">${L('帳簿', 'Ledger')}</div>
+      <div class="stamp">${L('帳簿', 'Ledger', '账本')}</div>
       <div class="res">
-        <div><span>${L('販売の売上', 'Sales')}</span><b class="num">${fmt(r.revenue)}</b></div>
-        <div><span>${L('うち兵糧', 'of which rations')}</span><b class="num">${fmt(r.foodRev)}</b></div>
-        <div><span>${L('原価より高く売った売上', 'Sales above cost')}</span><b class="num">${fmt(r.acct ? r.acct.gainRev : 0)}</b></div>
-        <div><span>${L('その利益', 'Their margin')}</span><b class="num">${fmt(r.acct ? r.acct.gain : 0)}</b></div>
-        <div><span>${L('原価以下で売った売上', 'Sales at or below cost')}</span><b class="num">${fmt(r.acct ? r.acct.lossRev : 0)}</b></div>
-        <div><span>${L('その赤字(無償供与を含む)', 'Their loss (incl. gifts)')}</span><b class="num">${fmt(r.acct ? r.acct.loss : 0)}</b></div>
-        <div><span>${L('生産費', 'Production cost')}</span><b class="num">${fmt(r.spent)}</b></div>
-        <div><span>${L('暗躍費', 'Covert cost')}</span><b class="num">${fmt(r.opsSpent)}</b></div>
-        <div><span>${L('融資 回収/貸倒れ', 'Loans repaid/lost')}</span><b class="num">${short(r.loanRepaid)} / ${short(r.loanLost)}</b></div>
-        <div><span>${L('売れ残りの生産費', 'Unsold stock cost')}</span><b class="num">${fmt(r.wasted)}</b></div>
-        <div><span>${L('取引回数', 'Deals')}</span><b class="num">${r.sales}</b></div>
-        <div><span>${L('断られた回数', 'Turned down')}</span><b class="num">${r.stats.noneed + r.stats.refuse + r.stats.nofunds + r.stats.stop + r.stats.nomorale}</b></div>
+        <div><span>${L('販売の売上', 'Sales', '销售额')}</span><b class="num">${fmt(r.revenue)}</b></div>
+        <div><span>${L('うち兵糧', 'of which rations', '其中军粮')}</span><b class="num">${fmt(r.foodRev)}</b></div>
+        <div><span>${L('原価より高く売った売上', 'Sales above cost', '高于成本的销售额')}</span><b class="num">${fmt(r.acct ? r.acct.gainRev : 0)}</b></div>
+        <div><span>${L('その利益', 'Their margin', '其利润')}</span><b class="num">${fmt(r.acct ? r.acct.gain : 0)}</b></div>
+        <div><span>${L('原価以下で売った売上', 'Sales at or below cost', '成本以下的销售额')}</span><b class="num">${fmt(r.acct ? r.acct.lossRev : 0)}</b></div>
+        <div><span>${L('その赤字(無償供与を含む)', 'Their loss (incl. gifts)', '其亏损(含无偿提供)')}</span><b class="num">${fmt(r.acct ? r.acct.loss : 0)}</b></div>
+        <div><span>${L('生産費', 'Production cost', '生产成本')}</span><b class="num">${fmt(r.spent)}</b></div>
+        <div><span>${L('暗躍費', 'Covert cost', '暗中行动费用')}</span><b class="num">${fmt(r.opsSpent)}</b></div>
+        <div><span>${L('融資 回収/貸倒れ', 'Loans repaid/lost', '贷款 收回/坏账')}</span><b class="num">${short(r.loanRepaid)} / ${short(r.loanLost)}</b></div>
+        <div><span>${L('売れ残りの生産費', 'Unsold stock cost', '卖剩库存的生产成本')}</span><b class="num">${fmt(r.wasted)}</b></div>
+        <div><span>${L('取引回数', 'Deals', '交易次数')}</span><b class="num">${r.sales}</b></div>
+        <div><span>${L('断られた回数', 'Turned down', '被拒绝次数')}</span><b class="num">${r.stats.noneed + r.stats.refuse + r.stats.nofunds + r.stats.stop + r.stats.nomorale}</b></div>
       </div>
       ${ledgerHTML(r)}
-      <div class="stamp">${L('経緯(何が起きて、どうなったか)', 'Timeline (what happened and why)')}</div>
+      <div class="stamp">${L('経緯(何が起きて、どうなったか)', 'Timeline (what happened and why)', '经过(发生了什么，结果如何)')}</div>
       <ul class="tline">${(r.timeline || []).map(e => `<li class="${e.kind}"><span class="d">${S.dateOf(e.t)}</span><span><span class="w">${esc(e.what)}</span>${e.why ? `<span class="y">${esc(e.why)}</span>` : ''}</span></li>`).join('')}</ul>
-      <div class="stamp">${L('振り返り', 'Review')}</div>
+      <div class="stamp">${L('振り返り', 'Review', '回顾')}</div>
       <div class="review">${reviewItems(r)}</div>
       ${chart()}
-      <div class="foot"><button class="btn" id="mHome">${L('ホームに戻る', 'Home')}</button><button class="btn primary" id="mGo">${L('同じ戦争をもう一度', 'Same war again')}</button></div>`);
+      <div class="foot"><button class="btn" id="mHome">${L('ホームに戻る', 'Home', '返回主页')}</button><button class="btn primary" id="mGo">${L('同じ戦争をもう一度', 'Same war again', '再打一次同样的战争')}</button></div>`);
     $('mGo').onclick = () => { hideModal(); startGame(curSc); };
     $('mHome').onclick = () => { hideModal(); showHome(); };
     $('mGo').focus();
@@ -853,44 +859,46 @@
   // ---------- home screen ----------
   const SCN_DESC = {
     s1: { ja: ['国境の山地に眠る鉱脈をめぐり、大国A国は隣の小国B国へ軍を進めた。', '兵も資金も勝るA国は、数か月で片が付くと踏んでいる。', '貧しいB国は、祖国を明け渡すまいとする兵の士気だけを頼りに、不利な戦いを続ける。', '金払いのいいA国は上客になる。一方B国の国庫はすぐに底をつき、給金の途絶えた兵は前線を去っていく。', 'B国が崩れれば戦争は終わり、商売の場も消える。', '融資や値引きで小国を延命させながら、大国からどれだけ引き出せるかが腕の見せ所だ。', '小国の資金の管理に注意が必要だろう。'],
+          zh: ['为了争夺国境山地下沉睡的矿脉，大国A国向邻国小国B国进军。', '兵力与资金都占优的A国，认为几个月就能解决战斗。', '贫穷的B国只能依靠誓死不让出祖国的士兵们的士气，继续着不利的战斗。', '出手阔绰的A国会是好主顾。另一方面，B国的国库很快就会见底，领不到军饷的士兵会离开前线。', 'B国一旦崩溃，战争就会结束，生意也随之消失。', '用贷款和降价让小国苟延残喘，同时从大国身上尽可能多地赚钱，这才是展现本事的地方。', '需要留意小国的资金管理。'],
           en: ['Over the ore beneath their border hills, the great power A marched into its small neighbour B.', 'With more men and money, A expects it all to be over in months.', 'Poor B fights on against the odds, held together by the resolve of soldiers who will not give up their homeland.', 'Free-spending A makes a fine customer. B\'s treasury soon runs dry, and unpaid soldiers walk away from the front.', 'If B collapses, the war ends and so does your trade.', 'The art lies in keeping the small nation alive with loans and discounts while drawing as much as you can from the great one.', "Keep a close eye on the small nation's money."] },
     s2: { ja: ['工場と鉄道で栄えた工業国A国は、国民の食料を輸入に頼ってきた。', '凶作で輸入が途絶えると、A国は食料自給率を高めるため、隣の農業国B国の穀倉地帯へ侵攻した。', '装備では勝るA国だが、前線の兵を養う兵糧を自前では賄えない。', '兵と食料に恵まれたB国は、旧式の武器で穀倉を守りながら、新しい装備を求め続ける。', '開戦時の国土と資金は、ほぼ互角。', '同じ品を両国に売るより、それぞれに足りないものを見極めるのが稼ぎの近道だ。', '工業国の兵糧の管理に注意が必要だろう。'],
+          zh: ['以工厂和铁路繁荣起来的工业国A国，一直依赖进口来养活国民。', '歉收导致进口中断后，A国为了提高粮食自给率，入侵了邻国农业国B国的粮仓地带。', 'A国虽然装备占优，却无法自行供应养活前线士兵的军粮。', '兵员与粮食充足的B国，一边用旧式武器守卫粮仓，一边不断寻求新的装备。', '开战时两国的国土与资金几乎相当。', '与其向两国出售同样的货物，不如看清各自缺少什么，这才是赚钱的捷径。', '需要留意工业国的军粮管理。'],
           en: ['Industrial A, rich in factories and railways, has always imported the food it eats.', 'When a failed harvest cut off its imports, A invaded the granaries of agrarian B to feed itself.', 'A has the better arms, but cannot feed the soldiers at its front on its own.', 'B, rich in men and grain, defends its fields with old weapons and keeps asking for new ones.', 'Land and money start roughly even.', 'Rather than selling the same goods to both, the fastest profit lies in reading what each one lacks.', "Keep a close eye on the industrial nation's food."] },
   };
   function homePop(html) { const p = $('hpop'); p.innerHTML = html; p.hidden = false; }
   function homeScenarios() {
     S.setLang(SET.lang);
-    homePop(`<div class="hpanel"><h2>${L('どの戦争に関わるか', 'Choose your war')}</h2>
-      <div class="scards">${['s1', 's2'].map(k => { const d = SCN_DESC[k][SET.lang === 'en' ? 'en' : 'ja']; return `<div class="scard"><span class="st"><i></i>${esc(S.SCENARIOS[k].name)}</span>
-        <span class="sd">${d.map((l, i) => `<p${i === d.length - 1 ? ' class="warn"' : ''}>${esc(l)}</p>`).join('')}</span><button class="btn primary go" data-scn="${k}">${L('この戦争を始める', 'Start this war')}</button></div>`; }).join('')}</div>
-      <div class="foot"><button class="btn" data-hclose>${L('戻る', 'Back')}</button></div></div>`);
+    homePop(`<div class="hpanel"><h2>${L('どの戦争に関わるか', 'Choose your war', '选择要介入的战争')}</h2>
+      <div class="scards">${['s1', 's2'].map(k => { const d = SCN_DESC[k][SET.lang] || SCN_DESC[k].ja; return `<div class="scard"><span class="st"><i></i>${esc(S.SCENARIOS[k].name)}</span>
+        <span class="sd">${d.map((l, i) => `<p${i === d.length - 1 ? ' class="warn"' : ''}>${esc(l)}</p>`).join('')}</span><button class="btn primary go" data-scn="${k}">${L('この戦争を始める', 'Start this war', '开始这场战争')}</button></div>`; }).join('')}</div>
+      <div class="foot"><button class="btn" data-hclose>${L('戻る', 'Back', '返回')}</button></div></div>`);
     $('hpop').querySelector('[data-scn]').focus();
   }
   function homeSettings() {
     const rows = [
-      ['fx', L('危機の演出', 'Crisis effects'), L('降伏・陥落・講和が近い時に、画面の縁を赤や緑に点滅させる', 'Flash the screen edges red or green when defeat or peace is near')],
-      ['reduce', L('動きを減らす', 'Reduce motion'), L('駒のゆらぎや点滅を抑える', 'Calm unit wobble and flashing')],
-      ['autoFull', L('スマホで自動的に全画面', 'Auto full screen on phones'), L('戦争を始めた時や画面に触れた時に全画面にする', 'Go full screen when a war starts or the screen is touched')],
+      ['fx', L('危機の演出', 'Crisis effects', '危机演出'), L('降伏・陥落・講和が近い時に、画面の縁を赤や緑に点滅させる', 'Flash the screen edges red or green when defeat or peace is near', '投降、沦陷、和谈临近时，让画面边缘闪烁红色或绿色')],
+      ['reduce', L('動きを減らす', 'Reduce motion', '减少动态效果'), L('光点のゆらぎや点滅を抑える', 'Calm marker wobble and flashing', '抑制光点的晃动与闪烁')],
+      ['autoFull', L('スマホで自動的に全画面', 'Auto full screen on phones', '手机上自动全屏'), L('戦争を始めた時や画面に触れた時に全画面にする', 'Go full screen when a war starts or the screen is touched', '开始战争或触碰画面时切换为全屏')],
     ];
-    homePop(`<div class="hpanel small"><h2>${L('設定', 'Settings')}</h2>
+    homePop(`<div class="hpanel small"><h2>${L('設定', 'Settings', '设置')}</h2>
       ${rows.map(([k, l, h]) => `<div class="setrow"><div><div class="sl">${l}</div><div class="sh">${h}</div></div><button class="tog${SET[k] ? ' on' : ''}" data-set="${k}" aria-pressed="${SET[k]}" aria-label="${esc(l)}"></button></div>`).join('')}
-      <div class="foot"><button class="btn primary" data-hclose>${L('閉じる', 'Close')}</button></div></div>`);
+      <div class="foot"><button class="btn primary" data-hclose>${L('閉じる', 'Close', '关闭')}</button></div></div>`);
   }
   function homeLang() {
-    homePop(`<div class="hpanel small"><h2>Language / 言語</h2>
-      <div class="langs"><button class="btn${SET.lang === 'ja' ? ' sel' : ''}" data-lang="ja">日本語</button><button class="btn${SET.lang === 'en' ? ' sel' : ''}" data-lang="en">English</button></div>
-      <div class="foot"><button class="btn primary" data-hclose>${L('閉じる', 'Close')}</button></div></div>`);
+    homePop(`<div class="hpanel small"><h2>Language / 言語 / 语言</h2>
+      <div class="langs"><button class="btn${SET.lang === 'ja' ? ' sel' : ''}" data-lang="ja">日本語</button><button class="btn${SET.lang === 'en' ? ' sel' : ''}" data-lang="en">English</button><button class="btn${SET.lang === 'zh' ? ' sel' : ''}" data-lang="zh">简体中文</button></div>
+      <div class="foot"><button class="btn primary" data-hclose>${L('閉じる', 'Close', '关闭')}</button></div></div>`);
   }
   $('hNew').onclick = homeScenarios;
   $('hSet').onclick = homeSettings;
   $('hLang').onclick = homeLang;
   function homeTutorials() {
-    homePop(`<div class="hpanel small"><h2>${L('チュートリアル', 'Tutorial')}</h2>
+    homePop(`<div class="hpanel small"><h2>${L('チュートリアル', 'Tutorial', '教程')}</h2>
       <div class="tchoice">
-        <button class="btn" data-tut="1"><b>${L('チュートリアル1 画面説明', 'Tutorial 1: The Screen')}</b><span>${L('ゲームの目的と、画面の見方', 'The goal, and how to read the screen')}</span></button>
-        <button class="btn" data-tut="2"><b>${L('チュートリアル2 操作説明', 'Tutorial 2: How to Play')}</b><span>${L('販売・暗躍・生産を実際に操作する', 'Try selling, covert work and production')}</span></button>
+        <button class="btn" data-tut="1"><b>${L('チュートリアル1 画面説明', 'Tutorial 1: The Screen', '教程1 画面说明')}</b><span>${L('ゲームの目的と、画面の見方', 'The goal, and how to read the screen', '游戏目的与画面的看法')}</span></button>
+        <button class="btn" data-tut="2"><b>${L('チュートリアル2 操作説明', 'Tutorial 2: How to Play', '教程2 操作说明')}</b><span>${L('販売・暗躍・生産を実際に操作する', 'Try selling, covert work and production', '实际操作出售、暗中行动、生产')}</span></button>
       </div>
-      <div class="foot"><button class="btn" data-hclose>${L('戻る', 'Back')}</button></div></div>`);
+      <div class="foot"><button class="btn" data-hclose>${L('戻る', 'Back', '返回')}</button></div></div>`);
     $('hpop').querySelector('[data-tut]').focus();
   }
   function startTutorial(n) { if (!window.BSTut) return; if (touch && SET.autoFull) goFull(); window.BSTut.enter(n); } // the home screen stays until the screen is black
@@ -921,10 +929,10 @@
     if (d && d.dataset.do === 'sell') {
       if (act.blocked) return;
       const r = S.sell(g, act.cid, act.item, act.m); act.msg = r.text; act.ok = r.ok;
-      act.log.push({ ok: r.ok, text: SHORT()[act.item] + ' ' + (act.m === 0 ? L('無償', 'free') : '×' + act.m.toFixed(2)) + ' → ' + r.text });
+      act.log.push({ ok: r.ok, text: SHORT()[act.item] + ' ' + (act.m === 0 ? L('無償', 'free', '无偿') : '×' + act.m.toFixed(2)) + ' → ' + r.text });
       if (!r.ok && r.tier !== 'none') act.blocked = true;
       render(); renderAct(); return; }
-    const o = e.target.closest('[data-op]'); if (o) { const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); act.msg = r.text; act.ok = r.ok; const nm = o.dataset.op === 'consult' ? (o.dataset.arg === 'pass' ? L('戦争コンサル【消極】', 'Consulting [Cautious]') : L('戦争コンサル【積極】', 'Consulting [Aggressive]')) : O[o.dataset.op].name; act.log.push({ ok: r.ok, text: nm + ': ' + r.text }); render(); renderAct(); return; }
+    const o = e.target.closest('[data-op]'); if (o) { const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); act.msg = r.text; act.ok = r.ok; const nm = o.dataset.op === 'consult' ? (o.dataset.arg === 'pass' ? L('戦争コンサル【消極】', 'Consulting [Cautious]', '战争顾问【消极】') : L('戦争コンサル【積極】', 'Consulting [Aggressive]', '战争顾问【积极】')) : O[o.dataset.op].name; act.log.push({ ok: r.ok, text: nm + ': ' + r.text }); render(); renderAct(); return; }
   });
   stage.addEventListener('input', e => { if (act && e.target.id === 'mRange') { if (+e.target.value !== act.m) act.blocked = false; act.m = +e.target.value; updatePrice(); } });
   document.addEventListener('keydown', e => {
@@ -960,9 +968,9 @@
       const A = g.c.A, B = g.c.B;
       // sample notices for the top centre and the news feed
       A.policy = 'aggr'; A.policyUntil = g.t + 24; B.priceMod = 0.8; B.priceModUntil = g.t + 27;
-      const nw = [[L('B国の補給線が延び、前線への物資の到着が遅れている。', "B's supply lines are stretched; deliveries to the front are slow."), 'info'],
-        [L('A国の司令部が方針を「積極」に切り替えた。', 'A HQ switched to an "Aggressive" strategy.'), 'op'],
-        [L('B国の兵糧が減り始めている。', "B's food is starting to run low."), 'bad']];
+      const nw = [[L('B国の補給線が延び、前線への物資の到着が遅れている。', "B's supply lines are stretched; deliveries to the front are slow.", 'B国的补给线拉长，物资运抵前线出现延误。'), 'info'],
+        [L('A国の司令部が方針を「積極」に切り替えた。', 'A HQ switched to an "Aggressive" strategy.', 'A国的司令部将方针切换为“积极”。'), 'op'],
+        [L('B国の兵糧が減り始めている。', "B's food is starting to run low.", 'B国的军粮开始减少。'), 'bad']];
       for (const [text, k] of nw) g.news.unshift({ t: g.t, text, kind: k });
       if (kind === 2) {
         g.inv.equip = 3; g.inv.merc = 2; g.inv.food = 0; g.foodQueue = 0; g.prodOn.equip = true; g.prodOn.merc = true; g.prodOn.food = false;

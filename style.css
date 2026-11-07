@@ -384,3 +384,4 @@ html[lang="en"] .compact .gg .lb.em { font-size: 11px; }
   #tut .ring { animation: none; }
 }
 #fade.tutc { z-index: 75; }
+html[lang="zh-CN"] { --f-body: "Noto Sans SC", "PingFang SC", "Microsoft YaHei", "BIZ UDPGothic", sans-serif; }

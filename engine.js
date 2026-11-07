@@ -3,11 +3,12 @@
   'use strict';
   // 言語: 'ja' / 'en'。L(日本語, 英語)で切り替える
   const LANG = { cur: 'ja' };
-  const L = (ja, en) => LANG.cur === 'en' ? en : ja;
+  const L = (ja, en, zh) => LANG.cur === 'en' ? en : LANG.cur === 'zh' ? (zh === undefined ? en : zh) : ja;
+  const LI = () => LANG.cur === 'en' ? 1 : LANG.cur === 'zh' ? 2 : 0; // [ja, en, zh] の並びの位置
   const ITEMS_TXT = {
-    equip: { ja: { name:'装備一式', sub:'小銃・火砲・戦車と整備部品', lot:'1組', trait:'装備充足率を上げる' }, en: { name:'Arms Kit', sub:'Rifles, artillery, tanks and parts', lot:'1 kit', trait:'Raises equipment level' } },
-    merc:  { ja: { name:'傭兵', sub:'訓練済みの兵員', lot:'10,000人', trait:'軍人を増やす(人員充足率を上げる)' }, en: { name:'Mercenaries', sub:'Trained soldiers', lot:'10,000 men', trait:'Adds soldiers (raises manpower)' } },
-    food:  { ja: { name:'兵糧', sub:'穀物・保存食', lot:'1単位', trait:'兵糧を回復(軍人10万人あたり30%)。3か月で廃棄' }, en: { name:'Rations', sub:'Grain and preserved food', lot:'1 unit', trait:'Restores food (30% per 100k soldiers). Spoils in 3 months' } },
+    equip: { ja: { name:'装備一式', sub:'小銃・火砲・戦車と整備部品', lot:'1組', trait:'装備充足率を上げる' }, en: { name:'Arms Kit', sub:'Rifles, artillery, tanks and parts', lot:'1 kit', trait:'Raises equipment level' }, zh: { name:'成套装备', sub:'步枪、火炮、坦克与维修零件', lot:'1套', trait:'提高装备充足率' } },
+    merc:  { ja: { name:'傭兵', sub:'訓練済みの兵員', lot:'10,000人', trait:'軍人を増やす(人員充足率を上げる)' }, en: { name:'Mercenaries', sub:'Trained soldiers', lot:'10,000 men', trait:'Adds soldiers (raises manpower)' }, zh: { name:'雇佣兵', sub:'受过训练的兵员', lot:'10,000人', trait:'增加军人(提高人员充足率)' } },
+    food:  { ja: { name:'兵糧', sub:'穀物・保存食', lot:'1単位', trait:'兵糧を回復(軍人10万人あたり30%)。3か月で廃棄' }, en: { name:'Rations', sub:'Grain and preserved food', lot:'1 unit', trait:'Restores food (30% per 100k soldiers). Spoils in 3 months' }, zh: { name:'军粮', sub:'谷物、储备粮', lot:'1单位', trait:'恢复军粮(每10万军人30%)。3个月后废弃' } },
   };
   const ITEMS = {
     equip: { key:'equip', type:'mix', price:80000,  power:80000, soldiers:0,     interval:6,  lag:8 },
@@ -18,7 +19,7 @@
   const EQ = {
     all: { name:'装備', wear:1.3, crew:0.0196, ideal:1 },
   };
-  const OPS_TXT = { assassin: ['要人暗殺', 'Assassination'], rumor: ['敵国悪評流布', 'Smear Campaign'], consult: ['戦争コンサル', 'War Consulting'], loan: ['融資', 'Loan'] };
+  const OPS_TXT = { assassin: ['要人暗殺', 'Assassination', '要人暗杀'], rumor: ['敵国悪評流布', 'Smear Campaign', '散布敌国恶评'], consult: ['戦争コンサル', 'War Consulting', '战争顾问'], loan: ['融資', 'Loan', '贷款'] };
   const OPS = {
     assassin: { key:'assassin', cost:30000, cd:20 },
     rumor:    { key:'rumor',    cost:10000, cd:20 },
@@ -28,18 +29,18 @@
   // 名前などの文言は、言語に合わせてその場で引く
   function applyLang() {
     for (const k in ITEMS) Object.assign(ITEMS[k], ITEMS_TXT[k][LANG.cur]);
-    for (const k in OPS) OPS[k].name = OPS_TXT[k][LANG.cur === 'en' ? 1 : 0];
-    for (const k in POLICY) POLICY[k].name = POLICY_TXT[k][LANG.cur === 'en' ? 1 : 0];
+    for (const k in OPS) OPS[k].name = OPS_TXT[k][LI()];
+    for (const k in POLICY) POLICY[k].name = POLICY_TXT[k][LI()];
     for (const k in SCENARIOS) { const t = SCN_TXT[k][LANG.cur]; SCENARIOS[k].name = t.name; SCENARIOS[k].desc = t.desc; SCENARIOS[k].A.trait = t.A; SCENARIOS[k].B.trait = t.B; }
   }
-  function setLang(l) { LANG.cur = l === 'en' ? 'en' : 'ja'; applyLang(); }
-  const cname = id => L(id + '国', 'Nation ' + id);
+  function setLang(l) { LANG.cur = l === 'en' || l === 'zh' ? l : 'ja'; applyLang(); }
+  const cname = id => L(id + '国', 'Nation ' + id, id + '国');
   const CFG = {
     startMoney: 3000000, batLow: -0.06, batDef: 0.02, minIdleWeeks: 35, surrMorale: 20, surrHold: 36, defeatAlert: 0.2, capWarn: 36, bandW: 1.05, bandR: 1.15, stretchC: 1.1, stretchW: 0.1, stretchA: 1, threatSelf: 0, estTau: 6, estEvery: 12, boughtTau: 12, invCap: 12, prodRate: 1.5, needBase: 0, eqNeed: 1, suffOn: 1.5, suffOff: 1.3, wLose: 0.45, wAlarm: 0.6, wWealth: 0.15, fBase: 0.45, fNeed: 1.0, threatK: 8000, threatDecay: 1.2, seeSusp: 0.3, eqDecay: 0.00133, desertStart: 0.25, desertHeavy: 0.05, desertMid: 0.02, desertMax: 0.065, surrenderLine: 0.35, cap: 420, foodRef: 100000, cost: { equip: 0.6, merc: 0.5, food: 0.4 }, foodDrain: 0.03, foodMor: 0.8, foodPush: 0.3, foodAnti: 0.3, foodLife: 36, foodMax: 160, foodFull: 130,
     lossS: 0.0001, lossP: 0.0009, upkeep: 0.03, incomeK: 0.0022, richLine: 5000000,
     absMode: true, crewK: 1.58, eqStd: 23.5, eqPriceK: 0.5, compK: 1.08, peaceLine: 25, peaceHold: 18, threatLag: 12,
     sortieBase: 0.004, transitTime: 12, frontSpeed: 0.006, capitalLine: 0.12,
-    farmDecay: 0.0018, loanLimit: 300000, loanInterest: 0.2,
+    farmDecay: 0.0018, loanLimit: 300000, loanInterest: 0.2, rushK: 0.3, nearHold: 18, nearFade: 6, desperateLine: 0.35, desperateRatio: 0.8,
   };
 
   function rng(seed) {
@@ -77,9 +78,11 @@
   };
   const SCN_TXT = {
     s1: { ja: { name:'大国と小国', desc:'豊かな大国A国と、貧しいが士気の高い小国B国。', A:'大国: 豊かで兵が多い', B:'小国: 貧しいが戦意が高い' },
-          en: { name:'Giant vs. Minnow', desc:'Rich, populous Nation A against poor but spirited Nation B.', A:'Great power: rich, many troops', B:'Small nation: poor, high morale' } },
+          en: { name:'Giant vs. Minnow', desc:'Rich, populous Nation A against poor but spirited Nation B.', A:'Great power: rich, many troops', B:'Small nation: poor, high morale' },
+          zh: { name:'大国与小国', desc:'富裕的大国A国，对阵贫穷但士气高昂的小国B国。', A:'大国: 富裕且兵力众多', B:'小国: 贫穷但士气高昂' } },
     s2: { ja: { name:'工業国と農業国', desc:'装備の多い工業国A国と、兵と食料の多い農業国B国。', A:'工業国: 装備が多く、兵と食料が乏しい', B:'農業国: 兵と食料が豊富で、装備が乏しい' },
-          en: { name:'Industry vs. Farmland', desc:'Well-armed industrial Nation A against populous, well-fed agrarian Nation B.', A:'Industrial: well-armed, short of men and food', B:'Agrarian: many men and food, short of arms' } },
+          en: { name:'Industry vs. Farmland', desc:'Well-armed industrial Nation A against populous, well-fed agrarian Nation B.', A:'Industrial: well-armed, short of men and food', B:'Agrarian: many men and food, short of arms' },
+          zh: { name:'工业国与农业国', desc:'装备精良的工业国A国，对阵兵源与粮食充足的农业国B国。', A:'工业国: 装备多，兵员与粮食匮乏', B:'农业国: 兵员与粮食丰富，装备匮乏' } },
   };
   const BASE = SCENARIOS.s1;
   // 国の条件のゆらぎ(乱数): 兵・装備 ±15%、資金 ±30%、税収 ±25%、農業 ±15%、戦意 ±10、開戦時の戦線 ±4%
@@ -123,7 +126,7 @@
     };
     g.P = sc.P0; if (rr) g.P = clamp(sc.P0 - 0.02 + rr() * 0.04, 0.467, 0.533); // 開戦時の国土の表示は45〜55%に収める
     g.evSeq = eventSchedule(seed);
-    news(g, L('開戦から数週間。A国とB国の戦線は膠着しつつある。', 'A few weeks into the war. The front between A and B is settling into a stalemate.'), 'info');
+    news(g, L('開戦から数週間。A国とB国の戦線は膠着しつつある。', 'A few weeks into the war. The front between A and B is settling into a stalemate.', '开战已数周。A国与B国的战线逐渐陷入僵持。'), 'info');
     if (root.BothSides && root.BothSides.__setup) root.BothSides.__setup(g);
     return g;
   }
@@ -138,7 +141,7 @@
     return own < 0.5 ? 1 + 0.8 * (0.5 - own) : 1 - 0.5 * Math.max(0, own - 0.55);
   }
   // 司令部の方針: aggr=積極 / normal=保守 / pass=消極
-  const POLICY_TXT = { aggr: ['積極', 'Aggressive'], normal: ['保守', 'Standard'], pass: ['消極', 'Cautious'] };
+  const POLICY_TXT = { aggr: ['積極', 'Aggressive', '积极'], normal: ['保守', 'Standard', '稳健'], pass: ['消極', 'Cautious', '消极'] };
   const POLICY = { aggr: { name: '積極', price: 0.15, sortie: 1.8, push: 1.15, anti: 0.15, morale: -0.1 }, normal: { name: '保守', price: 0, sortie: 1, push: 1, anti: 0, morale: 0 }, pass: { name: '消極', price: -0.1, sortie: 0.5, push: 0.88, anti: -0.15, morale: 0.1 } };
   const pol = c => POLICY[c.policy || 'normal'];
   function policyPush(c) { return pol(c).push; }
@@ -169,9 +172,9 @@
     const t = terrOf(shareOf(g, c.id)), out = [];
     let lv = 0;
     const add = (l, why) => { out.push({ l, why }); if (l > lv) lv = l; };
-    if (c.surT > 0) add(2, L('降伏を検討中', 'considering surrender'));
-    else if (c.morale < 25 && t < 0.4) add(1, L('降伏の恐れ', 'may surrender'));
-    if (t < CFG.defeatAlert) add(2, L('首都が陥落寸前', 'capital about to fall')); else if (t < 0.28) add(1, L('首都に迫られている', 'enemy nearing the capital'));
+    if (c.surT > 0) add(2, L('降伏を検討中', 'considering surrender', '正在考虑投降'));
+    else if (c.morale < 25 && t < 0.4) add(1, L('降伏の恐れ', 'may surrender', '有投降之虞'));
+    if (t < CFG.defeatAlert) add(2, L('首都が陥落寸前', 'capital about to fall', '首都即将沦陷')); else if (t < 0.28) add(1, L('首都に迫られている', 'enemy nearing the capital', '首都告急'));
     out.sort((x, y) => y.l - x.l);
     return { lv, why: out.map(x => x.why), weeks: c.surT > 0 ? Math.max(1, Math.ceil((CFG.surrHold - c.surT) / 3)) : null };
   }
@@ -192,16 +195,16 @@
       };
       const ss = selfSuff(g, c), dem = demand(g, c), sh = shareOf(g, c.id);
       const n = c.name;
-      flag('nomorale', c.morale < CFG.peaceLine, L(n + 'の戦意が初めて25を下回った。', n + "'s morale fell below 25 for the first time."), L(n + 'は武器を買わなくなった(相場の3割以下なら受け取る)', n + ' stopped buying arms (accepts 30% of market or less)'), L(n + 'の戦意が初めて25以上に戻った。', n + "'s morale recovered to 25 for the first time."), L(n + 'は再び武器を買うようになった', n + ' buys arms again'), true);
-      if ((c.seenSusp || 0) >= 10) { tl(g, L(n + 'は、敵国の前線で同型の装備が使われていることに気付いた。', n + ' noticed the same arms on the enemy front.'), L('相手国への納品が見えるたびに、' + n + 'の疑惑度が上がる(合計 +' + Math.round(c.seenSusp) + ')', 'Each delivery it sees raises its suspicion (total +' + Math.round(c.seenSusp) + ')')); c.seenSusp = 0; }
-      flag('warn', c.susp >= 50, L(n + 'の疑惑度が50を超えた。', n + "'s suspicion rose above 50."), L(n + 'は値引きを求めるようになった', n + ' now demands discounts'), L(n + 'の疑惑度が50を下回った。', n + "'s suspicion fell below 50."), L('値引きの要求が止んだ', 'Discount demands stopped'));
-      flag('stop', c.susp >= 80, L(n + 'の疑惑度が80を超えた。', n + "'s suspicion rose above 80."), L(n + 'との取引が止まった(膠着時の破格は例外)', 'Trade with ' + n + ' halted (except rock-bottom offers in a stalemate)'), L(n + 'の疑惑度が80を下回った。', n + "'s suspicion fell below 80."), L(n + 'との取引が再開できる', 'Trade with ' + n + ' can resume'));
-      flag('noneed', c.noNeed && c.morale >= CFG.peaceLine, L(n + 'の装備が初めて十分に揃った(装備充足率150%超)。', n + ' is fully armed for the first time (equipment over 150%).'), L(n + 'は武器を必要としなくなった(相場の5割以下なら買う)', n + ' no longer needs arms (buys at 50% of market or less)'), L(n + 'が初めて再び武器を求め始めた。', n + ' wants arms again for the first time.'), L('装備の損耗や兵の増加で充足率が130%を下回った', 'Wear or new troops brought equipment below 130%'), true);
-      flag('finish', sh > 0.65 && c.antiwar > 50 && c.morale >= CFG.peaceLine, L(n + 'が圧倒的優勢のまま、反戦感情が50を超えた。', n + ' is winning big, but anti-war sentiment passed 50.'), L(n + 'は早期終結を望み、武器を求めるようになった', n + ' wants a quick end and seeks arms'));
-      flag('food70', c.foodLv < 70, L(n + 'の兵糧が70%を下回った。', n + "'s food fell below 70%."), L('戦意の低下と出動の鈍化が目に見えて強まる', 'Morale and deployment drop visibly'), L(n + 'の兵糧が70%以上に戻った。', n + "'s food is back above 70%."), L('兵糧の不足が和らいだ', 'Food shortage eased'));
-      flag('food', c.foodLv < 90, L(n + 'の兵糧が90%を下回った。', n + "'s food fell below 90%."), L('兵糧の相場が1.3倍になった。戦意と出動の勢いの落ち込みが強まっていく', 'Food price is now x1.3. Morale and deployment keep sliding'), L(n + 'の兵糧が90%以上に戻った。', n + "'s food is back above 90%."), L('兵糧の不足が和らいだ', 'Food shortage eased'));
-      flag('sortie', c.sortieRate * 3 < 250 && !c.massing, L(n + 'の出動の勢いが初めて細った(毎週250人未満)。', n + "'s deployment dried up for the first time (under 250/week)."), L('予備の不足・戦意の低下・兵糧不足のいずれかが原因。前線の補充が追いつかなくなる', 'Caused by low reserves, morale or food. The front cannot be refilled'), L(n + 'の出動の勢いが初めて回復した。', n + "'s deployment recovered for the first time."), L('前線への補充が再開した', 'Reinforcement of the front resumed'), true);
-      flag('mass', c.massing, L(n + 'が首都に兵を集結させ始めた。', n + ' began massing troops at the capital.'), L('反戦感情が高まり、早く終わらせるための総攻撃の準備', 'Anti-war mood is high; preparing an all-out offensive to end it'));
+      flag('nomorale', c.morale < CFG.peaceLine, L(n + 'の戦意が初めて25を下回った。', n + "'s morale fell below 25 for the first time.", n + '的士气首次跌破25。'), L(n + 'は武器を買わなくなった(相場の3割以下なら受け取る)', n + ' stopped buying arms (accepts 30% of market or less)', n + '不再购买武器(行情价三成以下仍会接受)'), L(n + 'の戦意が初めて25以上に戻った。', n + "'s morale recovered to 25 for the first time.", n + '的士气首次回升至25以上。'), L(n + 'は再び武器を買うようになった', n + ' buys arms again', n + '重新开始购买武器'), true);
+      if ((c.seenSusp || 0) >= 10) { tl(g, L(n + 'は、敵国の前線で同型の装備が使われていることに気付いた。', n + ' noticed the same arms on the enemy front.', n + '发现敌军前线也在使用同型装备。'), L('相手国への納品が見えるたびに、' + n + 'の疑惑度が上がる(合計 +' + Math.round(c.seenSusp) + ')', 'Each delivery it sees raises its suspicion (total +' + Math.round(c.seenSusp) + ')', '每当看到你向对方交货，' + n + '的怀疑度就会上升(累计 +' + Math.round(c.seenSusp) + ')')); c.seenSusp = 0; }
+      flag('warn', c.susp >= 50, L(n + 'の疑惑度が50を超えた。', n + "'s suspicion rose above 50.", n + '的怀疑度超过了50。'), L(n + 'は値引きを求めるようになった', n + ' now demands discounts', n + '开始要求降价'), L(n + 'の疑惑度が50を下回った。', n + "'s suspicion fell below 50.", n + '的怀疑度降到了50以下。'), L('値引きの要求が止んだ', 'Discount demands stopped', '降价要求停止了'));
+      flag('stop', c.susp >= 80, L(n + 'の疑惑度が80を超えた。', n + "'s suspicion rose above 80.", n + '的怀疑度超过了80。'), L(n + 'との取引が止まった(国土35%未満まで追い詰められれば、相場の8割以下で買う)', 'Trade with ' + n + ' stopped (if its land falls below 35%, it buys at 80% of market or less)', '与' + n + '的交易中断(若其国土跌破35%，行情价八成以下仍会购买)'), L(n + 'の疑惑度が80を下回った。', n + "'s suspicion fell below 80.", n + '的怀疑度降到了80以下。'), L(n + 'との取引が再開できる', 'Trade with ' + n + ' can resume', '可以恢复与' + n + '的交易'));
+      flag('noneed', c.noNeed && c.morale >= CFG.peaceLine, L(n + 'の装備が初めて十分に揃った(装備充足率150%超)。', n + ' is fully armed for the first time (equipment over 150%).', n + '的装备首次充足(装备充足率超过150%)。'), L(n + 'は武器を必要としなくなった(相場の5割以下なら買う)', n + ' no longer needs arms (buys at 50% of market or less)', n + '不再需要武器(行情价五成以下才会购买)'), L(n + 'が初めて再び武器を求め始めた。', n + ' wants arms again for the first time.', n + '首次重新开始寻求武器。'), L('装備の損耗や兵の増加で充足率が130%を下回った', 'Wear or new troops brought equipment below 130%', '由于装备损耗或兵员增加，充足率降到了130%以下'), true);
+      flag('finish', sh > 0.65 && c.antiwar > 50 && c.morale >= CFG.peaceLine, L(n + 'が圧倒的優勢のまま、反戦感情が50を超えた。', n + ' is winning big, but anti-war sentiment passed 50.', n + '在压倒性优势下，反战情绪超过了50。'), L(n + 'は早期終結を望み、武器を求めるようになった', n + ' wants a quick end and seeks arms', n + '希望尽早结束战争，开始寻求武器'));
+      flag('food70', c.foodLv < 70, L(n + 'の兵糧が70%を下回った。', n + "'s food fell below 70%.", n + '的军粮跌破了70%。'), L('戦意の低下と出動の鈍化が目に見えて強まる', 'Morale and deployment drop visibly', '士气下降与出动迟缓明显加剧'), L(n + 'の兵糧が70%以上に戻った。', n + "'s food is back above 70%.", n + '的军粮回升至70%以上。'), L('兵糧の不足が和らいだ', 'Food shortage eased', '军粮短缺有所缓解'));
+      flag('food', c.foodLv < 90, L(n + 'の兵糧が90%を下回った。', n + "'s food fell below 90%.", n + '的军粮跌破了90%。'), L('兵糧の相場が1.3倍になった。戦意と出動の勢いの落ち込みが強まっていく', 'Food price is now x1.3. Morale and deployment keep sliding', '军粮行情价升至1.3倍。士气与出动势头的下滑逐渐加剧'), L(n + 'の兵糧が90%以上に戻った。', n + "'s food is back above 90%.", n + '的军粮回升至90%以上。'), L('兵糧の不足が和らいだ', 'Food shortage eased', '军粮短缺有所缓解'));
+      flag('sortie', c.sortieRate * 3 < 250 && !c.massing, L(n + 'の出動の勢いが初めて細った(毎週250人未満)。', n + "'s deployment dried up for the first time (under 250/week).", n + '的出动势头首次减弱(每周不足250人)。'), L('予備の不足・戦意の低下・兵糧不足のいずれかが原因。前線の補充が追いつかなくなる', 'Caused by low reserves, morale or food. The front cannot be refilled', '原因是预备兵不足、士气低落或军粮短缺之一。前线的补充跟不上了'), L(n + 'の出動の勢いが初めて回復した。', n + "'s deployment recovered for the first time.", n + '的出动势头首次恢复。'), L('前線への補充が再開した', 'Reinforcement of the front resumed', '向前线的补充恢复了'), true);
+      flag('mass', c.massing, L(n + 'が首都に兵を集結させ始めた。', n + ' began massing troops at the capital.', n + '开始在首都集结兵力。'), L('反戦感情が高まり、早く終わらせるための総攻撃の準備', 'Anti-war mood is high; preparing an all-out offensive to end it', '反战情绪高涨，正在准备总攻以尽早结束战争'));
     }
   }
   function news(g, text, kind) { g.news.unshift({ t: g.t, text, kind: kind || 'info' }); if (g.news.length > 60) g.news.pop(); }
@@ -226,12 +229,26 @@
     const suff = CFG.absMode ? CFG.eqPriceK * clamp(1 - c.power / (Math.max(1, c.soldiers) * CFG.eqStd), -0.3, 0.4) : 0;
     return lack + suff;
   }
+  // 決着を急ぐ度合い(0〜1): 総攻撃の準備中、6週で国土を大きく広げた、相手を首都近くまで追い詰めた
+  function rush(g, c) {
+    if (!g) return 0;
+    const terrNow = sh => terrOf(c.id === 'A' ? sh : 1 - sh);
+    const h = g.history, past = h.length > 18 ? h[h.length - 19] : null;
+    const gain = past ? clamp((terrNow(g.P) - terrNow(past.share) - 0.03) / 0.06, 0, 1) : 0; // 6週で+3%から効き始め、+9%で最大
+    // 勝利が見えた時の割増しは期間限定: 相手の国土が30%を切ってから6週は全額、その後2週で消える。相手が35%まで持ち直すと再び起こりうる
+    let near = 0;
+    if (c.nearStart != null) {
+      const el = g.t - c.nearStart, fade = el < CFG.nearHold ? 1 : clamp((CFG.nearHold + CFG.nearFade - el) / CFG.nearFade, 0, 1);
+      near = clamp((0.3 - territory(g, other(c.id))) / 0.15, 0, 1) * fade; // 30%から効き始め、15%で最大
+    }
+    return Math.max(gain, near, c.massing ? 0.7 : 0);
+  }
   function fairMult(g, c, item) {
     if (g.fairOverride && g.fairOverride[c.id + item] != null) return g.fairOverride[c.id + item]; // チュートリアル用に相場を固定する
     if (item === 'food') { let f = foodMult(c); if (c.susp >= 50) f *= 0.8; if (g.t < c.priceModUntil) f *= c.priceMod; return f; }
     const D = demand(g, c);
     const wealth = CFG.wWealth * clamp((c.funds - 1000000) / 3000000, 0, 1);
-    let f = CFG.fBase + CFG.fNeed * D + wealth + (c.morale - 50) / 300 + itemBonus(c, item) + pol(c).price;
+    let f = CFG.fBase + CFG.fNeed * D + wealth + (c.morale - 50) / 300 + itemBonus(c, item) + pol(c).price + CFG.rushK * rush(g, c);
     f = CFG.stretchC + (f - CFG.stretchC) + CFG.stretchA * CFG.stretchW * Math.tanh((f - CFG.stretchC) / CFG.stretchW); // 中央(1.1倍)付近ほど動きを大きくする
     if (c.susp >= 50) f *= 0.8;
     if (item) f -= buyImpact(c, item); // 司令部が買った量を把握し、同じ品目を続けて買うほどその品目の相場が下がる
@@ -265,8 +282,8 @@
 
 
   // 相場の段階表示(兵糧以外)。数値ではなく言葉で示す
-  const PLABEL = [[0.6, ['大幅な値崩れ', 'Collapsed'], 0.5], [0.8, ['値崩れ', 'Slumping'], 0.7], [0.9, ['やや安い', 'Soft'], 0.85], [1.1, ['ほぼ定価', 'Near list'], 1.0], [1.3, ['少し高騰', 'Firm'], 1.2], [1.5, ['高騰', 'High'], 1.4], [9, ['大高騰', 'Soaring'], 1.6]];
-  function priceBand(m) { for (const b of PLABEL) if (m < b[0]) return { label: L(b[1][0], b[1][1]), mid: b[2] }; return { label: L('大高騰', 'Soaring'), mid: 1.6 }; }
+  const PLABEL = [[0.6, ['大幅な値崩れ', 'Collapsed', '大幅暴跌'], 0.5], [0.8, ['値崩れ', 'Slumping', '下跌'], 0.7], [0.9, ['やや安い', 'Soft', '略低'], 0.85], [1.1, ['ほぼ定価', 'Near list', '接近标价'], 1.0], [1.3, ['少し高騰', 'Firm', '小幅上涨'], 1.2], [1.5, ['高騰', 'High', '上涨'], 1.4], [9, ['大高騰', 'Soaring', '大幅暴涨'], 1.6]];
+  function priceBand(m) { for (const b of PLABEL) if (m < b[0]) return { label: L(b[1][0], b[1][1], b[1][2]), mid: b[2] }; return { label: L('大高騰', 'Soaring', '大幅暴涨'), mid: 1.6 }; }
   function priceLabel(g, c, item) { return priceBand(estimate(g, c, item)); }
   function estimate(g, c, item) {
     if (item === 'food') return fairMult(g, c, item); // 兵糧の相場は備蓄の段階で決まり、正確に分かる
@@ -315,7 +332,7 @@
     const ds = scaled(sBase, es), dm = scaled(mBase, em);
     if (sBase > 0) discAdd(g, c, 's'); if (mBase > 0) discAdd(g, c, 'm');
     // 戦意は満額で疑惑度だけ薄れた時は「少し薄かった」。それ以外で薄れた時は「薄かった」
-    const note = (es < 1 || em < 1) ? (mBase > 0 && em === 1 ? L('効果は少し薄かった', 'It had a bit less effect') : L('効果は薄かった', 'It had little effect')) : '';
+    const note = (es < 1 || em < 1) ? (mBase > 0 && em === 1 ? L('効果は少し薄かった', 'It had a bit less effect', '效果略有减弱') : L('効果は薄かった', 'It had little effect', '效果减弱了')) : '';
     return { ds, dm, weak: !!note, note };
   }
   // 売上の内訳: 原価より高く売れた分と、原価以下で渡した分(無償供与を含む)
@@ -330,92 +347,92 @@
   function sell(g, cid, item, mult) {
     const c = g.c[cid], it = ITEMS[item];
     if (g.over) return { ok:false, text:'' };
-    if (g.inv[item] < 1) return { ok:false, tier:'none', text: L(it.name + 'の在庫がありません。', 'No ' + it.name + ' in stock.') };
+    if (g.inv[item] < 1) return { ok:false, tier:'none', text: L(it.name + 'の在庫がありません。', 'No ' + it.name + ' in stock.', it.name + '没有库存。') };
     mult = Math.round(mult * 100) / 100;
     if (mult <= 0) {
       // 無償供与: 疑惑度が大きく下がり、受け取った国の戦意が持ち直す
       take(g, item); deliver(g, c, item); g.stats.free++; g.supplied[item]++;
       const da = discApply(g, c, 4 * SUSM[item], 8), d = da.ds, mo = da.dm, en = da.weak ? '。' + da.note + '。' : ''; book(g, c, item, 0);
       c.susp = clamp(c.susp - d, -100, 100); c.morale = clamp(c.morale + mo, 0, 100); c.antiwar = clamp(c.antiwar - 2, 0, 100);
-      news(g, L(c.name + 'へ' + it.name + '(' + it.lot + ')を無償供与。疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo + (da.weak ? '。' + da.note : ''), 'Gave ' + it.name + ' (' + it.lot + ') to ' + c.name + ' for free. Suspicion -' + d.toFixed(0) + ', morale +' + mo + (da.weak ? '. ' + da.note : '')), 'sale');
-      tl(g, L('あなたは' + c.name + 'へ' + it.name + 'を無償供与した。' + (da.weak ? da.note + '。' : ''), 'You gave ' + it.name + ' to ' + c.name + ' for free.' + (da.weak ? ' ' + da.note + '.' : '')), L(c.name + 'の疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo, c.name + ': suspicion -' + d.toFixed(0) + ', morale +' + mo), 'act');
-      return { ok:true, tier:'free', text: L(c.name + 'は無償供与を受け取った。疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo + '、反戦感情 -2' + en, c.name + ' accepted the gift. Suspicion -' + d.toFixed(0) + ', morale +' + mo + ', anti-war -2' + (da.weak ? '. ' + da.note + '.' : '')) };
+      news(g, L(c.name + 'へ' + it.name + '(' + it.lot + ')を無償供与。疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo + (da.weak ? '。' + da.note : ''), 'Gave ' + it.name + ' (' + it.lot + ') to ' + c.name + ' for free. Suspicion -' + d.toFixed(0) + ', morale +' + mo + (da.weak ? '. ' + da.note : ''), '向' + c.name + '无偿提供' + it.name + '(' + it.lot + ')。怀疑度 -' + d.toFixed(0) + '，士气 +' + mo + (da.weak ? '。' + da.note : '')), 'sale');
+      tl(g, L('あなたは' + c.name + 'へ' + it.name + 'を無償供与した。' + (da.weak ? da.note + '。' : ''), 'You gave ' + it.name + ' to ' + c.name + ' for free.' + (da.weak ? ' ' + da.note + '.' : ''), '你向' + c.name + '无偿提供了' + it.name + '。' + (da.weak ? da.note + '。' : '')), L(c.name + 'の疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo, c.name + ': suspicion -' + d.toFixed(0) + ', morale +' + mo, c.name + '的怀疑度 -' + d.toFixed(0) + '，士气 +' + mo), 'act');
+      return { ok:true, tier:'free', text: L(c.name + 'は無償供与を受け取った。疑惑度 -' + d.toFixed(0) + '、戦意 +' + mo + '、反戦感情 -2' + en, c.name + ' accepted the gift. Suspicion -' + d.toFixed(0) + ', morale +' + mo + ', anti-war -2' + (da.weak ? '. ' + da.note + '.' : ''), c.name + '接受了无偿援助。怀疑度 -' + d.toFixed(0) + '，士气 +' + mo + '，反战情绪 -2' + (da.weak ? '。' + da.note + '。' : '')) };
     }
     const price = Math.round(listPrice(g, item) * mult);
     const ratio = mult / fairMult(g, c, item);
-    const own = shareOf(g, c.id), stalemate = own > 0.38 && own < 0.62;
     // 大幅な値引きは、通常なら断られる状況でも受け取られる
     let bypass = '';
-    if (c.susp >= 80) { if (ratio <= 0.4 && stalemate) bypass = L('取引停止中だが、膠着した戦況で破格の申し出を受け入れた', 'had halted trade, but took a rock-bottom offer in the stalemate'); else { g.stats.stop++; return { ok:false, tier:'stop', text: L(c.name + 'は取引を停止している(疑惑度80以上)。戦況が膠着していれば、相場の4割以下の破格なら受け取る。', c.name + ' has halted trade (suspicion 80+). In a stalemate it still takes 40% of market or less.') }; } }
-    if (c.morale < CFG.peaceLine) { if (ratio <= 0.3) bypass = bypass || L('戦う意思を失いかけていたが、破格の支援を受け取った', 'was losing the will to fight, but took the rock-bottom help'); else { g.stats.nomorale++; return { ok:false, tier:'nomorale', text: L(c.name + 'に購入の意思がない(戦意25未満)。相場の3割以下なら受け取る。', c.name + ' has no will to buy (morale under 25). It takes 30% of market or less.') }; } }
+    const desperate = territory(g, c.id) < CFG.desperateLine;
+    if (c.susp >= 80) { if (desperate && ratio <= CFG.desperateRatio) bypass = L('取引を停止していたが、追い詰められて背に腹は代えられず買った', 'had halted trade, but was too desperate to refuse', '虽已中断交易，但被逼到绝境，只能硬着头皮购买'); else { g.stats.stop++; return { ok:false, tier:'stop', text: L(c.name + 'は取引を停止している(疑惑度80以上)。国土が35%を切るほど追い詰められれば、相場の8割以下なら買う。', c.name + ' has halted trade (suspicion 80+). If its land falls below 35%, it buys at 80% of market or less.', c.name + '已中断交易(怀疑度80以上)。若被逼到国土不足35%，行情价八成以下仍会购买。') }; } }
+    if (c.morale < CFG.peaceLine) { if (ratio <= 0.3) bypass = bypass || L('戦う意思を失いかけていたが、破格の支援を受け取った', 'was losing the will to fight, but took the rock-bottom help', '虽已快失去战斗意志，但接受了极低价的援助'); else { g.stats.nomorale++; return { ok:false, tier:'nomorale', text: L(c.name + 'に購入の意思がない(戦意25未満)。相場の3割以下なら受け取る。', c.name + ' has no will to buy (morale under 25). It takes 30% of market or less.', c.name + '没有购买意愿(士气不足25)。行情价三成以下仍会接受。') }; } }
     const noNeed = item === 'food' ? c.foodLv >= CFG.foodFull : item === 'equip' ? c.noNeed : false;
-    if (noNeed) { if (ratio <= 0.5) bypass = bypass || L('必要としていなかったが、安さにつられて買った', "didn't need it, but the low price won it over"); else { g.stats.noneed++; news(g, L(c.name + 'は「今は必要ない」と' + it.name + 'の購入を見送った。', c.name + ' passed on ' + it.name + ': "not needed now."'), 'bad'); return { ok:false, tier:'noneed', text: item === 'food' ? L(c.name + 'は兵糧が十分にあり(130%以上)、今は必要としていない。相場の5割以下なら買う。', c.name + ' has plenty of food (130%+) and does not need it. It buys at 50% of market or less.') : L(c.name + 'は装備が十分に揃っており、今は武器を必要としていない。相場の5割以下なら買う。', c.name + ' is fully armed and does not need arms now. It buys at 50% of market or less.') }; } }
-    if (c.funds < price) { g.stats.nofunds++; return { ok:false, tier:'nofunds', text: L(c.name + 'は資金が足りない。', c.name + ' cannot afford it.') }; }
+    if (noNeed) { if (ratio <= 0.5) bypass = bypass || L('必要としていなかったが、安さにつられて買った', "didn't need it, but the low price won it over", '本来并不需要，但被低价吸引而购买'); else { g.stats.noneed++; news(g, L(c.name + 'は「今は必要ない」と' + it.name + 'の購入を見送った。', c.name + ' passed on ' + it.name + ': "not needed now."', c.name + '以“现在不需要”为由，放弃购买' + it.name + '。'), 'bad'); return { ok:false, tier:'noneed', text: item === 'food' ? L(c.name + 'は兵糧が十分にあり(130%以上)、今は必要としていない。相場の5割以下なら買う。', c.name + ' has plenty of food (130%+) and does not need it. It buys at 50% of market or less.', c.name + '军粮充足(130%以上)，现在并不需要。行情价五成以下才会购买。') : L(c.name + 'は装備が十分に揃っており、今は武器を必要としていない。相場の5割以下なら買う。', c.name + ' is fully armed and does not need arms now. It buys at 50% of market or less.', c.name + '装备齐全，现在并不需要武器。行情价五成以下才会购买。') }; } }
+    if (c.funds < price) { g.stats.nofunds++; return { ok:false, tier:'nofunds', text: L(c.name + 'は資金が足りない。', c.name + ' cannot afford it.', c.name + '资金不足。') }; }
     let tier, ds, dm = 0, label;
     // 信頼(マイナスの疑惑度)があると、相場より高い価格も受け入れる。快く買っても信頼は少し消費される
     // 同じ価格なら、信頼が厚いほど疑惑度の上昇は小さい(逆転しない)
     const trust = -c.susp;
     const rich = c.funds >= CFG.richLine;
     const band = trust >= 40 ? { w: 1.45, r: 1.6, w1: 1, w2: 3, rd: 6 } : trust >= 15 ? { w: 1.3, r: 1.45, w1: 1, w2: 1, rd: 4 } : rich ? { w: 1.2, r: 1.4, w1: 0, w2: 0, rd: 2, rich: true } : { w: CFG.bandW, r: CFG.bandR, w1: 0, w2: 0, rd: 2 };
-    if (ratio > band.r) { tier = 'refuse'; ds = 2; label = L('買わない', 'Refused'); }
-    else if (ratio > band.w) { tier = 'reluctant'; ds = band.rd; label = L('しぶしぶ買う', 'Bought reluctantly'); }
-    else if (ratio > 1.1) { tier = 'willing'; ds = ratio > 1.3 ? band.w2 : band.w1; label = band.rich ? L('資金に余裕があり普通に買う', 'Rich enough to buy anyway') : L('信頼から快く買う', 'Bought gladly out of trust'); }
-    else if (ratio >= 0.9) { tier = 'normal'; ds = 0; label = L('普通に買う', 'Bought'); }
-    else if (ratio >= 0.7) { tier = 'grateful'; ds = -2; label = L('ありがたく買う', 'Bought gratefully'); }
-    else if (ratio > 0.4) { tier = 'thanks'; ds = -2; dm = 3; label = L('感謝される', 'Thankful'); }
-    else { tier = 'debt'; ds = -3; dm = 4; label = L('恩義を感じる', 'Deeply indebted'); }
+    if (ratio > band.r) { tier = 'refuse'; ds = 2; label = L('買わない', 'Refused', '拒绝购买'); }
+    else if (ratio > band.w) { tier = 'reluctant'; ds = band.rd; label = L('しぶしぶ買う', 'Bought reluctantly', '勉强购买'); }
+    else if (ratio > 1.1) { tier = 'willing'; ds = ratio > 1.3 ? band.w2 : band.w1; label = band.rich ? L('資金に余裕があり普通に買う', 'Rich enough to buy anyway', '资金宽裕，照常购买') : L('信頼から快く買う', 'Bought gladly out of trust', '出于信任，爽快购买'); }
+    else if (ratio >= 0.9) { tier = 'normal'; ds = 0; label = L('普通に買う', 'Bought', '照常购买'); }
+    else if (ratio >= 0.7) { tier = 'grateful'; ds = -2; label = L('ありがたく買う', 'Bought gratefully', '感激地购买'); }
+    else if (ratio > 0.4) { tier = 'thanks'; ds = -2; dm = 3; label = L('感謝される', 'Thankful', '深表感谢'); }
+    else { tier = 'debt'; ds = -3; dm = 4; label = L('恩義を感じる', 'Deeply indebted', '铭感于心'); }
     let weak = false, wnote = '';
     if (ds < 0) { const da = discApply(g, c, -ds * SUSM[item], dm); ds = -da.ds; dm = da.dm; weak = da.weak; wnote = da.note; } // 値引きの効き目は続けるほど薄れる
     else ds = sm(ds, item); c.susp = clamp(c.susp + ds, -100, 100); c.morale = clamp(c.morale + dm, 0, 100);
-    const sTxt = (ds === 0 ? '' : L('(疑惑度 ', ' (suspicion ') + (ds > 0 ? '+' : '') + ds + (dm ? L('、戦意 +', ', morale +') + dm : '') + ')') + (weak ? L('。', '. ') + wnote : '');
+    const sTxt = (ds === 0 ? '' : L('(疑惑度 ', ' (suspicion ', '(怀疑度 ') + (ds > 0 ? '+' : '') + ds + (dm ? L('、戦意 +', ', morale +', '，士气 +') + dm : '') + ')') + (weak ? L('。', '. ', '。') + wnote : '');
     if (tier === 'refuse') {
       g.stats.refuse++;
-      news(g, L(c.name + 'は' + it.name + 'の購入を拒否した ×' + mult.toFixed(1) + sTxt, c.name + ' refused ' + it.name + ' at x' + mult.toFixed(1) + sTxt), 'bad');
+      news(g, L(c.name + 'は' + it.name + 'の購入を拒否した ×' + mult.toFixed(1) + sTxt, c.name + ' refused ' + it.name + ' at x' + mult.toFixed(1) + sTxt, c.name + '拒绝购买' + it.name + ' ×' + mult.toFixed(1) + sTxt), 'bad');
       return { ok:false, tier, text: c.name + ': ' + label + sTxt };
     }
     take(g, item); if (item === 'food') g.foodRev += price; g.money += price; g.revenue += price; g.sales++; g.supplied[item]++; c.sold.push({ t: g.t, v: price, k: item }); c.bought[item] += 1; c.lastDeal[item] = { m: mult, t: g.t, tier, label }; // 前回の成約(画面に表示する)
     c.funds -= price; deliver(g, c, item); book(g, c, item, price);
-    news(g, L(c.name + 'が' + it.name + '(' + it.lot + ')を' + fmt(price) + 'で購入: ' + label + sTxt, c.name + ' bought ' + it.name + ' (' + it.lot + ') for ' + fmt(price) + ': ' + label + sTxt), 'sale');
-    if (bypass) tl(g, L(c.name + 'は' + bypass + '(' + it.name + ' ×' + mult.toFixed(2) + ')。', c.name + ' ' + bypass + ' (' + it.name + ' x' + mult.toFixed(2) + ').'), L('大幅な値引きは、断られる状況でも通ることがある', 'A deep discount can pass even when a sale would be refused'), 'act');
-    return { ok:true, tier, text: L(c.name + ': ' + label + '。' + fmt(price) + 'の売上' + sTxt + (bypass ? '。' + bypass : ''), c.name + ': ' + label + '. Sold for ' + fmt(price) + sTxt + (bypass ? '. It ' + bypass : '')) };
+    news(g, L(c.name + 'が' + it.name + '(' + it.lot + ')を' + fmt(price) + 'で購入: ' + label + sTxt, c.name + ' bought ' + it.name + ' (' + it.lot + ') for ' + fmt(price) + ': ' + label + sTxt, c.name + '以' + fmt(price) + '购买了' + it.name + '(' + it.lot + '):' + label + sTxt), 'sale');
+    if (bypass) tl(g, L(c.name + 'は' + bypass + '(' + it.name + ' ×' + mult.toFixed(2) + ')。', c.name + ' ' + bypass + ' (' + it.name + ' x' + mult.toFixed(2) + ').', c.name + bypass + '(' + it.name + ' ×' + mult.toFixed(2) + ')。'), L('大幅な値引きは、断られる状況でも通ることがある', 'A deep discount can pass even when a sale would be refused', '大幅降价有时能在本会被拒绝的情况下成交'), 'act');
+    return { ok:true, tier, text: L(c.name + ': ' + label + '。' + fmt(price) + 'の売上' + sTxt + (bypass ? '。' + bypass : ''), c.name + ': ' + label + '. Sold for ' + fmt(price) + sTxt + (bypass ? '. It ' + bypass : ''), c.name + ':' + label + '。销售额' + fmt(price) + sTxt + (bypass ? '。' + bypass : '')) };
   }
 
   function covert(g, op, cid, arg) {
     const o = OPS[op], c = g.c[cid], oc = g.c[other(cid)];
     if (g.over) return { ok:false, text:'' };
-    if (g.cd[op] > 0) return { ok:false, text: L(o.name + 'は準備中です(あと' + Math.ceil(g.cd[op] / 3) + '週)。', o.name + ' is not ready (' + Math.ceil(g.cd[op] / 3) + ' more weeks).') };
-    if (g.money < o.cost) return { ok:false, text: L('資金が足りません。', 'Not enough money.') };
+    if (g.cd[op] > 0) return { ok:false, text: L(o.name + 'は準備中です(あと' + Math.ceil(g.cd[op] / 3) + '週)。', o.name + ' is not ready (' + Math.ceil(g.cd[op] / 3) + ' more weeks).', o.name + '正在准备中(还需' + Math.ceil(g.cd[op] / 3) + '周)。') };
+    if (g.money < o.cost) return { ok:false, text: L('資金が足りません。', 'Not enough money.', '资金不足。') };
     g.money -= o.cost; g.opsSpent += o.cost; g.cd[op] = o.cd; g.opsCount[op]++;
     if (op === 'assassin') {
       c.morale = clamp(c.morale + 15, 0, 100); c.antiwar = clamp(c.antiwar - 10, 0, 100);
       c.susp = clamp(c.susp + 30, -100, 100); oc.susp = clamp(oc.susp + (oc.susp <= -15 ? 5 : 10), -100, 100);
-      news(g, L(c.name + 'の要人が死亡。' + c.name + '国内で' + oc.name + 'への報復を求める声が高まる。', 'A key figure of ' + c.name + ' is dead. Calls for revenge on ' + oc.name + ' grow.'), 'op');
-      tl(g, L('あなたは' + c.name + 'で要人暗殺を仕掛けた。', 'You arranged an assassination in ' + c.name + '.'), L(c.name + 'の戦意 +15・反戦感情 -10、疑惑度 ' + c.name + '+30/' + oc.name + '+10', c.name + ': morale +15, anti-war -10. Suspicion ' + c.name + ' +30 / ' + oc.name + ' +10'), 'act');
-      return { ok:true, text: L(c.name + 'の戦意 +15、反戦感情 -10。疑惑度 ' + c.name + '+30 / ' + oc.name + '+10', c.name + ': morale +15, anti-war -10. Suspicion ' + c.name + ' +30 / ' + oc.name + ' +10') };
+      news(g, L(c.name + 'の要人が死亡。' + c.name + '国内で' + oc.name + 'への報復を求める声が高まる。', 'A key figure of ' + c.name + ' is dead. Calls for revenge on ' + oc.name + ' grow.', c.name + '的要人身亡。' + c.name + '国内要求向' + oc.name + '复仇的呼声高涨。'), 'op');
+      tl(g, L('あなたは' + c.name + 'で要人暗殺を仕掛けた。', 'You arranged an assassination in ' + c.name + '.', '你在' + c.name + '策划了要人暗杀。'), L(c.name + 'の戦意 +15・反戦感情 -10、疑惑度 ' + c.name + '+30/' + oc.name + '+10', c.name + ': morale +15, anti-war -10. Suspicion ' + c.name + ' +30 / ' + oc.name + ' +10', c.name + '的士气 +15、反战情绪 -10，怀疑度 ' + c.name + '+30/' + oc.name + '+10'), 'act');
+      return { ok:true, text: L(c.name + 'の戦意 +15、反戦感情 -10。疑惑度 ' + c.name + '+30 / ' + oc.name + '+10', c.name + ': morale +15, anti-war -10. Suspicion ' + c.name + ' +30 / ' + oc.name + ' +10', c.name + '的士气 +15，反战情绪 -10。怀疑度 ' + c.name + '+30 / ' + oc.name + '+10') };
     }
     if (op === 'rumor') {
       c.morale = clamp(c.morale + 8, 0, 100);
       c.susp = clamp(c.susp + 10, -100, 100); oc.susp = clamp(oc.susp + (oc.susp <= -15 ? 1.5 : 3), -100, 100);
-      news(g, L(c.name + 'の報道に' + oc.name + '軍の非道を伝える記事が相次ぐ。', c.name + "'s press is full of stories of " + oc.name + ' atrocities.'), 'op');
-      tl(g, L('あなたは' + c.name + 'で悪評を流布した。', 'You ran a smear campaign in ' + c.name + '.'), L(c.name + 'の戦意 +8、疑惑度 +10', c.name + ': morale +8, suspicion +10'), 'act');
-      return { ok:true, text: L(c.name + 'の戦意 +8。疑惑度 ' + c.name + '+10 / ' + oc.name + '+3', c.name + ': morale +8. Suspicion ' + c.name + ' +10 / ' + oc.name + ' +3') };
+      news(g, L(c.name + 'の報道に' + oc.name + '軍の非道を伝える記事が相次ぐ。', c.name + "'s press is full of stories of " + oc.name + ' atrocities.', c.name + '的媒体接连报道' + oc.name + '军的暴行。'), 'op');
+      tl(g, L('あなたは' + c.name + 'で悪評を流布した。', 'You ran a smear campaign in ' + c.name + '.', '你在' + c.name + '散布了恶评。'), L(c.name + 'の戦意 +8、疑惑度 +10', c.name + ': morale +8, suspicion +10', c.name + '的士气 +8，怀疑度 +10'), 'act');
+      return { ok:true, text: L(c.name + 'の戦意 +8。疑惑度 ' + c.name + '+10 / ' + oc.name + '+3', c.name + ': morale +8. Suspicion ' + c.name + ' +10 / ' + oc.name + ' +3', c.name + '的士气 +8。怀疑度 ' + c.name + '+10 / ' + oc.name + '+3') };
     }
     if (op === 'consult') {
       const p = arg === 'pass' ? 'pass' : 'aggr', P = POLICY[p];
       c.policy = p; c.policyUntil = g.t + 30; c.susp = clamp(c.susp + 5, -100, 100);
-      news(g, L(c.name + 'の司令部が方針を「' + P.name + '」に切り替えた。', c.name + ' HQ switched to a "' + P.name + '" strategy.'), 'op');
-      tl(g, L('あなたは' + c.name + 'に「' + P.name + '」の作戦方針を進言した(10週間)。', 'You advised ' + c.name + ' to go "' + P.name + '" (10 weeks).'), p === 'aggr' ? L('装備・傭兵の相場が上がり、前線への出動と押す力が増す。反戦感情が上がり戦意は下がっていく', 'Arms and mercenary prices rise; deployment and push grow. Anti-war rises, morale falls') : L('装備・傭兵の相場が下がり、出動と押す力が減る(対抗の増援は行う)。反戦感情が下がり戦意は上がっていく', 'Arms and mercenary prices fall; deployment and push drop (still counters surges). Anti-war falls, morale rises'), 'act');
-      return { ok:true, text: L(c.name + 'の方針を10週間「' + P.name + '」に変えた。' + (p === 'aggr' ? '相場+0.15、出動1.8倍、押す力+15%、反戦感情と戦意が徐々に悪化' : '相場-0.1、出動0.5倍、押す力-12%、反戦感情と戦意が徐々に改善') + '。' + c.name + 'の疑惑度 +5', c.name + ' goes "' + P.name + '" for 10 weeks. ' + (p === 'aggr' ? 'Price +0.15, deployment x1.8, push +15%; anti-war and morale worsen' : 'Price -0.1, deployment x0.5, push -12%; anti-war and morale improve') + '. ' + c.name + ' suspicion +5') };
+      news(g, L(c.name + 'の司令部が方針を「' + P.name + '」に切り替えた。', c.name + ' HQ switched to a "' + P.name + '" strategy.', c.name + '的司令部将方针切换为“' + P.name + '”。'), 'op');
+      tl(g, L('あなたは' + c.name + 'に「' + P.name + '」の作戦方針を進言した(10週間)。', 'You advised ' + c.name + ' to go "' + P.name + '" (10 weeks).', '你向' + c.name + '建议了“' + P.name + '”的作战方针(10周)。'), p === 'aggr' ? L('装備・傭兵の相場が上がり、前線への出動と押す力が増す。反戦感情が上がり戦意は下がっていく', 'Arms and mercenary prices rise; deployment and push grow. Anti-war rises, morale falls', '装备与雇佣兵的行情价上涨，向前线的出动与推进力增强。反战情绪上升，士气逐渐下降') : L('装備・傭兵の相場が下がり、出動と押す力が減る(対抗の増援は行う)。反戦感情が下がり戦意は上がっていく', 'Arms and mercenary prices fall; deployment and push drop (still counters surges). Anti-war falls, morale rises', '装备与雇佣兵的行情价下降，出动与推进力减弱(仍会对敌方增援做出反击)。反战情绪下降，士气逐渐上升'), 'act');
+      return { ok:true, text: L(c.name + 'の方針を10週間「' + P.name + '」に変えた。' + (p === 'aggr' ? '相場+0.15、出動1.8倍、押す力+15%、反戦感情と戦意が徐々に悪化' : '相場-0.1、出動0.5倍、押す力-12%、反戦感情と戦意が徐々に改善') + '。' + c.name + 'の疑惑度 +5', c.name + ' goes "' + P.name + '" for 10 weeks. ' + (p === 'aggr' ? 'Price +0.15, deployment x1.8, push +15%; anti-war and morale worsen' : 'Price -0.1, deployment x0.5, push -12%; anti-war and morale improve') + '. ' + c.name + ' suspicion +5', '将' + c.name + '的方针改为“' + P.name + '”，为期10周。' + (p === 'aggr' ? '行情价+0.15，出动1.8倍，推进力+15%，反战情绪与士气逐渐恶化' : '行情价-0.1，出动0.5倍，推进力-12%，反战情绪与士气逐渐改善') + '。' + c.name + '的怀疑度 +5') };
     }
     if (op === 'loan') {
       g.money += o.cost; g.opsSpent -= o.cost; g.cd[op] = 0; g.opsCount[op]--;
-      if (g.loans.some(l => l.cid === cid)) return { ok:false, text: L(c.name + 'への融資は1回までです。', 'Only one loan per nation.') };
-      if (c.funds > CFG.loanLimit) return { ok:false, text: L(c.name + 'は資金に余裕があり、融資を必要としていない(資金30万以下で受け入れ)。', c.name + ' has money and needs no loan (accepts at 300K or less).') };
+      if (g.loans.some(l => l.cid === cid)) return { ok:false, text: L(c.name + 'への融資は1回までです。', 'Only one loan per nation.', '对' + c.name + '的贷款只能进行一次。') };
+      if (c.funds > CFG.loanLimit) return { ok:false, text: L(c.name + 'は資金に余裕があり、融資を必要としていない(資金30万以下で受け入れ)。', c.name + ' has money and needs no loan (accepts at 300K or less).', c.name + '资金宽裕，不需要贷款(资金30万以下才会接受)。') };
       g.money -= o.cost; g.cd[op] = o.cd; c.funds += o.cost; g.loanOut += o.cost;
       g.loans.push({ cid, amount: o.cost, t: g.t }); g.opsCount.loan++;
-      news(g, L(c.name + 'へ' + fmt(o.cost) + 'を融資した。', 'Lent ' + fmt(o.cost) + ' to ' + c.name + '.'), 'op');
-      tl(g, L('あなたは' + c.name + 'へ50万を融資した。', 'You lent 500K to ' + c.name + '.'), L(c.name + 'の資金が増え、武器を買えるようになった', c.name + ' has money to buy arms again'), 'act');
-      return { ok:true, text: L(c.name + 'へ' + fmt(o.cost) + 'を融資。終戦時に利息20%付きで回収(崩壊した場合は回収不能)', 'Lent ' + fmt(o.cost) + ' to ' + c.name + '. Repaid with 20% interest at war end (lost if it collapses)') };
+      news(g, L(c.name + 'へ' + fmt(o.cost) + 'を融資した。', 'Lent ' + fmt(o.cost) + ' to ' + c.name + '.', '向' + c.name + '贷款' + fmt(o.cost) + '。'), 'op');
+      tl(g, L('あなたは' + c.name + 'へ50万を融資した。', 'You lent 500K to ' + c.name + '.', '你向' + c.name + '贷款了50万。'), L(c.name + 'の資金が増え、武器を買えるようになった', c.name + ' has money to buy arms again', c.name + '的资金增加，可以购买武器了'), 'act');
+      return { ok:true, text: L(c.name + 'へ' + fmt(o.cost) + 'を融資。終戦時に利息20%付きで回収(崩壊した場合は回収不能)', 'Lent ' + fmt(o.cost) + ' to ' + c.name + '. Repaid with 20% interest at war end (lost if it collapses)', '向' + c.name + '贷款' + fmt(o.cost) + '。战争结束时连同20%利息收回(若该国崩溃则无法收回)') };
     }
     return { ok:false, text:'' };
   }
@@ -429,43 +446,43 @@
   const EVENTS = [
     // ---- 優勢側がより優勢になる ----
     { id:1, cat:'lead', pre:false, w:g => 1,
-      make:g => { const c = lead(g); return { text: L(c.name + 'の戦果が大きく報じられている。' + c.name + 'の戦意 +8', c.name + "'s victories make headlines. " + c.name + ' morale +8'),
+      make:g => { const c = lead(g); return { text: L(c.name + 'の戦果が大きく報じられている。' + c.name + 'の戦意 +8', c.name + "'s victories make headlines. " + c.name + ' morale +8', c.name + '的战果被大肆报道。' + c.name + '的士气 +8'),
         fire:() => { c.morale = clamp(c.morale + 8, 0, 100); } }; } },
     { id:2, cat:'lead', pre:true, delay:18, w:g => 1,
-      make:g => { const c = lead(g); return { who: c.id, text: L(c.name + 'が約6週後に大規模な突破作戦を行う見込み。発動から8週間、' + c.name + 'の押す力 +25%', c.name + ' plans a major breakthrough in about 6 weeks. For 8 weeks, ' + c.name + ' push +25%'),
-        fire:() => { c.pushMod = 1.25; c.pushModUntil = g.t + 24; news(g, L(c.name + 'が突破作戦を開始。8週間、押す力 +25%', c.name + ' launched its breakthrough. Push +25% for 8 weeks'), 'event'); } }; } },
+      make:g => { const c = lead(g); return { who: c.id, text: L(c.name + 'が約6週後に大規模な突破作戦を行う見込み。発動から8週間、' + c.name + 'の押す力 +25%', c.name + ' plans a major breakthrough in about 6 weeks. For 8 weeks, ' + c.name + ' push +25%', c.name + '预计约6周后发动大规模突破作战。发动后8周内，' + c.name + '的推进力 +25%'),
+        fire:() => { c.pushMod = 1.25; c.pushModUntil = g.t + 24; news(g, L(c.name + 'が突破作戦を開始。8週間、押す力 +25%', c.name + ' launched its breakthrough. Push +25% for 8 weeks', c.name + '发动了突破作战。8周内推进力 +25%'), 'event'); } }; } },
     { id:3, cat:'lead', pre:true, delay:24, w:g => 1,
-      make:g => { const c = lead(g); return { who: c.id, text: L('同盟国が約8週後に' + c.name + 'へ武器を供与する予定。' + c.name + 'の武器戦力 +8%', 'An ally will send arms to ' + c.name + ' in about 8 weeks. ' + c.name + ' arms +8%'),
-        fire:() => { for (const k in EQ) c.eq[k] *= 1.08; totals(c); news(g, L('同盟国の武器が' + c.name + 'に到着。武器戦力 +8%', 'Allied arms reached ' + c.name + '. Arms +8%'), 'event'); } }; } },
+      make:g => { const c = lead(g); return { who: c.id, text: L('同盟国が約8週後に' + c.name + 'へ武器を供与する予定。' + c.name + 'の武器戦力 +8%', 'An ally will send arms to ' + c.name + ' in about 8 weeks. ' + c.name + ' arms +8%', '盟国预计约8周后向' + c.name + '提供武器。' + c.name + '的武器战力 +8%'),
+        fire:() => { for (const k in EQ) c.eq[k] *= 1.08; totals(c); news(g, L('同盟国の武器が' + c.name + 'に到着。武器戦力 +8%', 'Allied arms reached ' + c.name + '. Arms +8%', '盟国的武器运抵' + c.name + '。武器战力 +8%'), 'event'); } }; } },
     // ---- 劣勢側を支える / 強い側を削る ----
     { id:4, cat:'even', pre:true, delay:30, w:g => 1,
-      make:g => { const c = g.c.A.morale >= g.c.B.morale ? g.c.A : g.c.B; return { who: c.id, text: L(c.name + 'の閣僚が約10週後に辞任する見込み。国内にはまだ出ていない。' + c.name + 'の戦意 -8、反戦感情 +5', 'A minister of ' + c.name + ' will resign in about 10 weeks; not yet public. ' + c.name + ' morale -8, anti-war +5'),
-        fire:() => { c.morale = clamp(c.morale - 8, 0, 100); c.antiwar = clamp(c.antiwar + 5, 0, 100); news(g, L(c.name + 'の閣僚が辞任。戦意 -8、反戦感情 +5', 'A minister of ' + c.name + ' resigned. Morale -8, anti-war +5'), 'event'); } }; } },
+      make:g => { const c = g.c.A.morale >= g.c.B.morale ? g.c.A : g.c.B; return { who: c.id, text: L(c.name + 'の閣僚が約10週後に辞任する見込み。国内にはまだ出ていない。' + c.name + 'の戦意 -8、反戦感情 +5', 'A minister of ' + c.name + ' will resign in about 10 weeks; not yet public. ' + c.name + ' morale -8, anti-war +5', c.name + '的一名阁僚预计约10周后辞职。国内尚未公开。' + c.name + '的士气 -8，反战情绪 +5'),
+        fire:() => { c.morale = clamp(c.morale - 8, 0, 100); c.antiwar = clamp(c.antiwar + 5, 0, 100); news(g, L(c.name + 'の閣僚が辞任。戦意 -8、反戦感情 +5', 'A minister of ' + c.name + ' resigned. Morale -8, anti-war +5', c.name + '的阁僚辞职。士气 -8，反战情绪 +5'), 'event'); } }; } },
     { id:5, cat:'even', pre:true, delay:30, w:g => 1,
-      make:g => { const c = g.c.A.front / g.c.B.front <= 1 ? g.c.A : g.c.B; return { who: c.id, text: L(c.name + 'で大規模な徴兵令が準備されている。約10週後に発令。' + c.name + 'の軍人 +15,000、反戦感情 +5', c.name + ' prepares a mass draft, due in about 10 weeks. ' + c.name + ' soldiers +15,000, anti-war +5'),
-        fire:() => { c.reserve += 15000; syncSoldiers(c); c.antiwar = clamp(c.antiwar + 5, 0, 100); news(g, L(c.name + 'で徴兵令。軍人 +15,000、反戦感情 +5', 'Draft in ' + c.name + '. Soldiers +15,000, anti-war +5'), 'event'); } }; } },
+      make:g => { const c = g.c.A.front / g.c.B.front <= 1 ? g.c.A : g.c.B; return { who: c.id, text: L(c.name + 'で大規模な徴兵令が準備されている。約10週後に発令。' + c.name + 'の軍人 +15,000、反戦感情 +5', c.name + ' prepares a mass draft, due in about 10 weeks. ' + c.name + ' soldiers +15,000, anti-war +5', c.name + '正在筹备大规模征兵令，约10周后颁布。' + c.name + '的军人 +15,000，反战情绪 +5'),
+        fire:() => { c.reserve += 15000; syncSoldiers(c); c.antiwar = clamp(c.antiwar + 5, 0, 100); news(g, L(c.name + 'で徴兵令。軍人 +15,000、反戦感情 +5', 'Draft in ' + c.name + '. Soldiers +15,000, anti-war +5', c.name + '颁布征兵令。军人 +15,000，反战情绪 +5'), 'event'); } }; } },
     { id:7, cat:'even', pre:false, w:g => 1,
-      make:g => { const c = lag(g); return { text: L(c.name + 'の防衛戦が英雄的に報じられている。' + c.name + 'の戦意 +10', c.name + "'s defense is hailed as heroic. " + c.name + ' morale +10'),
+      make:g => { const c = lag(g); return { text: L(c.name + 'の防衛戦が英雄的に報じられている。' + c.name + 'の戦意 +10', c.name + "'s defense is hailed as heroic. " + c.name + ' morale +10', c.name + '的防御战被誉为英雄之举。' + c.name + '的士气 +10'),
         fire:() => { c.morale = clamp(c.morale + 10, 0, 100); } }; } },
     { id:8, cat:'even', pre:false, w:g => 1,
-      make:g => { const c = g.c.A.power >= g.c.B.power ? g.c.A : g.c.B; return { text: L(c.name + 'の補給基地で大規模な事故。' + c.name + 'の武器戦力 -5%', 'Major accident at a ' + c.name + ' supply depot. ' + c.name + ' arms -5%'),
+      make:g => { const c = g.c.A.power >= g.c.B.power ? g.c.A : g.c.B; return { text: L(c.name + 'の補給基地で大規模な事故。' + c.name + 'の武器戦力 -5%', 'Major accident at a ' + c.name + ' supply depot. ' + c.name + ' arms -5%', c.name + '的补给基地发生重大事故。' + c.name + '的武器战力 -5%'),
         fire:() => { for (const k in EQ) c.eq[k] *= 0.95; totals(c); } }; } },
     // ---- 商人に関わる ----
     { id:9, cat:'merchant', pre:false, w:g => 1,
       make:g => { const vA = soldSince(g.c.A, g.t - 60), vB = soldSince(g.c.B, g.t - 60), any = vA + vB > 0;
         const c = any ? (vA >= vB ? g.c.A : g.c.B) : (g.c.A.funds >= g.c.B.funds ? g.c.A : g.c.B);
-        return { text: L('競合の武器商人が' + c.name + 'に参入した(' + (any ? '最近あなたが多く売っている国' : '資金の多い国') + ')。10週間、' + c.name + 'の相場 -20%', 'A rival dealer moved into ' + c.name + ' (' + (any ? 'your recent best customer' : 'the richer nation') + '). ' + c.name + ' prices -20% for 10 weeks'),
+        return { text: L('競合の武器商人が' + c.name + 'に参入した(' + (any ? '最近あなたが多く売っている国' : '資金の多い国') + ')。10週間、' + c.name + 'の相場 -20%', 'A rival dealer moved into ' + c.name + ' (' + (any ? 'your recent best customer' : 'the richer nation') + '). ' + c.name + ' prices -20% for 10 weeks', '竞争对手的军火商进入了' + c.name + '(' + (any ? '你最近大量出售的国家' : '资金较多的国家') + ')。10周内，' + c.name + '的行情价 -20%'),
           fire:() => { c.priceMod = 0.8; c.priceModUntil = g.t + 30; } }; } },
     { id:10, cat:'merchant', pre:true, delay:39, w:g => 1,
-      make:g => { const t0 = g.t; return { text: L('国際調査団が約13週後に報告書を公表する。これから13週の間に両国へ販売していると、両国の疑惑度が上がる(販売額の偏りが少ないほど大きく、最大 +25)。', 'An international inquiry reports in about 13 weeks. Selling to both nations in that time raises both suspicions (more if balanced, up to +25).'),
+      make:g => { const t0 = g.t; return { text: L('国際調査団が約13週後に報告書を公表する。これから13週の間に両国へ販売していると、両国の疑惑度が上がる(販売額の偏りが少ないほど大きく、最大 +25)。', 'An international inquiry reports in about 13 weeks. Selling to both nations in that time raises both suspicions (more if balanced, up to +25).', '国际调查团将在约13周后公布报告。今后13周内若向两国出售，两国的怀疑度都会上升(对两国的销售额越均衡，上升越多，最多 +25)。'),
         fire:() => { const vA = soldSince(g.c.A, t0), vB = soldSince(g.c.B, t0);
           if (vA > 0 && vB > 0) { const d = Math.round(10 + 15 * Math.min(vA, vB) / Math.max(vA, vB));
             for (const c of [g.c.A, g.c.B]) c.susp = clamp(c.susp + d, -100, 100);
-            news(g, L('国際調査団の報告書が公表された。両国への販売が指摘され、両国の疑惑度 +' + d, 'The inquiry report is out. Your sales to both sides were named. Both suspicions +' + d), 'event'); }
-          else news(g, L('国際調査団の報告書が公表された。あなたへの指摘はなかった。', 'The inquiry report is out. You were not named.'), 'event'); } }; } },
+            news(g, L('国際調査団の報告書が公表された。両国への販売が指摘され、両国の疑惑度 +' + d, 'The inquiry report is out. Your sales to both sides were named. Both suspicions +' + d, '国际调查团公布了报告。你向两国出售一事被指出，两国的怀疑度 +' + d), 'event'); }
+          else news(g, L('国際調査団の報告書が公表された。あなたへの指摘はなかった。', 'The inquiry report is out. You were not named.', '国际调查团公布了报告。报告中没有提到你。'), 'event'); } }; } },
     { id:11, cat:'merchant', pre:true, delay:39, w:g => 1,
-      make:g => ({ text: L('第三国が約13週後に停戦の仲介を発表する予定。両国の戦意 -8', 'A third country will offer to mediate a ceasefire in about 13 weeks. Both morale -8'),
-        fire:() => { g.c.A.morale = clamp(g.c.A.morale - 8, 0, 100); g.c.B.morale = clamp(g.c.B.morale - 8, 0, 100); news(g, L('第三国が停戦仲介を発表。両国の戦意 -8', 'A third country offered mediation. Both morale -8'), 'event'); } }) },
+      make:g => ({ text: L('第三国が約13週後に停戦の仲介を発表する予定。両国の戦意 -8', 'A third country will offer to mediate a ceasefire in about 13 weeks. Both morale -8', '第三国预计约13周后宣布斡旋停战。两国的士气 -8'),
+        fire:() => { g.c.A.morale = clamp(g.c.A.morale - 8, 0, 100); g.c.B.morale = clamp(g.c.B.morale - 8, 0, 100); news(g, L('第三国が停戦仲介を発表。両国の戦意 -8', 'A third country offered mediation. Both morale -8', '第三国宣布斡旋停战。两国的士气 -8'), 'event'); } }) },
   ];
 
   // イベントの時期と種類は、プレイヤーの操作と無関係な専用の乱数で開戦時に決める(同じシードなら同じ順番・同じ時期)
@@ -480,13 +497,13 @@
   }
   function pickEvent(g) { const x = g.evSeq[g.evIdx || 0]; g.evIdx = (g.evIdx || 0) + 1; return EVENTS.find(e => e.id === x.id); }
   function nextEventAt(g) { const x = g.evSeq && g.evSeq[g.evIdx || 0]; return x ? x.t : 1e9; }
-  const PRE_LABEL = { 2: ['の突破作戦', ' breakthrough'], 3: ['へ同盟国の武器供与', ': allied arms'], 4: ['の閣僚辞任', ': minister quits'], 5: ['の徴兵令', ': draft'], 10: ['国際調査団の報告', 'Inquiry report'], 11: ['停戦の仲介', 'Ceasefire mediation'] };
+  const PRE_LABEL = { 2: ['の突破作戦', ' breakthrough', '的突破作战'], 3: ['へ同盟国の武器供与', ': allied arms', '获盟国武器援助'], 4: ['の閣僚辞任', ': minister quits', '的阁僚辞职'], 5: ['の徴兵令', ': draft', '的征兵令'], 10: ['国際調査団の報告', 'Inquiry report', '国际调查团的报告'], 11: ['停戦の仲介', 'Ceasefire mediation', '停战斡旋'] };
   function triggerEvent(g, forced) {
     const e = forced || pickEvent(g); g.lastEvent = e.id; (g.evLog || (g.evLog = [])).push({ id: e.id, t: g.t });
     const m = e.make(g);
-    if (e.pre) { schedule(g, g.t + e.delay, m.fire); news(g, L('[情報] ', '[Intel] ') + m.text, 'intel'); const who = m.who ? g.c[m.who].name : ''; const pl = PRE_LABEL[e.id]; g.pending.push({ at: g.t + e.delay, label: pl ? (e.id === 10 || e.id === 11 ? '' : who) + L(pl[0], pl[1]) : L('予定', 'Scheduled') }); }
-    else { m.fire(); news(g, L('[速報] ', '[Flash] ') + m.text, 'event'); }
-    g.modal = { kind:'event', title: e.pre ? L('事前情報', 'Advance Intel') : L('速報', 'Breaking News'), text:m.text, pre:e.pre };
+    if (e.pre) { schedule(g, g.t + e.delay, m.fire); news(g, L('[情報] ', '[Intel] ', '[情报] ') + m.text, 'intel'); const who = m.who ? g.c[m.who].name : ''; const pl = PRE_LABEL[e.id]; g.pending.push({ at: g.t + e.delay, label: pl ? (e.id === 10 || e.id === 11 ? '' : who) + L(pl[0], pl[1], pl[2]) : L('予定', 'Scheduled', '预定') }); }
+    else { m.fire(); news(g, L('[速報] ', '[Flash] ', '[快讯] ') + m.text, 'event'); }
+    g.modal = { kind:'event', title: e.pre ? L('事前情報', 'Advance Intel', '事前情报') : L('速報', 'Breaking News', '快讯'), text:m.text, pre:e.pre };
     g.paused = true;
   }
 
@@ -497,7 +514,7 @@
     while (!b.over && guard++ < 6000) { if (b.modal && b.modal.kind !== 'result') { b.modal = null; b.paused = false; } step(b, 0.1); }
     return { t: b.t, weeks: weekOf(b.t), cas: b.cas.A + b.cas.B, type: b.result ? b.result.type : 'cap' };
   }
-  function retreat(g) { if (g.over) return; endGame(g, 'retreat', L('あなたは戦場から手を引いた。戦争はまだ続いている。', 'You pulled out. The war goes on without you.')); }
+  function retreat(g) { if (g.over) return; endGame(g, 'retreat', L('あなたは戦場から手を引いた。戦争はまだ続いている。', 'You pulled out. The war goes on without you.', '你从战场抽身而退。战争仍在继续。')); }
   // 緊急発注: 劣勢に追い込まれた国・戦況が急変した国から、期限付きの好条件の依頼が届く
   function checkOrder(g) {
     if (g.order || g.orderCount >= 4 || g.t < 30 || g.over) return;
@@ -514,16 +531,16 @@
       g.lastOrderT = g.t; g.orderCount++;
       g.modal = { kind: 'order', cid: id, item, qty, mult, unit, weeks: 4, fair };
       g.paused = true;
-      news(g, L('[緊急発注] ' + c.name + 'から' + ITEMS[item].name + 'の至急の依頼が届いた。', '[Rush Order] ' + c.name + ' urgently wants ' + ITEMS[item].name + '.'), 'intel');
+      news(g, L('[緊急発注] ' + c.name + 'から' + ITEMS[item].name + 'の至急の依頼が届いた。', '[Rush Order] ' + c.name + ' urgently wants ' + ITEMS[item].name + '.', '[紧急订单] ' + c.name + '发来了' + ITEMS[item].name + '的紧急订货。'), 'intel');
       return;
     }
   }
   function answerOrder(g, accept) {
     const m = g.modal; if (!m || m.kind !== 'order') return;
     g.modal = null; g.paused = false;
-    if (!accept) { news(g, L(g.c[m.cid].name + 'の緊急発注を見送った。', 'Declined the rush order from ' + g.c[m.cid].name + '.'), 'info'); return; }
+    if (!accept) { news(g, L(g.c[m.cid].name + 'の緊急発注を見送った。', 'Declined the rush order from ' + g.c[m.cid].name + '.', '放弃了' + g.c[m.cid].name + '的紧急订单。'), 'info'); return; }
     g.order = { cid: m.cid, item: m.item, left: m.qty, qty: m.qty, mult: m.mult, deadline: g.t + m.weeks * 3 };
-    news(g, L(g.c[m.cid].name + 'の緊急発注を引き受けた(' + m.weeks + '週以内に' + ITEMS[m.item].name + '×' + m.qty + ')。', 'Took the rush order from ' + g.c[m.cid].name + ' (' + ITEMS[m.item].name + ' x' + m.qty + ' within ' + m.weeks + ' weeks).'), 'sale');
+    news(g, L(g.c[m.cid].name + 'の緊急発注を引き受けた(' + m.weeks + '週以内に' + ITEMS[m.item].name + '×' + m.qty + ')。', 'Took the rush order from ' + g.c[m.cid].name + ' (' + ITEMS[m.item].name + ' x' + m.qty + ' within ' + m.weeks + ' weeks).', '接下了' + g.c[m.cid].name + '的紧急订单(' + m.weeks + '周内交付' + ITEMS[m.item].name + '×' + m.qty + ')。'), 'sale');
   }
   function processOrder(g) {
     const o = g.order; if (!o) return;
@@ -533,15 +550,15 @@
       if (c.funds < price) break;
       take(g, o.item); g.money += price; g.revenue += price; g.sales++; g.supplied[o.item]++; c.sold.push({ t: g.t, v: price, k: o.item, order: true });
       c.funds -= price; deliver(g, c, o.item); c.susp = clamp(c.susp - 2, -100, 100); o.left--;
-      news(g, L(c.name + 'へ緊急発注の' + it.name + 'を' + fmt(price) + 'で納品(残り' + o.left + ')。', 'Delivered rush ' + it.name + ' to ' + c.name + ' for ' + fmt(price) + ' (' + o.left + ' left).'), 'sale');
+      news(g, L(c.name + 'へ緊急発注の' + it.name + 'を' + fmt(price) + 'で納品(残り' + o.left + ')。', 'Delivered rush ' + it.name + ' to ' + c.name + ' for ' + fmt(price) + ' (' + o.left + ' left).', '向' + c.name + '交付紧急订单的' + it.name + '，金额' + fmt(price) + '(剩余' + o.left + ')。'), 'sale');
     }
-    if (o.left <= 0) { c.susp = clamp(c.susp - 8, -100, 100); c.morale = clamp(c.morale + 3, 0, 100); news(g, L(c.name + 'の緊急発注をすべて納品した。疑惑度 -8、戦意 +3', 'Rush order for ' + c.name + ' complete. Suspicion -8, morale +3'), 'sale'); tl(g, L(c.name + 'の緊急発注を期限内に納品した。', 'Delivered the rush order for ' + c.name + ' on time.'), L('必要な時に届けたことで、疑惑度 -8・戦意 +3', 'Help when it mattered: suspicion -8, morale +3'), 'act'); g.order = null; return; }
-    if (g.t > o.deadline) { c.susp = clamp(c.susp + 10, -100, 100); news(g, L(c.name + 'への緊急発注は期限切れ。約束を破られたと受け取られた。疑惑度 +10', 'The rush order for ' + c.name + ' expired. It feels betrayed. Suspicion +10'), 'bad'); g.order = null; }
+    if (o.left <= 0) { c.susp = clamp(c.susp - 8, -100, 100); c.morale = clamp(c.morale + 3, 0, 100); news(g, L(c.name + 'の緊急発注をすべて納品した。疑惑度 -8、戦意 +3', 'Rush order for ' + c.name + ' complete. Suspicion -8, morale +3', c.name + '的紧急订单已全部交付。怀疑度 -8，士气 +3'), 'sale'); tl(g, L(c.name + 'の緊急発注を期限内に納品した。', 'Delivered the rush order for ' + c.name + ' on time.', '在期限内交付了' + c.name + '的紧急订单。'), L('必要な時に届けたことで、疑惑度 -8・戦意 +3', 'Help when it mattered: suspicion -8, morale +3', '在需要时送达，怀疑度 -8、士气 +3'), 'act'); g.order = null; return; }
+    if (g.t > o.deadline) { c.susp = clamp(c.susp + 10, -100, 100); news(g, L(c.name + 'への緊急発注は期限切れ。約束を破られたと受け取られた。疑惑度 +10', 'The rush order for ' + c.name + ' expired. It feels betrayed. Suspicion +10', c.name + '的紧急订单已过期限，被视为违约。怀疑度 +10'), 'bad'); g.order = null; }
   }
 
   function endGame(g, type, text, loser) {
     g.over = true; g.paused = true;
-    tl(g, text, type === 'peace' ? L('両国の戦意が25未満のまま約6週続いた', 'Both morale stayed under 25 for about 6 weeks') : type === 'cap' ? L('期限に達した', 'The deadline was reached') : type === 'retreat' ? L('あなたが撤退した', 'You withdrew') : (g.endWhy || L('戦意20未満・国土35%未満のまま約12週が過ぎた', 'Morale under 20 and land under 35% for about 12 weeks')), 'end');
+    tl(g, text, type === 'peace' ? L('両国の戦意が25未満のまま約6週続いた', 'Both morale stayed under 25 for about 6 weeks', '两国士气均低于25的状态持续了约6周') : type === 'cap' ? L('期限に達した', 'The deadline was reached', '已到期限') : type === 'retreat' ? L('あなたが撤退した', 'You withdrew', '你撤离了') : (g.endWhy || L('戦意20未満・国土35%未満のまま約12週が過ぎた', 'Morale under 20 and land under 35% for about 12 weeks', '士气低于20、国土不足35%的状态持续了约12周')), 'end');
     let repaid = 0, lost = 0;
     for (const l of g.loans) { if ((type === 'collapse' && l.cid === loser) || type === 'retreat') lost += l.amount; else repaid += l.amount * (1 + (l.rate != null ? l.rate : CFG.loanInterest)); }
     g.order = null;
@@ -567,7 +584,7 @@
       if (c.massing && g.t >= c.massUntil) {
         c.massing = false;
         const n = c.reserve * 0.8;
-        if (sendWave(g, c, n, 'offensive')) { c.morale = clamp(c.morale + 5, 0, 100); const k = fmt(Math.round(n / 1000) * 1000); news(g, L(c.name + 'が総攻撃を開始した。約' + k + '人が前線へ向かっている。', c.name + ' launched an all-out offensive. About ' + k + ' troops head to the front.'), 'event'); tl(g, L(c.name + 'が総攻撃を開始した(約' + k + '人)。', c.name + ' launched an all-out offensive (about ' + k + ').'), L('集結させた予備の8割を一斉に投入', '80% of the massed reserve sent at once')); }
+        if (sendWave(g, c, n, 'offensive')) { c.morale = clamp(c.morale + 5, 0, 100); const k = fmt(Math.round(n / 1000) * 1000); news(g, L(c.name + 'が総攻撃を開始した。約' + k + '人が前線へ向かっている。', c.name + ' launched an all-out offensive. About ' + k + ' troops head to the front.', c.name + '发动了总攻。约' + k + '人正开赴前线。'), 'event'); tl(g, L(c.name + 'が総攻撃を開始した(約' + k + '人)。', c.name + ' launched an all-out offensive (about ' + k + ').', c.name + '发动了总攻(约' + k + '人)。'), L('集結させた予備の8割を一斉に投入', '80% of the massed reserve sent at once', '将集结的预备兵八成一次投入')); }
         c.cool = g.t + 30; continue;
       }
       if (c.massing || g.t < c.cool || !lag) continue;
@@ -577,20 +594,20 @@
       // 1. 数で大きく劣ったら、まとめて補充する
       if (c.policy !== 'pass' && ratio < (c.policy === 'aggr' ? 0.85 : 0.7) && c.reserve > 8000) {
         const n = Math.min(c.reserve * 0.7, obsE * 0.95 - own);
-        if (n >= 6000 && sendWave(g, c, n, 'surge')) { const k = fmt(Math.round(n / 1000) * 1000); news(g, L('[観測] ' + c.name + 'が前線の劣勢を受け、約' + k + '人の大規模な増援を送り出した。', '[Observed] Outnumbered, ' + c.name + ' sent a surge of about ' + k + ' troops.'), 'intel'); tl(g, L(c.name + 'が大規模な増援を送った(約' + k + '人)。', c.name + ' sent a large surge (about ' + k + ').'), L('前線の兵数が相手の7割を下回ったため', 'Its front fell below 70% of the enemy')); c.cool = g.t + 24; continue; }
+        if (n >= 6000 && sendWave(g, c, n, 'surge')) { const k = fmt(Math.round(n / 1000) * 1000); news(g, L('[観測] ' + c.name + 'が前線の劣勢を受け、約' + k + '人の大規模な増援を送り出した。', '[Observed] Outnumbered, ' + c.name + ' sent a surge of about ' + k + ' troops.', '[观测] ' + c.name + '因前线劣势，派出了约' + k + '人的大规模增援。'), 'intel'); tl(g, L(c.name + 'が大規模な増援を送った(約' + k + '人)。', c.name + ' sent a large surge (about ' + k + ').', c.name + '派出了大规模增援(约' + k + '人)。'), L('前線の兵数が相手の7割を下回ったため', 'Its front fell below 70% of the enemy', '前线兵力降到对方的七成以下')); c.cool = g.t + 24; continue; }
       }
       // 2. 相手の大波を確認したら、遅れて対抗する
       const big = e.transit.find(x => x.wave && x.n >= 8000 && g.t - x.t0 >= 3 && !x.seen[c.id]);
       if (big && c.reserve > 8000) {
         big.seen[c.id] = true;
         const n = Math.min(c.reserve * 0.6, big.n * 0.6);
-        if (sendWave(g, c, n, 'counter')) { const k = fmt(Math.round(n / 1000) * 1000); news(g, L('[観測] ' + c.name + 'が' + e.name + 'の増援に対抗し、約' + k + '人を前線へ送った。', '[Observed] ' + c.name + ' countered ' + e.name + "'s surge with about " + k + ' troops.'), 'intel'); tl(g, L(c.name + 'が対抗の増援を送った(約' + k + '人)。', c.name + ' sent a counter-surge (about ' + k + ').'), L(e.name + 'の大規模な増援を確認したため', 'In response to ' + e.name + "'s surge")); c.cool = g.t + 18; continue; }
+        if (sendWave(g, c, n, 'counter')) { const k = fmt(Math.round(n / 1000) * 1000); news(g, L('[観測] ' + c.name + 'が' + e.name + 'の増援に対抗し、約' + k + '人を前線へ送った。', '[Observed] ' + c.name + ' countered ' + e.name + "'s surge with about " + k + ' troops.', '[观测] ' + c.name + '为对抗' + e.name + '的增援，向前线派出了约' + k + '人。'), 'intel'); tl(g, L(c.name + 'が対抗の増援を送った(約' + k + '人)。', c.name + ' sent a counter-surge (about ' + k + ').', c.name + '派出了对抗增援(约' + k + '人)。'), L(e.name + 'の大規模な増援を確認したため', 'In response to ' + e.name + "'s surge", '确认了' + e.name + '的大规模增援')); c.cool = g.t + 18; continue; }
       }
       // 3. 予備が厚く、早く終わらせたい国は集結して総攻撃を準備する
       const sh = shareOf(g, c.id);
       if (c.policy !== 'pass' && g.t > 90 && c.reserve > c.front * 0.7 && c.antiwar >= 45 && sh >= 0.42 && c.morale >= 35) {
         c.massing = true; c.massUntil = g.t + 12;
-        news(g, L('[情報] ' + c.name + 'が首都に予備兵を集結させている。前線への出動が止まっている。', '[Intel] ' + c.name + ' is massing reserves at the capital. Deployment has stopped.'), 'intel');
+        news(g, L('[情報] ' + c.name + 'が首都に予備兵を集結させている。前線への出動が止まっている。', '[Intel] ' + c.name + ' is massing reserves at the capital. Deployment has stopped.', '[情报] ' + c.name + '正在首都集结预备兵。向前线的出动已经停止。'), 'intel');
       }
     }
   }
@@ -611,7 +628,7 @@
       }
     }
     // 兵糧は作ってから3か月で傷み、廃棄される
-    while (g.foodLots.length && g.t - g.foodLots[0] >= CFG.foodLife) { g.foodLots.shift(); g.inv.food--; g.stats.spoiled = (g.stats.spoiled || 0) + 1; g.spoiledCost = (g.spoiledCost || 0) + ITEMS.food.price * costRate('food'); news(g, L('倉庫の兵糧1単位が傷み、廃棄した。', '1 unit of rations spoiled and was thrown out.'), 'bad'); }
+    while (g.foodLots.length && g.t - g.foodLots[0] >= CFG.foodLife) { g.foodLots.shift(); g.inv.food--; g.stats.spoiled = (g.stats.spoiled || 0) + 1; g.spoiledCost = (g.spoiledCost || 0) + ITEMS.food.price * costRate('food'); news(g, L('倉庫の兵糧1単位が傷み、廃棄した。', '1 unit of rations spoiled and was thrown out.', '仓库中有1单位军粮变质，已被废弃。'), 'bad'); }
     const A = g.c.A, B = g.c.B;
     // deliveries
     for (const c of [A, B]) {
@@ -657,8 +674,8 @@
       const dr = desertRate(c), lv = dr <= 0 ? 0 : (c.funds / c.initFunds < CFG.desertHeavy ? 2 : 1);
       if (dr > 0 && c.front > 0) { const n = Math.min(c.front, c.front * dr / 3 * dt); c.front -= n; c.deserted += n; syncSoldiers(c); }
       if (lv > c.desertLv) {
-        if (lv === 1) { news(g, L(c.name + 'は資金が乏しく、給与の遅配で前線から兵が離れ始めた。', c.name + ' is short of money; unpaid soldiers start deserting.'), 'bad'); tl(g, L(c.name + 'の前線で兵の離脱が始まった。', 'Desertion began on ' + c.name + "'s front."), L('資金が初期の25%を下回った。予備から送っても、届くまでの間は前線が薄くなる', 'Funds fell below 25% of the start. The front thins until reserves arrive')); }
-        else { news(g, L(c.name + 'の資金が底をつき、前線から兵が大量に離脱している。', c.name + ' is broke; soldiers are deserting en masse.'), 'bad'); tl(g, L(c.name + 'の前線で兵の離脱が深刻になった。', 'Desertion on ' + c.name + "'s front turned severe."), L('資金が初期の5%を下回った', 'Funds fell below 5% of the start')); }
+        if (lv === 1) { news(g, L(c.name + 'は資金が乏しく、給与の遅配で前線から兵が離れ始めた。', c.name + ' is short of money; unpaid soldiers start deserting.', c.name + '资金匮乏，军饷拖欠，士兵开始离开前线。'), 'bad'); tl(g, L(c.name + 'の前線で兵の離脱が始まった。', 'Desertion began on ' + c.name + "'s front.", c.name + '的前线开始有士兵逃离。'), L('資金が初期の25%を下回った。予備から送っても、届くまでの間は前線が薄くなる', 'Funds fell below 25% of the start. The front thins until reserves arrive', '资金降到初始的25%以下。即使从预备兵调派，在抵达之前前线也会变得薄弱')); }
+        else { news(g, L(c.name + 'の資金が底をつき、前線から兵が大量に離脱している。', c.name + ' is broke; soldiers are deserting en masse.', c.name + '的资金见底，大量士兵正在逃离前线。'), 'bad'); tl(g, L(c.name + 'の前線で兵の離脱が深刻になった。', 'Desertion on ' + c.name + "'s front turned severe.", c.name + '前线的士兵逃离变得严重。'), L('資金が初期の5%を下回った', 'Funds fell below 5% of the start', '资金降到初始的5%以下')); }
       }
       c.desertLv = lv;
     }
@@ -681,7 +698,7 @@
       const tm = g.t < c.taxModUntil ? c.taxMod : 1;
       if (c.policy !== 'normal') {
         c.antiwar = clamp(c.antiwar + pol(c).anti * dt, 0, 100); c.morale = clamp(c.morale + pol(c).morale * dt, 0, 100);
-        if (g.t >= c.policyUntil) { news(g, L(c.name + 'の司令部は方針を「保守」に戻した。', c.name + ' HQ returned to a "Standard" strategy.'), 'info'); tl(g, L(c.name + 'の方針が「保守」に戻った。', c.name + "'s strategy returned to Standard."), L('戦闘コンサルの効果が切れた', 'The consulting effect wore off')); c.policy = 'normal'; }
+        if (g.t >= c.policyUntil) { news(g, L(c.name + 'の司令部は方針を「保守」に戻した。', c.name + ' HQ returned to a "Standard" strategy.', c.name + '的司令部将方针恢复为“稳健”。'), 'info'); tl(g, L(c.name + 'の方針が「保守」に戻った。', c.name + "'s strategy returned to Standard.", c.name + '的方针恢复为“稳健”。'), L('戦争コンサルの効果が切れた', 'The consulting effect wore off', '战争顾问的效果结束了')); c.policy = 'normal'; }
       }
       c.funds += (c.taxBase * tm - c.soldiers * CFG.upkeep) * dt;
       if (c.funds < 0) c.funds = 0;
@@ -706,9 +723,9 @@
       g.plIdx = (g.plIdx || 0) + 1;
       const broken = [A, B].filter(c => c.morale < CFG.peaceLine);
       if (broken.length) {
-        const bn = broken.map(c => c.name).join(L('・', ' and '));
-        news(g, L('[相場] ' + bn + 'が戦意を失っており、装備の需要は伸びなかった。定価は据え置き(×' + priceStep(g).toFixed(1) + ')。', '[Market] ' + bn + ' lost the will to fight; demand stalled. List price unchanged (x' + priceStep(g).toFixed(1) + ').'), 'info');
-        tl(g, L('定価の見直しで、定価は据え置かれた(×' + priceStep(g).toFixed(1) + ')。', 'Price review: list price unchanged (x' + priceStep(g).toFixed(1) + ').'), L(bn + 'の戦意が25を下回っていたため', 'Morale of ' + bn + ' was under 25'));
+        const bn = broken.map(c => c.name).join(L('・', ' and ', '、'));
+        news(g, L('[相場] ' + bn + 'が戦意を失っており、装備の需要は伸びなかった。定価は据え置き(×' + priceStep(g).toFixed(1) + ')。', '[Market] ' + bn + ' lost the will to fight; demand stalled. List price unchanged (x' + priceStep(g).toFixed(1) + ').', '[行情] ' + bn + '已失去士气，装备需求没有增长。标价维持不变(×' + priceStep(g).toFixed(1) + ')。'), 'info');
+        tl(g, L('定価の見直しで、定価は据え置かれた(×' + priceStep(g).toFixed(1) + ')。', 'Price review: list price unchanged (x' + priceStep(g).toFixed(1) + ').', '标价复审后，标价维持不变(×' + priceStep(g).toFixed(1) + ')。'), L(bn + 'の戦意が25を下回っていたため', 'Morale of ' + bn + ' was under 25', bn + '的士气低于25'));
       } else {
         g.pl = Math.round((priceStep(g) + 0.1) * 10) / 10;
         const ps = g.pl, n = weekOf(g.t), yr = Math.floor(n / 48) + 1, mo = Math.floor(n / 4) % 12 + 1;
@@ -717,9 +734,9 @@
           1.3: '戦争は泥沼と化している。装備の調達は奪い合いの様相を呈し、相場は高騰を続けている。定価が元の1.3倍に上昇した。' }[ps],
           { 1.1: 'The war drags into year ' + yr + '. Both sides are worn down and arms are in demand. List price is now x1.1.',
           1.2: 'Year ' + yr + ' of the war. Factories cannot keep up with losses; arms are scarce everywhere. List price is now x1.2.',
-          1.3: 'The war is a quagmire. Buyers fight over every shipment and prices keep climbing. List price is now x1.3.' }[ps]);
-        news(g, L('[相場] ', '[Market] ') + txt, 'event'); tl(g, L('装備の定価が元の' + ps.toFixed(1) + '倍に上昇した。', 'List price rose to x' + ps.toFixed(1) + '.'), L('両国とも戦意を保ったまま戦争が長期化し、需要が高まったため(生産費は据え置き)', 'A long war with both sides still fighting raised demand (production cost unchanged)'));
-        g.pendingModal = { kind: 'event', title: L('相場の変動', 'Market Shift'), text: txt + L('生産費は据え置きのため、ここからの販売は利幅が大きくなる。', ' Production cost is unchanged, so margins grow from here.'), pre: false };
+          1.3: 'The war is a quagmire. Buyers fight over every shipment and prices keep climbing. List price is now x1.3.' }[ps], { 1.1: '战争进入第' + yr + '年的' + mo + '月，呈现长期化的态势。两国消耗加剧，装备需求日益增长。标价上涨至原来的1.1倍。', 1.2: '开战第' + yr + '年的' + mo + '月。各地工厂赶不上前线的消耗，装备处处短缺。标价上涨至原来的1.2倍。', 1.3: '战争已陷入泥沼。装备采购成了争夺战，行情价持续暴涨。标价上涨至原来的1.3倍。' }[ps]);
+        news(g, L('[相場] ', '[Market] ', '[行情] ') + txt, 'event'); tl(g, L('装備の定価が元の' + ps.toFixed(1) + '倍に上昇した。', 'List price rose to x' + ps.toFixed(1) + '.', '装备的标价上涨至原来的' + ps.toFixed(1) + '倍。'), L('両国とも戦意を保ったまま戦争が長期化し、需要が高まったため(生産費は据え置き)', 'A long war with both sides still fighting raised demand (production cost unchanged)', '两国在保持士气的情况下战争长期化，需求增长(生产成本不变)'));
+        g.pendingModal = { kind: 'event', title: L('相場の変動', 'Market Shift', '行情变动'), text: txt + L('生産費は据え置きのため、ここからの販売は利幅が大きくなる。', ' Production cost is unchanged, so margins grow from here.', '生产成本维持不变，此后的销售利润空间更大。'), pre: false };
       }
     }
     if (g.pendingModal && !g.modal) { g.modal = g.pendingModal; g.pendingModal = null; g.paused = true; }
@@ -732,35 +749,40 @@
       const s = c.id === 'A' ? sA : 1 - sA;
       if (s < CFG.capitalLine) {
         const w = g.c[other(c.id)];
-        g.endWhy = L(c.name + 'は国土の大半を失い、首都が陥落した', c.name + ' lost most of its land and its capital fell');
+        g.endWhy = L(c.name + 'は国土の大半を失い、首都が陥落した', c.name + ' lost most of its land and its capital fell', c.name + '失去了大部分国土，首都沦陷');
         g.endKind = 'capital';
-        return endGame(g, 'collapse', L(c.name + 'の戦線が崩壊。' + w.name + 'の勝利で戦争は終結した。', c.name + "'s front collapsed. The war ends in victory for " + w.name + '.'), c.id);
+        return endGame(g, 'collapse', L(c.name + 'の戦線が崩壊。' + w.name + 'の勝利で戦争は終結した。', c.name + "'s front collapsed. The war ends in victory for " + w.name + '.', c.name + '的战线崩溃。战争以' + w.name + '的胜利告终。'), c.id);
       }
+    }
+    for (const c of [A, B]) { // 勝利が見えた時の割増しの期間を管理する
+      const en = territory(g, other(c.id));
+      if (en < 0.3 && !c.nearUsed) { c.nearUsed = true; c.nearStart = g.t; }
+      else if (en > 0.35 && c.nearUsed) { c.nearUsed = false; c.nearStart = null; }
     }
     for (const c of [A, B]) {
       const own = shareOf(g, c.id);
       // 戦線の後退を知らせる
       const lv = own < 0.2 ? 3 : own < 0.28 ? 2 : own < 0.36 ? 1 : 0;
-      if (lv > c.warned) { c.warned = lv; news(g, L(['', c.name + 'の戦線が後退している。', c.name + 'は国土の大半を失いつつある。首都が近い。', c.name + 'の首都まで敵が迫っている。崩壊は目前だ。'][lv], ['', c.name + "'s front is falling back.", c.name + ' is losing most of its land. The capital is near.', 'The enemy is at ' + c.name + "'s capital. Collapse is imminent."][lv]), 'bad'); }
+      if (lv > c.warned) { c.warned = lv; news(g, L(['', c.name + 'の戦線が後退している。', c.name + 'は国土の大半を失いつつある。首都が近い。', c.name + 'の首都まで敵が迫っている。崩壊は目前だ。'][lv], ['', c.name + "'s front is falling back.", c.name + ' is losing most of its land. The capital is near.', 'The enemy is at ' + c.name + "'s capital. Collapse is imminent."][lv], ['', c.name + '的战线正在后退。', c.name + '正在失去大部分国土。首都已近在眼前。', '敌军已逼近' + c.name + '的首都。崩溃迫在眉睫。'][lv]), 'bad'); }
       if (lv < c.warned - 1) c.warned = lv;
       // 敗北の危機: 国土20%を下回ったら時を止めて知らせる(23%を上回るまで再び知らせない)
       const tr = terrOf(own);
-      if (tr < CFG.defeatAlert && !c.defeatAlert) { c.defeatAlert = true; alertModal(g, L('敗北の危機', 'On the Brink'), L('これ以上戦線を押し込まれると、' + c.name + 'は敗北してしまう。', 'If the front is pushed back any further, ' + c.name + ' will be defeated.'), L('警告', 'Warning')); tl(g, L(c.name + 'の国土が20%を下回った。', c.name + "'s land fell below 20%."), L('これ以上押し込まれると首都が陥落し、戦争は終わる', 'Any further and the capital falls, ending the war'), 'bad'); }
+      if (tr < CFG.defeatAlert && !c.defeatAlert) { c.defeatAlert = true; alertModal(g, L('敗北の危機', 'On the Brink', '败北的危机'), L('これ以上戦線を押し込まれると、' + c.name + 'は敗北してしまう。', 'If the front is pushed back any further, ' + c.name + ' will be defeated.', '战线若再被推进，' + c.name + '就会战败。'), L('警告', 'Warning', '警告')); tl(g, L(c.name + 'の国土が20%を下回った。', c.name + "'s land fell below 20%.", c.name + '的国土跌破了20%。'), L('これ以上押し込まれると首都が陥落し、戦争は終わる', 'Any further and the capital falls, ending the war', '若再被推进，首都就会沦陷，战争随之结束'), 'bad'); }
       else if (tr > CFG.defeatAlert + 0.03) c.defeatAlert = false;
       // 戦意が尽き、劣勢の国は降伏する(条件が約12週続くと降伏。途切れると数え直し)
       if (c.morale < CFG.surrMorale && tr < CFG.surrenderLine) {
-        if (c.surT === 0 && !(g.t - (c.surAlertT == null ? -1e9 : c.surAlertT) < 12)) { c.surAlertT = g.t; alertModal(g, L('降伏の兆し', 'Signs of Surrender'), L('戦意が低く、国土も奪われ続け、' + c.name + 'は降伏を考え始めた。', 'With morale low and land slipping away, ' + c.name + ' has begun to consider surrender.'), L('警告', 'Warning')); tl(g, L(c.name + 'が降伏を考え始めた。', c.name + ' began to consider surrender.'), L('戦意20未満・国土35%未満。この状態が約12週続くと降伏する', 'Morale under 20, land under 35%. 12 weeks of this means surrender'), 'bad'); }
-        c.surT += dt; if (c.surT >= CFG.surrHold) { g.endKind = 'surrender'; return endGame(g, 'collapse', L(c.name + 'は戦う意思を失い、降伏した。' + g.c[other(c.id)].name + 'の勝利で戦争は終結した。', c.name + ' lost the will to fight and surrendered. The war ends in victory for ' + g.c[other(c.id)].name + '.'), c.id); } }
+        if (c.surT === 0 && !(g.t - (c.surAlertT == null ? -1e9 : c.surAlertT) < 12)) { c.surAlertT = g.t; alertModal(g, L('降伏の兆し', 'Signs of Surrender', '投降的征兆'), L('戦意が低く、国土も奪われ続け、' + c.name + 'は降伏を考え始めた。', 'With morale low and land slipping away, ' + c.name + ' has begun to consider surrender.', '士气低落，国土不断被夺，' + c.name + '开始考虑投降。'), L('警告', 'Warning', '警告')); tl(g, L(c.name + 'が降伏を考え始めた。', c.name + ' began to consider surrender.', c.name + '开始考虑投降。'), L('戦意20未満・国土35%未満。この状態が約12週続くと降伏する', 'Morale under 20, land under 35%. 12 weeks of this means surrender', '士气低于20、国土不足35%。此状态持续约12周就会投降'), 'bad'); }
+        c.surT += dt; if (c.surT >= CFG.surrHold) { g.endKind = 'surrender'; return endGame(g, 'collapse', L(c.name + 'は戦う意思を失い、降伏した。' + g.c[other(c.id)].name + 'の勝利で戦争は終結した。', c.name + ' lost the will to fight and surrendered. The war ends in victory for ' + g.c[other(c.id)].name + '.', c.name + '失去了战斗意志，宣布投降。战争以' + g.c[other(c.id)].name + '的胜利告终。'), c.id); } }
       else c.surT = 0;
     }
     if (A.morale < CFG.peaceLine && B.morale < CFG.peaceLine) {
-      if (g.peaceT === 0 && !(g.t - (g.peaceAlertT == null ? -1e9 : g.peaceAlertT) < 12)) { g.peaceAlertT = g.t; alertModal(g, L('講和の動き', 'Peace Talks'), L('両国の戦意が尽きて、上層部が講和に乗り出そうとしている。', 'Both sides are exhausted; their leaders are moving toward peace.'), L('警告', 'Warning')); tl(g, L('両国の上層部が講和に動き始めた。', 'Both leaderships began moving toward peace.'), L('両国の戦意25未満。この状態が約6週続くと講和が成立する', 'Both morale under 25. 6 weeks of this means peace'), 'bad'); }
+      if (g.peaceT === 0 && !(g.t - (g.peaceAlertT == null ? -1e9 : g.peaceAlertT) < 12)) { g.peaceAlertT = g.t; alertModal(g, L('講和の動き', 'Peace Talks', '和谈的动向'), L('両国の戦意が尽きて、上層部が講和に乗り出そうとしている。', 'Both sides are exhausted; their leaders are moving toward peace.', '两国士气耗尽，高层正着手和谈。'), L('警告', 'Warning', '警告')); tl(g, L('両国の上層部が講和に動き始めた。', 'Both leaderships began moving toward peace.', '两国高层开始推动和谈。'), L('両国の戦意25未満。この状態が約6週続くと講和が成立する', 'Both morale under 25. 6 weeks of this means peace', '两国士气均低于25。此状态持续约6周就会达成和谈'), 'bad'); }
       g.peaceT += dt;
-      if (g.peaceT >= CFG.peaceHold) return endGame(g, 'peace', L('両国の戦意が尽き、講和が成立した。', 'Both sides ran out of will to fight. Peace was signed.'));
+      if (g.peaceT >= CFG.peaceHold) return endGame(g, 'peace', L('両国の戦意が尽き、講和が成立した。', 'Both sides ran out of will to fight. Peace was signed.', '两国士气耗尽，达成了和谈。'));
     } else g.peaceT = 0;
-    if (g.t >= CFG.cap - CFG.capWarn && !g.capWarned) { g.capWarned = true; alertModal(g, L('強制講和の予告', 'Imposed Peace Ahead'), L('12週後に国際機関が乗り出し、戦争は強制的に講和となる。', 'In 12 weeks, international bodies will step in and impose peace.'), L('予告', 'Notice')); }
+    if (g.t >= CFG.cap - CFG.capWarn && !g.capWarned) { g.capWarned = true; alertModal(g, L('強制講和の予告', 'Imposed Peace Ahead', '强制停战的预告'), L('12週後に国際機関が乗り出し、戦争は強制的に講和となる。', 'In 12 weeks, international bodies will step in and impose peace.', '12周后国际机构将介入，战争将被强制停战。'), L('予告', 'Notice', '预告')); }
     if (g.alertQ && g.alertQ.length && !g.modal) { g.modal = g.alertQ.shift(); g.paused = true; }
-    if (g.t >= CFG.cap) return endGame(g, 'cap', L('3年目12月、国際社会の圧力により強制的に講和が結ばれた。', 'Y3 December: under international pressure, peace was imposed.'));
+    if (g.t >= CFG.cap) return endGame(g, 'cap', L('3年目12月、国際社会の圧力により強制的に講和が結ばれた。', 'Y3 December: under international pressure, peace was imposed.', '第3年12月，在国际社会的压力下，两国被强制停战。'));
     // events
     processOrder(g);
     if (Math.floor(g.t) !== Math.floor(g.t - dt)) checkOrder(g);
@@ -770,10 +792,10 @@
   // 暦: 3秒=1週、4週=1か月、12か月=1年(48週)
   function weekOf(t) { return Math.floor(t / 3); }
   const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-  function dateOf(t) { const n = weekOf(t), y = Math.floor(n / 48) + 1, m = Math.floor(n / 4) % 12, w = n % 4 + 1; return L(y + '年目 ' + (m + 1) + '月' + w + '週', 'Y' + y + ' ' + MON[m] + ' W' + w); }
+  function dateOf(t) { const n = weekOf(t), y = Math.floor(n / 48) + 1, m = Math.floor(n / 4) % 12, w = n % 4 + 1; return L(y + '年目 ' + (m + 1) + '月' + w + '週', 'Y' + y + ' ' + MON[m] + ' W' + w, '第' + y + '年 ' + (m + 1) + '月第' + w + '周'); }
   function fmt(n) { return Math.round(n).toLocaleString('en-US'); }
   applyLang();
 
-  root.BothSides = { L, LANG, setLang, discEff, alertModal, collapseRisk, priceBand, priceLabel, foodRestore, foodPen, foodMult, eqSuff, eqTarget, eventSchedule, SCENARIOS, needParts, BASE, terrOf, territory, desertRate, EVENTS, triggerEvent, POLICY, crewFill, SUSM, nextPriceCheck, pressure, transitSum, retreat, answerOrder, baseline, weekOf, dateOf, ITEMS, EQ, comp, itemBonus, priceStep, listPrice, selfSuff, shortage,  OPS, CFG, newGame, step, sell, covert, fairMult, demand, estimate, shareOf, eff, fmt, other };
+  root.BothSides = { L, LANG, setLang, discEff, alertModal, collapseRisk, priceBand, priceLabel, rush, foodRestore, foodPen, foodMult, eqSuff, eqTarget, eventSchedule, SCENARIOS, needParts, BASE, terrOf, territory, desertRate, EVENTS, triggerEvent, POLICY, crewFill, SUSM, nextPriceCheck, pressure, transitSum, retreat, answerOrder, baseline, weekOf, dateOf, ITEMS, EQ, comp, itemBonus, priceStep, listPrice, selfSuff, shortage,  OPS, CFG, newGame, step, sell, covert, fairMult, demand, estimate, shareOf, eff, fmt, other };
 })(typeof window !== 'undefined' ? window : globalThis);
 
