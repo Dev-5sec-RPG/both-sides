@@ -64,9 +64,8 @@
   // ---------- fit to screen ----------
   function fit() {
     const vv = window.visualViewport, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
-    const compact = vh < 560 || vw < 1000;
-    stage.className = compact ? 'compact' : 'full';
-    const W = compact ? 900 : 1280, H = compact ? 420 : 720;
+    stage.className = 'full'; // the operations table is one fixed 16:9 layout, scaled to the window
+    const W = 1376, H = 768;
     scale = Math.min(vw / W, vh / H);
     stage.style.transform = 'scale(' + scale + ')';
     stage.style.left = Math.max(0, (vw - W * scale) / 2) + 'px';
@@ -139,16 +138,23 @@
         <button data-open="ops" data-c="${id}" id="${id}bOps">${ico('ops', '')}${L('暗躍', 'Covert', '暗中行动')}</button>
       </div>`;
   }
+  // goods pictures (placeholders until the real art is made)
+  const ITEM_ART = {
+    equip: '<svg viewBox="0 0 48 48" aria-hidden="true"><g fill="currentColor"><path d="M30 14h8v24h-8z" opacity=".9"></path><path d="M30 14c0-6 4-10 4-10s4 4 4 10z"></path><path d="M29 33h10v2H29zM29 36h10v2H29z" opacity=".55"></path></g><g fill="none" stroke="currentColor" stroke-linecap="round"><path d="M5 34L27 16" stroke-width="2.6"></path><path d="M21 21l3 4" stroke-width="1.6"></path></g><path d="M4 33l5-1 3 4-6 4z" fill="currentColor"></path></svg>',
+    merc: '<svg viewBox="0 0 48 48" aria-hidden="true"><g fill="currentColor"><path d="M8 29c0-10 7-17 16-17s16 7 16 17z"></path><path d="M4 29h40c0 2-1 3-3 3H7c-2 0-3-1-3-3z" opacity=".9"></path></g><g fill="none" stroke="currentColor" stroke-width="1.6"><path d="M13 32c1 6 5 9 11 9s10-3 11-9"></path><path d="M14 20c3-3 6-4 10-4" opacity=".6"></path></g></svg>',
+    food: '<svg viewBox="0 0 48 48" aria-hidden="true"><g fill="currentColor"><ellipse cx="17" cy="14" rx="9" ry="3" opacity=".9"></ellipse><path d="M8 14h18v22c0 2-4 3-9 3s-9-1-9-3z" opacity=".8"></path><ellipse cx="33" cy="22" rx="8" ry="2.8" opacity=".9"></ellipse><path d="M25 22h16v18c0 1.6-3.6 2.6-8 2.6S25 41.6 25 40z"></path></g></svg>',
+  };
+  const art = k => `<span class="sic">${ITEM_ART[k]}</span>`;
   function buildStock() {
     const sh = SHORT();
     $('stock').innerHTML = Object.values(I).map(it => it.key === 'food' ? `
       <div class="slotw"><button class="slot" id="sl_food" data-food="add" title="${esc(L('押した回数だけ兵糧を作る(1回で1単位)。作ってから3か月売れないと廃棄', 'Makes one ration per tap. Spoils if unsold for 3 months', '每按一次生产1单位军粮。生产后3个月未售出就会废弃'))}">
-        <span class="sn"><span>${sh.food}</span><span class="st" id="ss_food"></span></span>
+        ${art('food')}<span class="sn"><span>${sh.food}</span><span class="st" id="ss_food"></span></span>
         <span class="cnt" id="sc_food">×0</span>
         <span class="pg"><i id="sp_food" style="width:0"></i></span>
       </button><button class="fcan" data-food="sub" id="fcan" hidden>${L('取消', 'Undo', '取消')}</button></div>` : `
       <button class="slot" id="sl_${it.key}" data-tog="${it.key}" title="${esc(it.name + L('(' + it.sub + ')・', ' (' + it.sub + ') · ', '(' + it.sub + ')、') + it.trait)}">
-        <span class="sn"><span>${sh[it.key]}</span><span class="st" id="ss_${it.key}"></span></span>
+        ${art(it.key)}<span class="sn"><span>${sh[it.key]}</span><span class="st" id="ss_${it.key}"></span></span>
         <span class="cnt" id="sc_${it.key}">×0</span>
         <span class="pg"><i id="sp_${it.key}" style="width:0"></i></span>
       </button>`).join('');
@@ -197,10 +203,12 @@
     $('front1').setAttribute('points', pts); $('front2').setAttribute('points', pts); $('frontGlow').setAttribute('points', pts);
     $('polyA').setAttribute('points', '0,0 ' + pts + ' 0,500');
     $('polyB').setAttribute('points', '1000,0 ' + pts + ' 1000,500');
-    $('pill').style.left = (sA * 100) + '%';
+    boardShare(sA);
     { const hist = g.history, ref = hist.length > 6 ? hist[hist.length - 7].terr : sA, d = sA - ref;
       $('pA').textContent = d > 0.004 ? L('A国が押している ▶', 'A advancing ▶', 'A国正在推进 ▶') : ''; $('pB').textContent = d < -0.004 ? L('◀ B国が押している', '◀ B advancing', '◀ B国正在推进') : '';
-      if (Math.abs(d) <= 0.004) $('pA').textContent = L('膠着', 'Stalemate', '僵持'); }
+      if (Math.abs(d) <= 0.004) $('pA').textContent = L('膠着', 'Stalemate', '僵持');
+      // the front's colour follows the same 6-week movement: stalemate (white), A or B slightly ahead, A or B pushing hard
+      BOARD.push = Math.abs(d) <= 0.004 ? 0 : (d > 0 ? 1 : -1) * (Math.abs(d) > 0.015 ? 2 : 1); }
 
     for (const id of ['A', 'B']) {
       const c = g.c[id], s = S.shareOf(g, id);
@@ -337,31 +345,137 @@
   // ---------- living map ----------
   const FX = { cv: null, ctx: null, W: 0, H: 0, k: 1, units: { A: [], B: [] }, flashes: [], ripples: [], sparks: [], prevPipe: { A: [], B: [] }, shareLog: [], lastRipple: -99, clock: 0, lastCas: { A: null, B: null }, killAcc: { A: 0, B: 0 }, arrAcc: { A: 0, B: 0 }, prevTransit: { A: [], B: [] }, pushRate: 0, compactT: 0 };
   const MEN_PER_KILL = 3000, MEN_PER_MARKER = 3000;
-  const COL = { A: { main: '#8fb6de', fill: 'rgba(36,58,84,.92)', dark: '#3b6a99' }, B: { main: '#e09a88', fill: 'rgba(84,40,32,.92)', dark: '#8e3f2f' } };
-  const CAPS = { A: { x: 0.11, y: 0.77 }, B: { x: 0.89, y: 0.77 } };
+  const COL = { A: { main: '#2f6db5', fill: 'rgba(36,58,84,.92)', dark: '#1d4a80' }, B: { main: '#c0442c', fill: 'rgba(84,40,32,.92)', dark: '#8e2f1d' } };
+  const CAPS = { A: { x: 0.12, y: 0.58 }, B: { x: 0.88, y: 0.55 } }; // replaced by the map's own capitals
   const PER_ROW = { inf: 6, armor: 5 };
   function fxResize() {
-    const map = $('map'), cv = $('fx');
-    FX.W = map.offsetWidth; FX.H = map.offsetHeight;
-    const k = (window.devicePixelRatio || 1) * scale;
-    cv.width = Math.max(1, Math.round(FX.W * k)); cv.height = Math.max(1, Math.round(FX.H * k));
-    cv.style.width = FX.W + 'px'; cv.style.height = FX.H + 'px';
+    const cv = $('fx');
+    FX.W = 1000; FX.H = 500; // flat map space; PJ() puts it on the parchment
+    const k = Math.min(2.5, (window.devicePixelRatio || 1) * scale);
+    cv.width = Math.max(1, Math.round(DW * k)); cv.height = Math.max(1, Math.round(DH * k));
+    cv.style.width = DW + 'px'; cv.style.height = DH + 'px';
     FX.cv = cv; FX.ctx = cv.getContext('2d'); FX.k = k;
+    BOARD.share = -1; // rebuild the cached table at the new resolution
   }
   function frontX(yf) {
-    if (!frontArr.length) return FX.W / 2;
-    const yy = yf * 500;
-    for (let i = 1; i < frontArr.length; i++) {
-      const a = frontArr[i - 1], b = frontArr[i];
-      if (yy <= b.y) { const t = (yy - a.y) / ((b.y - a.y) || 1); return (a.x + (b.x - a.x) * t) / 1000 * FX.W; }
+    const r = BOARD.rowU, n = r.length;
+    if (!n) return FX.W / 2;
+    const f = Math.max(0, Math.min(n - 1, yf * n - 0.5)), i = Math.floor(f), j = Math.min(n - 1, i + 1), t = f - i;
+    return (r[i] + (r[j] - r[i]) * t) * FX.W;
+  }
+
+  // ---------- the operations table: desk picture, parchment map, terrain-shaped front ----------
+  // The engine's territory share is never changed here. The map data only decides where the line is drawn:
+  // the front is the contour of a precomputed field (phi) that encloses exactly the share's fraction of the map.
+  const DW = 1376, DH = 768;
+  const BOARD = { map: null, img: null, flame: null, lmask: null, P: null, phi: null, sorted: null, gw: 0, gh: 0, tau: 0.5, share: -1, cache: null, tint: null, rowU: [], line: [], rTop: 1 };
+  function homog(q) { // unit square -> quad (TL, TR, BR, BL), projective
+    const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
+    const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3, dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3, den = dx1 * dy2 - dx2 * dy1;
+    const gg = (dx3 * dy2 - dx2 * dy3) / den, h = (dx1 * dy3 - dx3 * dy1) / den;
+    const a = x1 - x0 + gg * x1, b = x3 - x0 + h * x3, c = x0, d = y1 - y0 + gg * y1, e = y3 - y0 + h * y3, f = y0;
+    const fwd = (u, v) => { const w = gg * u + h * v + 1; return [(a * u + b * v + c) / w, (d * u + e * v + f) / w]; };
+    // inverse of [[a b c][d e f][gg h 1]]
+    const A = e - f * h, B = c * h - b, C = b * f - c * e, D = f * gg - d, E = a - c * gg, F = c * d - a * f, G = d * h - e * gg, Hh = b * gg - a * h, II = a * e - b * d;
+    fwd.inv = (x, y) => { const w = G * x + Hh * y + II; return [(A * x + B * y + C) / w, (D * x + E * y + F) / w]; };
+    return fwd;
+  }
+  const loadImg = src => new Promise(res => { const im = new Image(); im.onload = () => res(im); im.onerror = () => res(null); im.src = src; });
+  async function boardUse(i) {
+    const m = window.BS_MAPS && window.BS_MAPS[i]; if (!m || BOARD.map === m) return;
+    BOARD.map = m; BOARD.P = homog(m.quad); BOARD.gw = m.gw; BOARD.gh = m.gh; BOARD.img = null; BOARD.cache = null;
+    const bin = atob(m.phi), u16 = new Uint16Array(bin.length / 2);
+    for (let k = 0; k < u16.length; k++) u16[k] = bin.charCodeAt(2 * k) | (bin.charCodeAt(2 * k + 1) << 8);
+    BOARD.phi = Float32Array.from(u16, x => x / 65535); BOARD.sorted = Float32Array.from(BOARD.phi).sort();
+    BOARD.rTop = (BOARD.P(1, 0)[0] - BOARD.P(0, 0)[0]) / (BOARD.P(1, 1)[0] - BOARD.P(0, 1)[0]);
+    // capitals: flat positions for the convoys, and the labels on the paper (the map area starts 75px down)
+    for (const id of ['A', 'B']) { const [cu, cv] = m.caps[id]; CAPS[id] = { x: cu, y: cv }; const [sx, sy] = BOARD.P(cu, cv), el = $('cap' + id); if (el) { el.style.left = sx + 'px'; el.style.top = (sy - 75) + 'px'; } }
+    const pp = $('paper'), tl = BOARD.P(0, 0), bl = BOARD.P(0, 1), br = BOARD.P(1, 1);
+    if (pp) Object.assign(pp.style, { left: bl[0] + 'px', top: (tl[1] - 75) + 'px', width: (br[0] - bl[0]) + 'px', height: (br[1] - tl[1]) + 'px' });
+    const [img, fl, lm] = await Promise.all([loadImg(m.img), loadImg(m.lantern.flame), loadImg(m.lantern.mask)]);
+    if (BOARD.map !== m) return;
+    BOARD.img = img; BOARD.flame = fl; BOARD.lmask = lm; BOARD.share = -1; DESK.flameSrc = null;
+    if (g) boardShare(S.territory(g, 'A'));
+  }
+  const phiAt = (u, v) => { // bilinear sample of the field at (u, v) in [0, 1]
+    const gw = BOARD.gw, gh = BOARD.gh, x = Math.max(0, Math.min(gw - 1.001, u * gw - 0.5)), y = Math.max(0, Math.min(gh - 1.001, v * gh - 0.5));
+    const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, p = BOARD.phi, a = p[j * gw + i], b = p[j * gw + i + 1], c = p[(j + 1) * gw + i], d = p[(j + 1) * gw + i + 1];
+    return (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+  };
+  // flat map point -> point on the parchment, with a depth factor: the far side is smaller and dimmer
+  function PJ(x, y) {
+    if (!BOARD.P) return { x, y, s: 1, a: 1 };
+    const v = y / FX.H, p = BOARD.P(x / FX.W, v);
+    const w = BOARD.P(1, v)[0] - BOARD.P(0, v)[0], w1 = BOARD.P(1, 1)[0] - BOARD.P(0, 1)[0];
+    const kn = Math.max(0, Math.min(1, (w / w1 - BOARD.rTop) / (1 - BOARD.rTop)));
+    return { x: p[0], y: p[1], s: 0.72 + 0.28 * kn, a: 0.68 + 0.32 * kn };
+  }
+  // the front: its colour shows who is pushing. white = stalemate, blue = A, red = B.
+  // a slow breath (1.6 s) when one side is slightly ahead or in stalemate, a quick one (0.8 s) when one side pushes hard
+  const FRONT = { phase: 0, col: [235, 228, 210] };
+  function drawFront(ctx, rm, dt) {
+    const ln = BOARD.line; if (!ln.length) return;
+    const pu = BOARD.push || 0, tgt = pu > 0 ? [90, 160, 255] : pu < 0 ? [255, 95, 70] : [235, 228, 210], period = Math.abs(pu) === 2 ? 0.8 : 1.6;
+    const kc = Math.min(1, dt * 3); FRONT.col = FRONT.col.map((c, i) => c + (tgt[i] - c) * kc);
+    FRONT.phase = (FRONT.phase + dt / period) % 1;
+    const br = rm ? 0.6 : 0.5 - 0.5 * Math.cos(FRONT.phase * Math.PI * 2), [r, g2, b] = FRONT.col.map(Math.round);
+    const path = () => { ctx.beginPath(); ln.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); };
+    ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
+    path(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(' + r + ',' + g2 + ',' + b + ',' + (0.06 + 0.26 * br) + ')'; ctx.lineWidth = 12 + 6 * br; ctx.stroke();
+    ctx.globalCompositeOperation = 'source-over';
+    path(); ctx.strokeStyle = 'rgba(30,14,6,.9)'; ctx.lineWidth = 5; ctx.stroke();
+    const lift = 0.75 + 0.25 * br;
+    path(); ctx.strokeStyle = 'rgb(' + Math.min(255, r * lift + 40 * br | 0) + ',' + Math.min(255, g2 * lift + 40 * br | 0) + ',' + Math.min(255, b * lift + 40 * br | 0) + ')'; ctx.lineWidth = 2.4; ctx.setLineDash([10, 6]); ctx.stroke();
+    ctx.restore();
+  }
+  function boardShare(sA) {
+    if (!BOARD.phi || !BOARD.img) return;
+    if (Math.abs(sA - BOARD.share) < 0.0004 && BOARD.cache) return;
+    BOARD.share = sA;
+    const srt = BOARD.sorted, tau = srt[Math.max(0, Math.min(srt.length - 1, Math.floor(sA * srt.length)))]; BOARD.tau = tau;
+    // where the line crosses each row (the crossing nearest the row above, so the line stays continuous)
+    const NR = 160, NU = 400, rowU = [];
+    let prev = null;
+    for (let r = 0; r < NR; r++) {
+      const v = (r + 0.5) / NR, xs = [];
+      let a = phiAt(0, v) - tau;
+      for (let k = 1; k <= NU; k++) { const u = k / NU, b = phiAt(u, v) - tau; if ((a < 0) !== (b < 0)) xs.push((k - 1 + a / (a - b)) / NU); a = b; }
+      let pick = xs.length ? xs[0] : (a < 0 ? 1 : 0);
+      if (xs.length > 1 && prev != null) pick = xs.reduce((best, x) => Math.abs(x - prev) < Math.abs(best - prev) ? x : best, xs[0]);
+      rowU.push(pick); prev = pick;
     }
-    return frontArr[frontArr.length - 1].x / 1000 * FX.W;
+    for (let it = 0; it < 2; it++) for (let r = 1; r < NR - 1; r++) rowU[r] = (rowU[r - 1] + 2 * rowU[r] + rowU[r + 1]) / 4;
+    BOARD.rowU = rowU;
+    BOARD.line = rowU.map((u, r) => BOARD.P(u, (r + 0.5) / NR));
+    // territory tint, stronger near the front; computed per screen pixel (half size) through the inverse mapping
+    const tl = BOARD.P(0, 0), bl = BOARD.P(0, 1), br = BOARD.P(1, 1), tr = BOARD.P(1, 0);
+    const bx = Math.floor(Math.min(tl[0], bl[0])), by = Math.floor(tl[1]), bw = Math.ceil(Math.max(tr[0], br[0])) - bx, bh = Math.ceil(bl[1]) - by, HS = 2, TW = Math.ceil(bw / HS), TH = Math.ceil(bh / HS);
+    if (!BOARD.tint || BOARD.tint.width !== TW) { BOARD.tint = document.createElement('canvas'); BOARD.tint.width = TW; BOARD.tint.height = TH; }
+    const tc = BOARD.tint.getContext('2d'), im = tc.createImageData(TW, TH), D = im.data, inv = BOARD.P.inv;
+    for (let j = 0; j < TH; j++) for (let i = 0; i < TW; i++) {
+      const uv = inv(bx + (i + 0.5) * HS, by + (j + 0.5) * HS), u = uv[0], v = uv[1], o = (j * TW + i) * 4;
+      if (u < 0 || u > 1 || v < 0 || v > 1) { D[o + 3] = 0; continue; }
+      const d = phiAt(u, v) - tau, near = Math.exp(-Math.abs(d) * 14), edge = Math.min(1, Math.min(u, 1 - u, v, 1 - v) * 60);
+      if (d < 0) { D[o] = 70; D[o + 1] = 115; D[o + 2] = 205; } else { D[o] = 215; D[o + 1] = 85; D[o + 2] = 60; }
+      D[o + 3] = (d < 0 ? 0.42 + 0.24 * near : 0.34 + 0.24 * near) * edge * 255; // blue reads weaker under the warm light
+    }
+    tc.putImageData(im, 0, 0);
+    // cache: desk + tint + front line, redrawn only when the share moves
+    const k = FX.k || 1;
+    if (!BOARD.cache) BOARD.cache = document.createElement('canvas');
+    const cc = BOARD.cache; if (cc.width !== Math.round(DW * k)) { cc.width = Math.round(DW * k); cc.height = Math.round(DH * k); }
+    const c = cc.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
+    c.drawImage(BOARD.img, 0, 0, DW, DH);
+    c.globalCompositeOperation = 'multiply'; c.imageSmoothingQuality = 'high'; c.drawImage(BOARD.tint, bx, by, TW * HS, TH * HS);
+    c.globalCompositeOperation = 'source-over'; c.lineJoin = 'round'; c.lineCap = 'round';
+    const ln = BOARD.line;
+    const top = ln[0]; if (top) { const pl = $('pill'); pl.style.left = top[0] + 'px'; pl.style.top = (top[1] - 75 - 6) + 'px'; } // the label rides on the top of the line
   }
   // fixed formation slots: row = position along the front, col = distance behind it
   function slotPos(side, slot, kind) {
     const dir = side === 'A' ? -1 : 1, step = 0.148, n = PER_ROW[kind], row = slot % n, col = Math.floor(slot / n);
     const yf = kind === 'armor' ? 0.16 + step / 2 + row * step : 0.16 + row * step;
-    const off = kind === 'armor' ? 42 + col * 22 : 16 + col * 18;
+    const off = (kind === 'armor' ? 42 + col * 22 : 16 + col * 18) * 1.3; // the flat map is narrower than the old screen map
     return { x: frontX(yf) + dir * off, y: yf * FX.H };
   }
   function freeSlot(list, kind) { const used = new Set(list.filter(u => u.kind === kind && u.st !== 'out' && u.st !== 'dead').map(u => u.slot)); let s = 0; while (used.has(s)) s++; return s; }
@@ -383,7 +497,7 @@
       const pool = frontRow.length ? frontRow : live.slice(0, 3);
       const pick = pool[Math.floor(Math.random() * pool.length)];
       pick.st = 'dead'; pick.t0 = FX.clock;
-      for (let i = 0; i < 5; i++) FX.sparks.push({ x: pick.x, y: pick.y, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40, t0: FX.clock, life: 0.45, c: '255,120,90' });
+      for (let i = 0; i < 5; i++) FX.sparks.push({ x: pick.x, y: pick.y, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40, t0: FX.clock, life: 0.45, c: '200,50,25' });
     }
   }
   function syncUnits(side) {
@@ -405,22 +519,24 @@
     }
   }
   // markers: points of light on the operations table (infantry = ring, armour = diamond)
-  const LIGHT = { A: '#c9dcf0', B: '#f3cdc3' };
+  // glowing light points; PJ() makes the far side of the table smaller and dimmer
+  const GLOW = { A: '110,170,255', B: '255,110,80' }, CORE = { A: '#d2ecff', B: '#ffd6c8' };
   function drawUnit(ctx, u, side, s) {
-    const col = COL[side], dead = u.st === 'dead', main = dead ? '#ff7a5f' : col.main, armor = u.kind === 'armor';
-    const grow = dead ? 1 + (FX.clock - u.t0) * 0.8 : 1, R = (armor ? 9 : 7) * s * grow;
-    ctx.save(); ctx.globalAlpha = Math.max(0, Math.min(1, u.a)); ctx.translate(u.x, u.y);
-    const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, R * 1.6);
-    gl.addColorStop(0, main + 'aa'); gl.addColorStop(1, main + '00');
-    ctx.fillStyle = gl; ctx.beginPath(); ctx.arc(0, 0, R * 1.6, 0, Math.PI * 2); ctx.fill();
-    ctx.strokeStyle = main; ctx.lineWidth = 1; ctx.fillStyle = dead ? '#ffd2c6' : LIGHT[side];
-    const k = s * grow;
+    const P = PJ(u.x, u.y), dead = u.st === 'dead', armor = u.kind === 'armor', glow = dead ? '230,70,30' : GLOW[side];
+    const grow = dead ? 1 + (FX.clock - u.t0) * 0.8 : 1, k = s * P.s * grow, al = Math.max(0, Math.min(1, u.a)) * P.a, R = (armor ? 14 : 12) * k;
+    ctx.save(); ctx.translate(P.x, P.y);
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = al;
+    const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+    gl.addColorStop(0, 'rgba(' + glow + ',.6)'); gl.addColorStop(1, 'rgba(' + glow + ',0)');
+    ctx.fillStyle = gl; ctx.fillRect(-R, -R, R * 2, R * 2);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.strokeStyle = 'rgba(' + glow + ',.95)'; ctx.lineWidth = 1.3 * k; ctx.fillStyle = dead ? '#ffd2c6' : CORE[side];
     if (armor) {
-      ctx.beginPath(); ctx.moveTo(0, -5 * k); ctx.lineTo(5 * k, 0); ctx.lineTo(0, 5 * k); ctx.lineTo(-5 * k, 0); ctx.closePath(); ctx.stroke();
-      ctx.beginPath(); ctx.moveTo(0, -2.2 * k); ctx.lineTo(2.2 * k, 0); ctx.lineTo(0, 2.2 * k); ctx.lineTo(-2.2 * k, 0); ctx.closePath(); ctx.fill();
+      ctx.beginPath(); ctx.moveTo(0, -5.2 * k); ctx.lineTo(5.2 * k, 0); ctx.lineTo(0, 5.2 * k); ctx.lineTo(-5.2 * k, 0); ctx.closePath(); ctx.stroke();
+      ctx.beginPath(); ctx.moveTo(0, -2.6 * k); ctx.lineTo(2.6 * k, 0); ctx.lineTo(0, 2.6 * k); ctx.lineTo(-2.6 * k, 0); ctx.closePath(); ctx.fill();
     } else {
-      ctx.beginPath(); ctx.arc(0, 0, 3.6 * k, 0, Math.PI * 2); ctx.stroke();
-      ctx.beginPath(); ctx.arc(0, 0, 1.6 * k, 0, Math.PI * 2); ctx.fill();
+      ctx.beginPath(); ctx.arc(0, 0, 4.4 * k, 0, Math.PI * 2); ctx.stroke();
+      ctx.beginPath(); ctx.arc(0, 0, 2.2 * k, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
   }
@@ -434,15 +550,18 @@
   }
   function drawConvoy(ctx, side, p, s) {
     const q = convoyPoint(side, p), col = COL[side];
-    ctx.save(); ctx.globalAlpha = 0.3; ctx.strokeStyle = '#c8a14c'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]);
-    ctx.beginPath(); ctx.moveTo(q.sx, q.sy); ctx.quadraticCurveTo(q.mx, q.my, q.ex, q.ey); ctx.stroke(); ctx.restore();
+    ctx.save(); ctx.globalAlpha = 0.5; ctx.strokeStyle = '#5a3f1f'; ctx.lineWidth = 1; ctx.setLineDash([3, 5]); ctx.beginPath();
+    for (let n = 0; n <= 24; n++) { const t = n / 24, x = (1 - t) * (1 - t) * q.sx + 2 * (1 - t) * t * q.mx + t * t * q.ex, y = (1 - t) * (1 - t) * q.sy + 2 * (1 - t) * t * q.my + t * t * q.ey, P = PJ(x, y); if (n) ctx.lineTo(P.x, P.y); else ctx.moveTo(P.x, P.y); }
+    ctx.stroke(); ctx.restore();
     const trail = { equip: [3, 0, 10], merc: [6, 1.6, 5], food: [4, 2.2, 6] }[p.item];
     for (let n = 0; n < trail[0]; n++) {
       const back = n * trail[2], lag = I[p.item].lag, dprog = back / (Math.hypot(q.ex - q.sx, q.ey - q.sy) || 1);
       const r = convoyPoint(side, Object.assign({}, p, { at: p.at + dprog * lag })); if (r.prog <= 0) continue;
-      ctx.fillStyle = col.main; ctx.strokeStyle = '#14171a'; ctx.lineWidth = 1;
-      if (p.item === 'equip') { const w = 9 * s, h = 6 * s; ctx.fillRect(r.x - w / 2, r.y - h / 2, w, h); ctx.strokeRect(r.x - w / 2, r.y - h / 2, w, h); }
-      else { ctx.beginPath(); ctx.arc(r.x, r.y, trail[1] * s, 0, Math.PI * 2); ctx.fill(); }
+      const P = PJ(r.x, r.y), ss = s * P.s;
+      ctx.fillStyle = col.main; ctx.strokeStyle = '#2a1a0e'; ctx.lineWidth = 1; ctx.globalAlpha = P.a;
+      if (p.item === 'equip') { const w = 9 * ss, h = 6 * ss; ctx.fillRect(P.x - w / 2, P.y - h / 2, w, h); ctx.strokeRect(P.x - w / 2, P.y - h / 2, w, h); }
+      else { ctx.beginPath(); ctx.arc(P.x, P.y, trail[1] * ss, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
     }
   }
   function drawTroops(ctx, side, x, s) {
@@ -480,9 +599,11 @@
   function fxFrame(dt) {
     if (!FX.ctx || !g) return;
     FX.clock += dt;
-    const ctx = FX.ctx, s = stage.classList.contains('compact') ? 0.8 : 1, live = started && !g.paused && !g.over, rm = RM();
+    const ctx = FX.ctx, s = 1, live = started && !g.paused && !g.over, rm = RM();
     ctx.setTransform(FX.k, 0, 0, FX.k, 0, 0);
-    ctx.clearRect(0, 0, FX.W, FX.H);
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    if (BOARD.share < 0) boardShare(S.territory(g, 'A'));
+    if (BOARD.cache && BOARD.share >= 0) { ctx.drawImage(BOARD.cache, 0, 0, DW, DH); drawFront(ctx, rm, dt); } else { ctx.fillStyle = '#0b0907'; ctx.fillRect(0, 0, DW, DH); }
     if (live) { detectArrivals('A'); detectArrivals('B'); detectPush(); }
     else { FX.prevPipe.A = g.c.A.pipeline.slice(); FX.prevPipe.B = g.c.B.pipeline.slice(); }
     const push = Math.max(-1, Math.min(1, FX.pushRate * 60)); // >0: A pushing, <0: B pushing
@@ -519,28 +640,105 @@
     // gunfire along the front: busier when one side is pushing hard
     if (live && !rm) {
       const rate = 3 + Math.abs(push) * 14;
-      if (Math.random() < rate * dt) { const yf = 0.12 + Math.random() * 0.8, x = frontX(yf) + (Math.random() - 0.5) * 18; FX.sparks.push({ x, y: yf * FX.H, vx: 0, vy: 0, t0: FX.clock, life: 0.22, c: '255,226,160', r: 2 + Math.random() * 2 }); }
+      if (Math.random() < rate * dt) { const yf = 0.12 + Math.random() * 0.8, x = frontX(yf) + (Math.random() - 0.5) * 18; FX.sparks.push({ x, y: yf * FX.H, vx: 0, vy: 0, t0: FX.clock, life: 0.22, c: '232,120,30', r: 2 + Math.random() * 2 }); }
     }
     FX.sparks = FX.sparks.filter(p => {
       const age = FX.clock - p.t0; if (age > p.life) return false;
-      const k = age / p.life; ctx.fillStyle = `rgba(${p.c},${(1 - k) * 0.9})`;
-      ctx.beginPath(); ctx.arc(p.x + p.vx * age, p.y + p.vy * age, (p.r || 1.6) * s * (1 - k * 0.5), 0, Math.PI * 2); ctx.fill(); return true;
+      const k = age / p.life, P = PJ(p.x + p.vx * age, p.y + p.vy * age); ctx.fillStyle = `rgba(${p.c},${(1 - k) * 0.9 * P.a})`;
+      ctx.beginPath(); ctx.arc(P.x, P.y, (p.r || 1.6) * s * P.s * (1 - k * 0.5), 0, Math.PI * 2); ctx.fill(); return true;
     });
     FX.flashes = FX.flashes.filter(f => {
       const age = FX.clock - f.t0, dur = 0.9; if (age > dur) return false;
-      const x = frontX(f.yf), y = f.yf * FX.H, k = age / dur, R = (f.big ? 30 : 20) * s * (0.4 + k);
+      const P = PJ(frontX(f.yf), f.yf * FX.H), x = P.x, y = P.y, k = age / dur, R = (f.big ? 30 : 20) * s * P.s * (0.4 + k);
       const gr = ctx.createRadialGradient(x, y, 0, x, y, R);
-      gr.addColorStop(0, 'rgba(226,192,125,' + (0.7 * (1 - k)) + ')'); gr.addColorStop(1, 'rgba(226,192,125,0)');
+      gr.addColorStop(0, 'rgba(200,120,30,' + (0.7 * (1 - k)) + ')'); gr.addColorStop(1, 'rgba(200,120,30,0)');
       ctx.fillStyle = gr; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill(); return true;
     });
     FX.ripples = FX.ripples.filter(r => {
       const age = FX.clock - r.t0, dur = rm ? 0.6 : 1.3; if (age > dur) return false;
-      const x = frontX(r.yf), y = r.yf * FX.H, k = age / dur;
-      ctx.strokeStyle = COL[r.side].main; ctx.globalAlpha = 0.6 * (1 - k); ctx.lineWidth = 2;
-      for (const m of [1, 0.6]) { ctx.beginPath(); ctx.arc(x, y, (8 + 42 * k) * m * s, 0, Math.PI * 2); ctx.stroke(); }
+      const P = PJ(frontX(r.yf), r.yf * FX.H), x = P.x, y = P.y, k = age / dur;
+      ctx.strokeStyle = COL[r.side].main; ctx.globalAlpha = 0.6 * (1 - k) * P.a; ctx.lineWidth = 2;
+      for (const m of [1, 0.6]) { ctx.beginPath(); ctx.arc(x, y, (8 + 42 * k) * m * s * P.s, 0, Math.PI * 2); ctx.stroke(); }
       ctx.globalAlpha = 1; return true;
     });
+    deskFrame(ctx, dt, rm);
   }
+
+  // ---------- the room: the lantern's flame and light, and someone passing beyond the desk ----------
+  const DESK = { t: 0, flameSrc: null, warp: null, pass: null, nextAt: 25 + Math.random() * 35, lA: null, lB: null, lS: null, full: null, blurOK: null };
+  const noise = seed => { const v = []; let s = seed; for (let i = 0; i < 4096; i++) { s = (s * 16807) % 2147483647; v.push(s / 2147483647 * 2 - 1); } return t => { const i = Math.floor(t), f = t - i, a = v[i & 4095], b = v[(i + 1) & 4095], u = f * f * (3 - 2 * f); return a + (b - a) * u; }; };
+  const nA = noise(11), nB = noise(23), nC = noise(37), nD = noise(53), nG = noise(71);
+  const mkCv = (w, h) => { const c = document.createElement('canvas'); c.width = w; c.height = h; return c; };
+  function blurWorks() { // the soft shadow needs canvas blur; without it the shadow is left out
+    try { const c = mkCv(9, 9), x = c.getContext('2d'); if (!('filter' in x)) return false; x.filter = 'blur(2px)'; x.fillRect(4, 4, 1, 1); return x.getImageData(2, 4, 1, 1).data[3] > 0; } catch (e) { return false; }
+  }
+  // one light beyond the centre of the desk; the shadow fans out toward the viewer and shows down to the shoulders
+  const SH = { LX: DW / 2, LY: -260, PW: 300, SC: 3 };
+  const shProf = v => { if (v < 0.55) return 1; if (v < 0.80) { const k = (v - 0.55) / 0.25; return 1 - 0.58 * (1 - Math.cos(k * Math.PI / 2)) ** 1.4; } return 0.42; };
+  function shBody(c, xp, wob, edge) {
+    const N = 40, Lp = [], Rp = [], sc = SH.SC;
+    for (let i = 0; i <= N; i++) { const v = i / N, y = edge + v * (DH + 40 - edge), f = (y - SH.LY) / (edge - SH.LY), hw = SH.PW / 2 * shProf(v) * (1 + wob * 0.04 * v); Lp.push([SH.LX + (xp - hw - SH.LX) * f, y]); Rp.push([SH.LX + (xp + hw - SH.LX) * f, y]); }
+    c.beginPath(); c.moveTo((xp - SH.PW / 2) / sc, (edge - 60) / sc); Lp.forEach(p => c.lineTo(p[0] / sc, p[1] / sc)); for (let i = Rp.length - 1; i >= 0; i--) c.lineTo(Rp[i][0] / sc, Rp[i][1] / sc); c.lineTo((xp + SH.PW / 2) / sc, (edge - 60) / sc); c.closePath();
+  }
+  function shLayer(cv, xp, wob, blur, top, bot, edge) {
+    const c = cv.getContext('2d'), W = cv.width, H = cv.height;
+    c.globalCompositeOperation = 'source-over'; c.filter = 'none'; c.clearRect(0, 0, W, H);
+    c.filter = 'blur(' + blur + 'px)'; c.fillStyle = '#000'; shBody(c, xp, wob, edge); c.fill(); c.filter = 'none';
+    c.globalCompositeOperation = 'destination-in'; const gr = c.createLinearGradient(0, edge / SH.SC, 0, DH / SH.SC); gr.addColorStop(0, 'rgba(0,0,0,' + top + ')'); gr.addColorStop(1, 'rgba(0,0,0,' + bot + ')'); c.fillStyle = gr; c.fillRect(0, 0, W, H); c.globalCompositeOperation = 'source-over';
+  }
+  function deskFrame(ctx, dt, rm) {
+    const m = BOARD.map; if (!m || !BOARD.img) return;
+    const L0 = m.lantern; DESK.t += dt; const t = DESK.t;
+    if (DESK.blurOK == null) DESK.blurOK = blurWorks();
+    // --- a passing shadow every 20-60 s (off with reduced motion) ---
+    if (!rm && DESK.blurOK) {
+      if (!DESK.pass && t >= DESK.nextAt) { DESK.pass = { t0: t, dur: 1.1 + Math.random() * 0.5, dir: Math.random() < 0.5 ? 1 : -1, str: 0.85 + Math.random() * 0.2 }; DESK.nextAt = t + 20 + Math.random() * 40; }
+      const ps = DESK.pass;
+      if (ps) {
+        const p = window.__shadowP != null ? window.__shadowP : (t - ps.t0) / ps.dur;
+        if (p >= 1) DESK.pass = null;
+        else {
+          const sc = SH.SC, OW = Math.ceil(DW / sc), OH = Math.ceil(DH / sc), edge = m.deskEdge;
+          if (!DESK.lA) { DESK.lA = mkCv(OW, OH); DESK.lB = mkCv(OW, OH); DESK.lS = mkCv(OW, OH); DESK.full = mkCv(DW, DH); }
+          const span = DW / 2 + SH.PW * 0.7, xp = SH.LX + ps.dir * (-span + 2 * span * p), wob = Math.sin(p * Math.PI * 2 * 2.2);
+          shLayer(DESK.lA, xp, wob, 10, 1, 0.25, edge); shLayer(DESK.lB, xp, wob, 26, 0.35, 1, edge);
+          const c = DESK.lS.getContext('2d'); c.globalCompositeOperation = 'source-over'; c.clearRect(0, 0, OW, OH); c.drawImage(DESK.lA, 0, 0); c.drawImage(DESK.lB, 0, 0);
+          // the lantern keeps its surroundings lit: 10 / 30 / 60 / 100 % of the shadow, in a flattened oval
+          const [lx, ly, lrx, lsq] = L0.lit; c.save(); c.globalCompositeOperation = 'destination-out'; c.translate(lx / sc, ly / sc); c.scale(1, lsq);
+          const gr = c.createRadialGradient(0, 0, 0, 0, 0, lrx / sc); [[0, 10], [0.33, 30], [0.66, 60], [1, 100]].forEach(([k, s0]) => gr.addColorStop(k, 'rgba(0,0,0,' + (1 - s0 / 100) + ')'));
+          c.fillStyle = gr; c.beginPath(); c.arc(0, 0, lrx / sc, 0, Math.PI * 2); c.fill(); c.restore();
+          // full size: the lantern stands on this side of the shadow, so it is cut out sharply
+          const f = DESK.full.getContext('2d'); f.globalCompositeOperation = 'source-over'; f.clearRect(0, 0, DW, DH); f.imageSmoothingQuality = 'high'; f.drawImage(DESK.lS, 0, 0, OW * sc, OH * sc); f.clearRect(0, 0, DW, edge - 2);
+          if (BOARD.lmask) { const [bx, by, bw, bh] = L0.maskBox; f.globalCompositeOperation = 'destination-out'; f.drawImage(BOARD.lmask, bx, by, bw, bh); }
+          ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.globalAlpha = 0.62 * ps.str; ctx.drawImage(DESK.full, 0, 0, DW, DH); ctx.restore();
+          const block = Math.max(0, 1 - Math.abs(xp - SH.LX) / (DW * 0.55));
+          ctx.save(); ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(232,228,224)'; ctx.globalAlpha = block * 0.5; ctx.fillRect(0, edge, DW, DH); ctx.restore();
+        }
+      }
+    }
+    // --- the lantern flame and its light ---
+    const gust = Math.max(0, nG(t * 0.35)) ** 2, fl = rm ? 0 : 0.55 * nA(t * 7) + 0.3 * nB(t * 13) + 0.15 * nC(t * 23);
+    const [FX0, FY0, FW, FH] = L0.fx, [CX, CY] = L0.c, BASE = L0.base, TIP = L0.tip, K = 4;
+    if (!rm) {
+      if (!DESK.flameSrc) { const im = BOARD.img, sx = im.width / DW, sy = im.height / DH; DESK.flameSrc = mkCv(FW * K, FH * K); const c = DESK.flameSrc.getContext('2d'); c.imageSmoothingQuality = 'high'; c.drawImage(im, FX0 * sx, FY0 * sy, FW * sx, FH * sy, 0, 0, FW * K, FH * K); DESK.warp = mkCv(FW, FH); }
+      const sway = (nD(t * 0.9) * 0.8 + nB(t * 4.5) * 0.3) * (1 + gust * 1.5), hs = 1 + 0.05 * nA(t * 6 + 5) - 0.03 * gust, w = DESK.warp.getContext('2d');
+      w.globalCompositeOperation = 'source-over'; w.clearRect(0, 0, FW, FH);
+      for (let r = 0; r < FH * K; r++) {
+        const dy = r / K, yy = FY0 + dy, h = Math.max(0, (BASE - yy) / (BASE - TIP)), sy = BASE - (BASE - yy) / hs, sr = (sy - FY0) * K; if (sr < 0 || sr >= FH * K) continue;
+        const off = sway * Math.pow(Math.min(h, 1.3), 1.7) + Math.sin(yy * 0.55 - t * 9) * 0.25 * h * h; w.drawImage(DESK.flameSrc, 0, sr, FW * K, 1, off, dy, FW, 1 / K);
+      }
+      w.globalCompositeOperation = 'destination-in'; const mg = w.createRadialGradient(CX - FX0, CY - FY0, 4, CX - FX0, CY - FY0, 24); mg.addColorStop(0, '#000'); mg.addColorStop(1, 'rgba(0,0,0,0)'); w.fillStyle = mg; w.fillRect(0, 0, FW, FH);
+      ctx.drawImage(DESK.warp, FX0, FY0);
+      if (BOARD.flame) { ctx.save(); ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.max(0, 0.18 + 0.22 * fl); ctx.drawImage(BOARD.flame, FX0, FY0); ctx.restore(); }
+    }
+    ctx.save(); ctx.globalCompositeOperation = 'screen';
+    let gr = ctx.createRadialGradient(CX, CY, 0, CX, CY, 120); gr.addColorStop(0, 'rgba(255,190,110,' + (0.16 + 0.08 * fl) + ')'); gr.addColorStop(1, 'rgba(255,160,80,0)'); ctx.fillStyle = gr; ctx.fillRect(CX - 120, CY - 120, 240, 240);
+    ctx.globalCompositeOperation = 'soft-light'; const R = 640 + 20 * fl, a2 = 0.22 + 0.12 * fl;
+    gr = ctx.createRadialGradient(CX, CY + 40, 0, CX, CY + 40, R); gr.addColorStop(0, 'rgba(255,200,130,' + a2 + ')'); gr.addColorStop(0.55, 'rgba(255,170,90,' + (a2 * 0.45) + ')'); gr.addColorStop(1, 'rgba(255,160,80,0)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, DW, DH);
+    if (fl < 0) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(' + (255 + fl * 12 | 0) + ',' + (255 + fl * 16 | 0) + ',' + (255 + fl * 22 | 0) + ')'; ctx.fillRect(0, 0, DW, DH); }
+    ctx.restore();
+  }
+  window.BSDesk = { pass() { DESK.pass = { t0: DESK.t, dur: 1.3, dir: 1, str: 1 }; }, get info() { return { blurOK: DESK.blurOK, pass: !!DESK.pass, t: DESK.t, map: !!BOARD.map, img: !!BOARD.img }; } }; // for checking by hand
 
   // ---------- tooltip ----------
   let tipTimer = null;
@@ -817,6 +1015,7 @@
     curSc = sc || curSc;
     S.setLang(SET.lang);
     g = S.newGame(null, { scenario: curSc }); g.paused = true; started = false; act = null; wireKey = '';
+    { const n = (window.BS_MAPS || []).length; if (n) boardUse(Math.floor(Math.random() * n)); BOARD.share = -1; } // one map for each war
     setScales(); rebuildAll();
     FX.units = { A: [], B: [] }; FX.flashes = []; FX.ripples = []; FX.sparks = []; FX.prevPipe = { A: [], B: [] }; FX.shareLog = []; FX.lastCas = { A: null, B: null }; FX.killAcc = { A: 0, B: 0 }; FX.arrAcc = { A: 0, B: 0 }; FX.prevTransit = { A: [], B: [] }; FX.pushRate = 0;
     for (const k in effMemo) delete effMemo[k];
