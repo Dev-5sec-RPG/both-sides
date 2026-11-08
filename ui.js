@@ -10,7 +10,7 @@
   let g = null, started = false, act = null, scale = 1, rotDismissed = false, mode = 'home', curSc = 's1';
 
   // ---------- settings (kept in this browser only) ----------
-  const SET = { lang: 'ja', fx: true, reduce: false, autoFull: true, sound: true };
+  const SET = { lang: 'ja', fx: true, reduce: false, autoFull: true, sound: true, movie: 'full' };
   try { Object.assign(SET, JSON.parse(localStorage.getItem('bs_settings') || '{}')); } catch (e) { /* storage unavailable */ }
   function saveSet() { try { localStorage.setItem('bs_settings', JSON.stringify(SET)); } catch (e) { /* ignore */ } }
   // sound effects (se.js). Buttons with their own sound are listed here; every other button clicks
@@ -770,6 +770,139 @@
   }
   window.BSDesk = { pass() { DESK.nextAt = DESK.t; }, get info() { return { blurOK: DESK.blurOK, pass: !!DESK.pass, t: DESK.t, map: !!BOARD.map, img: !!BOARD.img }; } }; // for checking by hand
 
+
+  // ---------- event movies: a scout reports at the operations table, then the usual window opens ----------
+  // full = every event window; important = the key ones below; none = windows only
+  const MOVIE_KEY = new Set(['defeat', 'surrender', 'peace', 'cap', 'order', 'ev10', 'ev2']);
+  const MOVIE = { on: false, side: 'A', pages: [], page: 0, phase: '', done: null, timers: [] };
+  function movieWanted(m) {
+    if (mode !== 'game' || SET.movie === 'none') return false;
+    const key = m.kind === 'order' ? 'order' : m.mk;
+    if (!key) return false;
+    return SET.movie === 'full' || MOVIE_KEY.has(key);
+  }
+  function presentModal(m) {
+    const open = () => { if (m.kind === 'order') orderModal(m); else eventModal(m); };
+    if (movieWanted(m)) playMovie(m, open); else open();
+  }
+  // what the scout says: two windows. A and B scouts word it a little differently
+  function talkPages(m, side) {
+    const who = m.kind === 'order' ? m.cid : m.who, cn = who ? g.c[who].name : null;
+    const key = m.kind === 'order' ? 'order' : m.mk;
+    const H = {
+      ev1: L(cn + 'の戦果が大きく報じられています。', cn + "'s victories are all over the papers.", cn + '的战果正被大肆报道。'),
+      ev2: L(cn + 'が大規模な突破作戦を準備しているようです。', cn + ' seems to be preparing a major breakthrough.', cn + '似乎正在准备一场大规模突破作战。'),
+      ev3: L(cn + 'に同盟国から武器が届く見込みです。', 'An ally is about to send arms to ' + cn + '.', '盟国预计将向' + cn + '提供武器。'),
+      ev4: L(cn + 'の閣僚が辞任するとの情報を掴みました。', 'We have learned that a minister of ' + cn + ' will resign.', '我们得知' + cn + '的一名阁僚将要辞职。'),
+      ev5: L(cn + 'で大規模な徴兵令の準備が進んでいます。', cn + ' is preparing a mass draft.', cn + '正在筹备大规模征兵令。'),
+      ev7: L(cn + 'の防衛戦が英雄的に報じられています。', cn + "'s defence is being hailed as heroic.", cn + '的防御战被誉为英雄之举。'),
+      ev8: L(cn + 'の補給基地で大きな事故がありました。', 'There has been a major accident at a ' + cn + ' supply depot.', cn + '的补给基地发生了重大事故。'),
+      ev9: L('競合の武器商人が' + cn + 'に入り込みました。', 'A rival dealer has moved in on ' + cn + '.', '竞争对手的军火商打进了' + cn + '。'),
+      ev10: L('国際調査団が報告書をまとめているそうです。', 'An international inquiry is preparing a report.', '国际调查团正在整理一份报告。'),
+      ev11: L('第三国が停戦の仲介に乗り出すようです。', 'A third country is about to offer mediation.', '第三国似乎要出面斡旋停战。'),
+      market: L('戦争が長引き、装備の値が上がっています。', 'The war drags on and arms are fetching higher prices.', '战争旷日持久，装备的价格在上涨。'),
+      order: L(cn + 'から至急の注文が入りました。', 'An urgent order has come in from ' + cn + '.', cn + '发来了紧急订单。'),
+      defeat: L(cn + 'が首都の目前まで押し込まれています。', cn + ' has been pushed back almost to its capital.', cn + '已被逼到首都跟前。'),
+      surrender: L(cn + 'に降伏の兆しがあります。', cn + ' is showing signs of surrender.', cn + '出现了投降的迹象。'),
+      peace: L('両国が講和に向けて動き始めました。', 'Both sides are moving toward peace.', '两国开始朝和谈方向行动。'),
+      cap: L('国際機関が介入の準備を始めました。', 'International bodies are preparing to intervene.', '国际机构开始准备介入。'),
+    };
+    const open = side === 'A'
+      ? (cn ? L('社長、' + cn + '側で動きがありました。', 'Sir, there is movement on the ' + cn + ' side.', '老板，' + cn + '那边有动静。') : L('社長、急ぎの報告です。', 'Sir, an urgent report.', '老板，紧急报告。'))
+      : (cn ? L('社長、' + cn + 'に潜らせた者から連絡が入りました。', 'Sir, word from our man inside ' + cn + '.', '老板，潜伏在' + cn + '的人传来了消息。') : L('社長、各方面から情報が入りました。', 'Sir, reports are coming in from all sides.', '老板，各方面都传来了消息。'));
+    const close = side === 'A' ? L('ご確認ください。', 'Please take a look.', '请过目。') : L('ご判断をお願いします。', 'Your call, sir.', '请您定夺。');
+    const it = m.kind === 'order' ? I[m.item] : null;
+    const C = {
+      ev1: L(cn + 'の戦意が上がります。', cn + "'s morale will rise.", cn + '的士气将会上升。'),
+      ev2: L('約6週後に作戦が始まり、8週間' + cn + 'の押す力が強まります。', 'It starts in about 6 weeks and boosts ' + cn + "'s push for 8 weeks.", '约6周后作战开始，8周内' + cn + '的推进力将增强。'),
+      ev3: L('約8週後に武器が届き、' + cn + 'の武器戦力が上がります。', 'The arms arrive in about 8 weeks and strengthen ' + cn + '.', '约8周后武器运到，' + cn + '的武器战力将提升。'),
+      ev4: L('約10週後に辞任が表に出て、' + cn + 'の戦意が下がり、反戦感情が高まります。', 'In about 10 weeks it goes public: morale falls and anti-war feeling grows.', '约10周后辞职将公开，' + cn + '士气下降，反战情绪高涨。'),
+      ev5: L('約10週後に発令され、' + cn + 'の兵は増えますが、反戦感情も高まります。', 'In about 10 weeks ' + cn + ' gains soldiers, and anti-war feeling grows too.', '约10周后颁布，' + cn + '兵力增加，但反战情绪也会高涨。'),
+      ev7: L(cn + 'の戦意が上がります。', cn + "'s morale will rise.", cn + '的士气将会上升。'),
+      ev8: L(cn + 'の武器戦力が落ちます。', cn + "'s arms strength will drop.", cn + '的武器战力将下降。'),
+      ev9: L('10週間、' + cn + 'での相場が下がります。', 'Prices in ' + cn + ' will fall for 10 weeks.', '10周内，' + cn + '的行情价将下跌。'),
+      ev10: L('約13週後に公表されます。その間に両国へ売っていると、疑いを向けられます。', 'It comes out in about 13 weeks. Selling to both sides until then will draw suspicion.', '约13周后公布。在此期间若向两国出售，将招致怀疑。'),
+      ev11: L('約13週後に発表され、両国の戦意が下がります。', 'It is announced in about 13 weeks and lowers both sides\' morale.', '约13周后公布，两国士气都将下降。'),
+      market: L('生産費は据え置きなので、ここからの販売は利幅が大きくなります。', 'Costs stay the same, so sales from here earn more.', '生产成本不变，此后销售的利润会更高。'),
+      order: it ? L(it.name + 'を' + m.qty + 'セット、' + m.weeks + '週以内に求めています。', 'They want ' + m.qty + ' sets of ' + it.name + ' within ' + m.weeks + ' weeks.', '对方要求在' + m.weeks + '周内交付' + it.name + m.qty + '套。') : '',
+      defeat: L('これ以上押し込まれると首都が陥落し、戦争が終わります。', 'If pushed any further the capital falls and the war ends.', '若再被推进，首都将陷落，战争结束。'),
+      surrender: L('この状態が続くと、' + cn + 'は降伏します。', 'If this goes on, ' + cn + ' will surrender.', '若持续下去，' + cn + '将会投降。'),
+      peace: L('両国の戦意が戻らなければ、講和が成立します。', 'If morale does not recover on both sides, peace will be made.', '若两国士气不能恢复，和谈将会达成。'),
+      cap: L('12週後、戦争は強制的に講和となります。', 'In 12 weeks the war will be ended by an imposed peace.', '12周后，战争将被强制停战。'),
+    };
+    const sp = S.LANG.cur === 'en' ? ' ' : '';
+    return [open + sp + (H[key] || ''), (C[key] || m.text || '') + sp + close];
+  }
+  const mvEl = id => $(id);
+  function mvClear() { MOVIE.timers.forEach(clearTimeout); MOVIE.timers = []; }
+  function mvLater(fn, ms) { MOVIE.timers.push(setTimeout(fn, ms)); }
+  function mvVideos(side) { return side === 'A' ? [mvEl('mvA0'), mvEl('mvA1')] : [mvEl('mvB0'), mvEl('mvB1')]; }
+  function playMovie(m, done) {
+    const who = m.kind === 'order' ? m.cid : m.who, side = who === 'A' || who === 'B' ? who : (Math.random() < 0.5 ? 'A' : 'B');
+    const [intro, loop] = mvVideos(side);
+    if (!intro || !loop || intro.error || loop.error) { done(); return; }
+    mvClear(); MOVIE.on = true; MOVIE.side = side; MOVIE.done = done; MOVIE.pages = talkPages(m, side); MOVIE.page = 0; MOVIE.phase = 'intro';
+    document.querySelectorAll('#mvStage video').forEach(v => { v.classList.remove('on'); v.pause(); });
+    $('mvTalk').hidden = true; $('mvSkip').textContent = L('スキップ ▶▶', 'Skip ▶▶', '跳过 ▶▶'); $('mvStage').getAnimations().forEach(a => a.cancel());
+    const black = $('mvBlack'); black.style.transition = 'none'; black.style.opacity = 1; $('movie').hidden = false;
+    let started = false;
+    const go = () => {
+      if (started || !MOVIE.on) return; started = true;
+      try { intro.currentTime = 0; } catch (e) { /* not ready */ }
+      intro.classList.add('on');
+      void black.offsetWidth; black.style.transition = 'opacity .35s linear'; black.style.opacity = 0;
+      const p = intro.play(); if (p && p.catch) p.catch(() => {});
+      intro.onended = () => { if (MOVIE.on && MOVIE.phase === 'intro') mvToLoop(); };
+    };
+    if (intro.readyState >= 3) go(); else { intro.addEventListener('canplay', go, { once: true }); intro.load(); mvLater(() => { if (!started) { mvEnd(true); } }, 2500); }
+  }
+  function mvToLoop() {
+    const [intro, loop] = mvVideos(MOVIE.side);
+    MOVIE.phase = 'talk';
+    try { loop.currentTime = 0; } catch (e) { /* not ready */ }
+    const p = loop.play(); if (p && p.catch) p.catch(() => {});
+    loop.classList.add('on'); intro.classList.remove('on'); intro.pause();
+    mvShowPage();
+  }
+  function mvShowPage() {
+    $('mvWho').textContent = MOVIE.side === 'A' ? L('密偵（' + g.c.A.name + '方面）', 'Scout (' + g.c.A.name + ' desk)', '密探（' + g.c.A.name + '方面）') : L('密偵（' + g.c.B.name + '方面）', 'Scout (' + g.c.B.name + ' desk)', '密探（' + g.c.B.name + '方面）');
+    $('mvText').textContent = MOVIE.pages[MOVIE.page];
+    const touch = matchMedia('(pointer: coarse)').matches;
+    $('mvHint').textContent = touch ? L('画面タップで次へ', 'Tap to continue', '轻触画面继续') : L('クリックで次へ（Enterキーでも可）', 'Click (or press Enter) to continue', '点击继续（也可按Enter键）');
+    $('mvPg').textContent = (MOVIE.page + 1) + ' / ' + MOVIE.pages.length;
+    $('mvTalk').hidden = false;
+  }
+  function mvAdvance() {
+    if (!MOVIE.on) return;
+    if (MOVIE.phase === 'intro') { mvToLoop(); return; }          // tapping during the walk-in jumps to the report
+    if (MOVIE.phase !== 'talk') return;
+    SFX('page');
+    if (MOVIE.page < MOVIE.pages.length - 1) { MOVIE.page++; mvShowPage(); return; }
+    // the report is over: nod twice while he keeps moving, then fade to black
+    MOVIE.phase = 'outro'; $('mvTalk').hidden = true;
+    const d = 13 * (stage.offsetWidth / 1376), nod = [0, 1, 0, 1, 0].map(k => ({ transform: 'scale(' + (1.03 + 0.004 * k) + ') translateY(' + (-d * k) + 'px)' }));
+    const a = $('mvStage').animate(nod, { duration: 1250, easing: 'ease-in-out' });
+    const black = $('mvBlack');
+    a.onfinish = () => { black.style.transition = 'opacity 1s ease-in'; black.style.opacity = 1; mvLater(() => mvEnd(false), 1000); };
+  }
+  function movieSkip() {
+    if (!MOVIE.on || MOVIE.phase === 'ending') return;
+    MOVIE.phase = 'ending'; $('mvTalk').hidden = true;
+    const black = $('mvBlack'); black.style.transition = 'opacity .3s linear'; black.style.opacity = 1;
+    mvLater(() => mvEnd(false), 300);
+  }
+  function mvEnd(failed) {
+    mvClear(); const done = MOVIE.done; MOVIE.on = false; MOVIE.phase = ''; MOVIE.done = null;
+    document.querySelectorAll('#mvStage video').forEach(v => { v.pause(); v.classList.remove('on'); });
+    $('mvStage').getAnimations().forEach(a => a.cancel());
+    const mv = $('movie'), black = $('mvBlack');
+    if (failed) { mv.hidden = true; if (done) done(); return; }
+    // back to the table: the window opens as the black lifts
+    mv.style.transition = 'opacity .45s linear'; mv.style.opacity = 0; if (done) done();
+    setTimeout(() => { mv.hidden = true; mv.style.transition = ''; mv.style.opacity = ''; black.style.opacity = 1; }, 470);
+  }
+  $('movie').addEventListener('click', e => { e.stopPropagation(); if (e.target.closest('#mvSkip')) { movieSkip(); return; } mvAdvance(); });
+
   // ---------- tooltip ----------
   let tipTimer = null;
   function showTip(el) {
@@ -1114,8 +1247,10 @@
       ['sound', L('効果音', 'Sound effects', '音效'), L('操作や出来事に効果音を付ける', 'Play sounds for actions and events', '为操作和事件播放音效')],
       ['autoFull', L('スマホで自動的に全画面', 'Auto full screen on phones', '手机上自动全屏'), L('戦争を始めた時や画面に触れた時に全画面にする', 'Go full screen when a war starts or the screen is touched', '开始战争或触碰画面时切换为全屏')],
     ];
+    const mv = [['full', L('フル', 'All', '全部')], ['important', L('重要のみ', 'Key only', '仅重要')], ['none', L('なし', 'Off', '关闭')]];
+    const movieRow = `<div class="setrow"><div><div class="sl">${L('ムービー', 'Movies', '过场动画')}</div><div class="sh">${L('出来事の報告をムービーで見せる。「重要のみ」は降伏・講和・敗北の危機・緊急発注など', 'Show reports of events as movies. "Key only" covers surrender, peace, defeat, rush orders and similar', '以动画呈现事件报告。“仅重要”包括投降、和谈、败北危机、紧急订单等')}</div></div><div class="segs">${mv.map(([k, l]) => `<button class="btn${SET.movie === k ? ' sel' : ''}" data-movie="${k}">${l}</button>`).join('')}</div></div>`;
     homePop(`<div class="hpanel small"><h2>${L('設定', 'Settings', '设置')}</h2>
-      ${rows.map(([k, l, h]) => `<div class="setrow"><div><div class="sl">${l}</div><div class="sh">${h}</div></div><button class="tog${SET[k] ? ' on' : ''}" data-set="${k}" aria-pressed="${SET[k]}" aria-label="${esc(l)}"></button></div>`).join('')}
+      ${movieRow}${rows.map(([k, l, h]) => `<div class="setrow"><div><div class="sl">${l}</div><div class="sh">${h}</div></div><button class="tog${SET[k] ? ' on' : ''}" data-set="${k}" aria-pressed="${SET[k]}" aria-label="${esc(l)}"></button></div>`).join('')}
       <div class="foot"><button class="btn primary" data-hclose>${L('閉じる', 'Close', '关闭')}</button></div></div>`);
   }
   function homeLang() {
@@ -1141,6 +1276,7 @@
     if (e.target === $('hpop') || e.target.closest('[data-hclose]')) { $('hpop').hidden = true; return; }
     const sc = e.target.closest('[data-scn]'); if (sc) { SFX('start'); startGame(sc.dataset.scn); return; }
     const tu = e.target.closest('[data-tut]'); if (tu) { startTutorial(+tu.dataset.tut); return; }
+    const mvb = e.target.closest('[data-movie]'); if (mvb) { SET.movie = mvb.dataset.movie; saveSet(); homeSettings(); return; }
     const st = e.target.closest('[data-set]'); if (st) { const k = st.dataset.set; SET[k] = !SET[k]; saveSet(); homeSettings(); return; }
     const lg = e.target.closest('[data-lang]'); if (lg) { SET.lang = lg.dataset.lang; saveSet(); S.setLang(SET.lang); applyStatic(); homeLang(); return; }
   });
@@ -1170,6 +1306,8 @@
   });
   stage.addEventListener('input', e => { if (act && e.target.id === 'mRange') { if (+e.target.value !== act.m) act.blocked = false; act.m = +e.target.value; updatePrice(); } });
   document.addEventListener('keydown', e => {
+    if (e.key === 'Escape' && MOVIE.on) { movieSkip(); return; }
+    if (MOVIE.on) { if (e.key === 'Enter' || e.code === 'Space') { e.preventDefault(); mvAdvance(); } return; }
     if (e.key === 'Escape' && act) { closeAct(); return; }
     if (e.code === 'Space' && mode === 'game' && !act && e.target.tagName !== 'BUTTON' && e.target.tagName !== 'INPUT' && started && !g.over && !g.modal) { e.preventDefault(); g.paused = !g.paused; render(); }
   });
@@ -1184,7 +1322,7 @@
     if (g && started && !act && mode === 'game') {
       acc += dt;
       while (acc >= 0.1) { S.step(g, 0.1); acc -= 0.1; if (g.paused) { acc = 0; break; } }
-      if (g.modal && shown !== g.modal) { shown = g.modal; if (g.modal.kind === 'event') eventModal(g.modal); else if (g.modal.kind === 'order') orderModal(g.modal); else if (g.modal.kind === 'result') endSequence(); }
+      if (g.modal && shown !== g.modal) { shown = g.modal; if (g.modal.kind === 'event' || g.modal.kind === 'order') presentModal(g.modal); else if (g.modal.kind === 'result') endSequence(); }
     }
     rAcc += dt; if (rAcc >= 0.1) { rAcc = 0; if (g && mode !== 'home') render(); }
     if (g && mode !== 'home') { if (!frontArr.length) render(); fxFrame(dt); updateVig(dt); }

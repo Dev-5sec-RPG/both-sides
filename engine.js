@@ -179,7 +179,8 @@
     return { lv, why: out.map(x => x.why), weeks: c.surT > 0 ? Math.max(1, Math.ceil((CFG.surrHold - c.surT) / 3)) : null };
   }
   // 時を止めて知らせる(他の知らせと重なった時は順番に出す)
-  function alertModal(g, title, text, stamp) { (g.alertQ || (g.alertQ = [])).push({ kind: 'event', title, text, stamp, pre: false }); }
+  let alertMeta = null; // set just before alertModal(): which alert and which nation (used only by the event movies)
+  function alertModal(g, title, text, stamp) { (g.alertQ || (g.alertQ = [])).push(Object.assign({ kind: 'event', title, text, stamp, pre: false }, alertMeta || {})); alertMeta = null; }
   function pressure(g, id) { const a = eff(g.c.A, g), b = eff(g.c.B, g), s = a / (a + b || 1); return id === 'A' ? s : 1 - s; }
   function transitSum(c) { return c.transit.reduce((s, x) => s + x.n, 0); }
   function syncSoldiers(c) { c.soldiers = c.reserve + c.front + transitSum(c); }
@@ -446,7 +447,7 @@
   const EVENTS = [
     // ---- 優勢側がより優勢になる ----
     { id:1, cat:'lead', pre:false, w:g => 1,
-      make:g => { const c = lead(g); return { text: L(c.name + 'の戦果が大きく報じられている。' + c.name + 'の戦意 +8', c.name + "'s victories make headlines. " + c.name + ' morale +8', c.name + '的战果被大肆报道。' + c.name + '的士气 +8'),
+      make:g => { const c = lead(g); return { who: c.id, text: L(c.name + 'の戦果が大きく報じられている。' + c.name + 'の戦意 +8', c.name + "'s victories make headlines. " + c.name + ' morale +8', c.name + '的战果被大肆报道。' + c.name + '的士气 +8'),
         fire:() => { c.morale = clamp(c.morale + 8, 0, 100); } }; } },
     { id:2, cat:'lead', pre:true, delay:18, w:g => 1,
       make:g => { const c = lead(g); return { who: c.id, text: L(c.name + 'が約6週後に大規模な突破作戦を行う見込み。発動から8週間、' + c.name + 'の押す力 +25%', c.name + ' plans a major breakthrough in about 6 weeks. For 8 weeks, ' + c.name + ' push +25%', c.name + '预计约6周后发动大规模突破作战。发动后8周内，' + c.name + '的推进力 +25%'),
@@ -462,16 +463,16 @@
       make:g => { const c = g.c.A.front / g.c.B.front <= 1 ? g.c.A : g.c.B; return { who: c.id, text: L(c.name + 'で大規模な徴兵令が準備されている。約10週後に発令。' + c.name + 'の軍人 +15,000、反戦感情 +5', c.name + ' prepares a mass draft, due in about 10 weeks. ' + c.name + ' soldiers +15,000, anti-war +5', c.name + '正在筹备大规模征兵令，约10周后颁布。' + c.name + '的军人 +15,000，反战情绪 +5'),
         fire:() => { c.reserve += 15000; syncSoldiers(c); c.antiwar = clamp(c.antiwar + 5, 0, 100); news(g, L(c.name + 'で徴兵令。軍人 +15,000、反戦感情 +5', 'Draft in ' + c.name + '. Soldiers +15,000, anti-war +5', c.name + '颁布征兵令。军人 +15,000，反战情绪 +5'), 'event'); } }; } },
     { id:7, cat:'even', pre:false, w:g => 1,
-      make:g => { const c = lag(g); return { text: L(c.name + 'の防衛戦が英雄的に報じられている。' + c.name + 'の戦意 +10', c.name + "'s defense is hailed as heroic. " + c.name + ' morale +10', c.name + '的防御战被誉为英雄之举。' + c.name + '的士气 +10'),
+      make:g => { const c = lag(g); return { who: c.id, text: L(c.name + 'の防衛戦が英雄的に報じられている。' + c.name + 'の戦意 +10', c.name + "'s defense is hailed as heroic. " + c.name + ' morale +10', c.name + '的防御战被誉为英雄之举。' + c.name + '的士气 +10'),
         fire:() => { c.morale = clamp(c.morale + 10, 0, 100); } }; } },
     { id:8, cat:'even', pre:false, w:g => 1,
-      make:g => { const c = g.c.A.power >= g.c.B.power ? g.c.A : g.c.B; return { text: L(c.name + 'の補給基地で大規模な事故。' + c.name + 'の武器戦力 -5%', 'Major accident at a ' + c.name + ' supply depot. ' + c.name + ' arms -5%', c.name + '的补给基地发生重大事故。' + c.name + '的武器战力 -5%'),
+      make:g => { const c = g.c.A.power >= g.c.B.power ? g.c.A : g.c.B; return { who: c.id, text: L(c.name + 'の補給基地で大規模な事故。' + c.name + 'の武器戦力 -5%', 'Major accident at a ' + c.name + ' supply depot. ' + c.name + ' arms -5%', c.name + '的补给基地发生重大事故。' + c.name + '的武器战力 -5%'),
         fire:() => { for (const k in EQ) c.eq[k] *= 0.95; totals(c); } }; } },
     // ---- 商人に関わる ----
     { id:9, cat:'merchant', pre:false, w:g => 1,
       make:g => { const vA = soldSince(g.c.A, g.t - 60), vB = soldSince(g.c.B, g.t - 60), any = vA + vB > 0;
         const c = any ? (vA >= vB ? g.c.A : g.c.B) : (g.c.A.funds >= g.c.B.funds ? g.c.A : g.c.B);
-        return { text: L('競合の武器商人が' + c.name + 'に参入した(' + (any ? '最近あなたが多く売っている国' : '資金の多い国') + ')。10週間、' + c.name + 'の相場 -20%', 'A rival dealer moved into ' + c.name + ' (' + (any ? 'your recent best customer' : 'the richer nation') + '). ' + c.name + ' prices -20% for 10 weeks', '竞争对手的军火商进入了' + c.name + '(' + (any ? '你最近大量出售的国家' : '资金较多的国家') + ')。10周内，' + c.name + '的行情价 -20%'),
+        return { who: c.id, text: L('競合の武器商人が' + c.name + 'に参入した(' + (any ? '最近あなたが多く売っている国' : '資金の多い国') + ')。10週間、' + c.name + 'の相場 -20%', 'A rival dealer moved into ' + c.name + ' (' + (any ? 'your recent best customer' : 'the richer nation') + '). ' + c.name + ' prices -20% for 10 weeks', '竞争对手的军火商进入了' + c.name + '(' + (any ? '你最近大量出售的国家' : '资金较多的国家') + ')。10周内，' + c.name + '的行情价 -20%'),
           fire:() => { c.priceMod = 0.8; c.priceModUntil = g.t + 30; } }; } },
     { id:10, cat:'merchant', pre:true, delay:39, w:g => 1,
       make:g => { const t0 = g.t; return { text: L('国際調査団が約13週後に報告書を公表する。これから13週の間に両国へ販売していると、両国の疑惑度が上がる(販売額の偏りが少ないほど大きく、最大 +25)。', 'An international inquiry reports in about 13 weeks. Selling to both nations in that time raises both suspicions (more if balanced, up to +25).', '国际调查团将在约13周后公布报告。今后13周内若向两国出售，两国的怀疑度都会上升(对两国的销售额越均衡，上升越多，最多 +25)。'),
@@ -503,7 +504,7 @@
     const m = e.make(g);
     if (e.pre) { schedule(g, g.t + e.delay, m.fire); news(g, L('[情報] ', '[Intel] ', '[情报] ') + m.text, 'intel'); const who = m.who ? g.c[m.who].name : ''; const pl = PRE_LABEL[e.id]; g.pending.push({ at: g.t + e.delay, label: pl ? (e.id === 10 || e.id === 11 ? '' : who) + L(pl[0], pl[1], pl[2]) : L('予定', 'Scheduled', '预定') }); }
     else { m.fire(); news(g, L('[速報] ', '[Flash] ', '[快讯] ') + m.text, 'event'); }
-    g.modal = { kind:'event', title: e.pre ? L('事前情報', 'Advance Intel', '事前情报') : L('速報', 'Breaking News', '快讯'), text:m.text, pre:e.pre };
+    g.modal = { kind:'event', mk: 'ev' + e.id, who: m.who || null, title: e.pre ? L('事前情報', 'Advance Intel', '事前情报') : L('速報', 'Breaking News', '快讯'), text:m.text, pre:e.pre };
     g.paused = true;
   }
 
@@ -736,7 +737,7 @@
           1.2: 'Year ' + yr + ' of the war. Factories cannot keep up with losses; arms are scarce everywhere. List price is now x1.2.',
           1.3: 'The war is a quagmire. Buyers fight over every shipment and prices keep climbing. List price is now x1.3.' }[ps], { 1.1: '战争进入第' + yr + '年的' + mo + '月，呈现长期化的态势。两国消耗加剧，装备需求日益增长。标价上涨至原来的1.1倍。', 1.2: '开战第' + yr + '年的' + mo + '月。各地工厂赶不上前线的消耗，装备处处短缺。标价上涨至原来的1.2倍。', 1.3: '战争已陷入泥沼。装备采购成了争夺战，行情价持续暴涨。标价上涨至原来的1.3倍。' }[ps]);
         news(g, L('[相場] ', '[Market] ', '[行情] ') + txt, 'event'); tl(g, L('装備の定価が元の' + ps.toFixed(1) + '倍に上昇した。', 'List price rose to x' + ps.toFixed(1) + '.', '装备的标价上涨至原来的' + ps.toFixed(1) + '倍。'), L('両国とも戦意を保ったまま戦争が長期化し、需要が高まったため(生産費は据え置き)', 'A long war with both sides still fighting raised demand (production cost unchanged)', '两国在保持士气的情况下战争长期化，需求增长(生产成本不变)'));
-        g.pendingModal = { kind: 'event', title: L('相場の変動', 'Market Shift', '行情变动'), text: txt + L('生産費は据え置きのため、ここからの販売は利幅が大きくなる。', ' Production cost is unchanged, so margins grow from here.', '生产成本维持不变，此后的销售利润空间更大。'), pre: false };
+        g.pendingModal = { kind: 'event', mk: 'market', title: L('相場の変動', 'Market Shift', '行情变动'), text: txt + L('生産費は据え置きのため、ここからの販売は利幅が大きくなる。', ' Production cost is unchanged, so margins grow from here.', '生产成本维持不变，此后的销售利润空间更大。'), pre: false };
       }
     }
     if (g.pendingModal && !g.modal) { g.modal = g.pendingModal; g.pendingModal = null; g.paused = true; }
@@ -767,20 +768,20 @@
       if (lv < c.warned - 1) c.warned = lv;
       // 敗北の危機: 国土20%を下回ったら時を止めて知らせる(23%を上回るまで再び知らせない)
       const tr = terrOf(own);
-      if (tr < CFG.defeatAlert && !c.defeatAlert) { c.defeatAlert = true; alertModal(g, L('敗北の危機', 'On the Brink', '败北的危机'), L('これ以上戦線を押し込まれると、' + c.name + 'は敗北してしまう。', 'If the front is pushed back any further, ' + c.name + ' will be defeated.', '战线若再被推进，' + c.name + '就会战败。'), L('警告', 'Warning', '警告')); tl(g, L(c.name + 'の国土が20%を下回った。', c.name + "'s land fell below 20%.", c.name + '的国土跌破了20%。'), L('これ以上押し込まれると首都が陥落し、戦争は終わる', 'Any further and the capital falls, ending the war', '若再被推进，首都就会沦陷，战争随之结束'), 'bad'); }
+      if (tr < CFG.defeatAlert && !c.defeatAlert) { c.defeatAlert = true; alertMeta = { mk: 'defeat', who: c.id }; alertModal(g, L('敗北の危機', 'On the Brink', '败北的危机'), L('これ以上戦線を押し込まれると、' + c.name + 'は敗北してしまう。', 'If the front is pushed back any further, ' + c.name + ' will be defeated.', '战线若再被推进，' + c.name + '就会战败。'), L('警告', 'Warning', '警告')); tl(g, L(c.name + 'の国土が20%を下回った。', c.name + "'s land fell below 20%.", c.name + '的国土跌破了20%。'), L('これ以上押し込まれると首都が陥落し、戦争は終わる', 'Any further and the capital falls, ending the war', '若再被推进，首都就会沦陷，战争随之结束'), 'bad'); }
       else if (tr > CFG.defeatAlert + 0.03) c.defeatAlert = false;
       // 戦意が尽き、劣勢の国は降伏する(条件が約12週続くと降伏。途切れると数え直し)
       if (c.morale < CFG.surrMorale && tr < CFG.surrenderLine) {
-        if (c.surT === 0 && !(g.t - (c.surAlertT == null ? -1e9 : c.surAlertT) < 12)) { c.surAlertT = g.t; alertModal(g, L('降伏の兆し', 'Signs of Surrender', '投降的征兆'), L('戦意が低く、国土も奪われ続け、' + c.name + 'は降伏を考え始めた。', 'With morale low and land slipping away, ' + c.name + ' has begun to consider surrender.', '士气低落，国土不断被夺，' + c.name + '开始考虑投降。'), L('警告', 'Warning', '警告')); tl(g, L(c.name + 'が降伏を考え始めた。', c.name + ' began to consider surrender.', c.name + '开始考虑投降。'), L('戦意20未満・国土35%未満。この状態が約12週続くと降伏する', 'Morale under 20, land under 35%. 12 weeks of this means surrender', '士气低于20、国土不足35%。此状态持续约12周就会投降'), 'bad'); }
+        if (c.surT === 0 && !(g.t - (c.surAlertT == null ? -1e9 : c.surAlertT) < 12)) { c.surAlertT = g.t; alertMeta = { mk: 'surrender', who: c.id }; alertModal(g, L('降伏の兆し', 'Signs of Surrender', '投降的征兆'), L('戦意が低く、国土も奪われ続け、' + c.name + 'は降伏を考え始めた。', 'With morale low and land slipping away, ' + c.name + ' has begun to consider surrender.', '士气低落，国土不断被夺，' + c.name + '开始考虑投降。'), L('警告', 'Warning', '警告')); tl(g, L(c.name + 'が降伏を考え始めた。', c.name + ' began to consider surrender.', c.name + '开始考虑投降。'), L('戦意20未満・国土35%未満。この状態が約12週続くと降伏する', 'Morale under 20, land under 35%. 12 weeks of this means surrender', '士气低于20、国土不足35%。此状态持续约12周就会投降'), 'bad'); }
         c.surT += dt; if (c.surT >= CFG.surrHold) { g.endKind = 'surrender'; return endGame(g, 'collapse', L(c.name + 'は戦う意思を失い、降伏した。' + g.c[other(c.id)].name + 'の勝利で戦争は終結した。', c.name + ' lost the will to fight and surrendered. The war ends in victory for ' + g.c[other(c.id)].name + '.', c.name + '失去了战斗意志，宣布投降。战争以' + g.c[other(c.id)].name + '的胜利告终。'), c.id); } }
       else c.surT = 0;
     }
     if (A.morale < CFG.peaceLine && B.morale < CFG.peaceLine) {
-      if (g.peaceT === 0 && !(g.t - (g.peaceAlertT == null ? -1e9 : g.peaceAlertT) < 12)) { g.peaceAlertT = g.t; alertModal(g, L('講和の動き', 'Peace Talks', '和谈的动向'), L('両国の戦意が尽きて、上層部が講和に乗り出そうとしている。', 'Both sides are exhausted; their leaders are moving toward peace.', '两国士气耗尽，高层正着手和谈。'), L('警告', 'Warning', '警告')); tl(g, L('両国の上層部が講和に動き始めた。', 'Both leaderships began moving toward peace.', '两国高层开始推动和谈。'), L('両国の戦意25未満。この状態が約6週続くと講和が成立する', 'Both morale under 25. 6 weeks of this means peace', '两国士气均低于25。此状态持续约6周就会达成和谈'), 'bad'); }
+      if (g.peaceT === 0 && !(g.t - (g.peaceAlertT == null ? -1e9 : g.peaceAlertT) < 12)) { g.peaceAlertT = g.t; alertMeta = { mk: 'peace' }; alertModal(g, L('講和の動き', 'Peace Talks', '和谈的动向'), L('両国の戦意が尽きて、上層部が講和に乗り出そうとしている。', 'Both sides are exhausted; their leaders are moving toward peace.', '两国士气耗尽，高层正着手和谈。'), L('警告', 'Warning', '警告')); tl(g, L('両国の上層部が講和に動き始めた。', 'Both leaderships began moving toward peace.', '两国高层开始推动和谈。'), L('両国の戦意25未満。この状態が約6週続くと講和が成立する', 'Both morale under 25. 6 weeks of this means peace', '两国士气均低于25。此状态持续约6周就会达成和谈'), 'bad'); }
       g.peaceT += dt;
       if (g.peaceT >= CFG.peaceHold) return endGame(g, 'peace', L('両国の戦意が尽き、講和が成立した。', 'Both sides ran out of will to fight. Peace was signed.', '两国士气耗尽，达成了和谈。'));
     } else g.peaceT = 0;
-    if (g.t >= CFG.cap - CFG.capWarn && !g.capWarned) { g.capWarned = true; alertModal(g, L('強制講和の予告', 'Imposed Peace Ahead', '强制停战的预告'), L('12週後に国際機関が乗り出し、戦争は強制的に講和となる。', 'In 12 weeks, international bodies will step in and impose peace.', '12周后国际机构将介入，战争将被强制停战。'), L('予告', 'Notice', '预告')); }
+    if (g.t >= CFG.cap - CFG.capWarn && !g.capWarned) { g.capWarned = true; alertMeta = { mk: 'cap' }; alertModal(g, L('強制講和の予告', 'Imposed Peace Ahead', '强制停战的预告'), L('12週後に国際機関が乗り出し、戦争は強制的に講和となる。', 'In 12 weeks, international bodies will step in and impose peace.', '12周后国际机构将介入，战争将被强制停战。'), L('予告', 'Notice', '预告')); }
     if (g.alertQ && g.alertQ.length && !g.modal) { g.modal = g.alertQ.shift(); g.paused = true; }
     if (g.t >= CFG.cap) return endGame(g, 'cap', L('3年目12月、国際社会の圧力により強制的に講和が結ばれた。', 'Y3 December: under international pressure, peace was imposed.', '第3年12月，在国际社会的压力下，两国被强制停战。'));
     // events
