@@ -6,12 +6,18 @@
   const $ = id => document.getElementById(id);
   const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]));
   const stage = $('stage');
+  let SW = 1376, SH0 = 768, BT = { s: 1, ox: 0, oy: 0, top: 75 };
   let g = null, started = false, act = null, scale = 1, rotDismissed = false, mode = 'home', curSc = 's1';
 
   // ---------- settings (kept in this browser only) ----------
-  const SET = { lang: 'ja', fx: true, reduce: false, autoFull: true };
+  const SET = { lang: 'ja', fx: true, reduce: false, autoFull: true, sound: true };
   try { Object.assign(SET, JSON.parse(localStorage.getItem('bs_settings') || '{}')); } catch (e) { /* storage unavailable */ }
   function saveSet() { try { localStorage.setItem('bs_settings', JSON.stringify(SET)); } catch (e) { /* ignore */ } }
+  // sound effects (se.js). Buttons with their own sound are listed here; every other button clicks
+  const SFX = (k, ...a) => { if (window.BSSE) { window.BSSE.enabled = SET.sound; window.BSSE.play(k, ...a); } };
+  const OWN_SOUND = '[data-tog],[data-food="add"],[data-do="sell"],[data-op],[data-scn],[data-open],[data-do="close"],[data-do="home"],[data-do="retreat"],#tut';
+  document.addEventListener('click', e => { const b = e.target.closest('button'); if (!b || b.disabled || b.closest(OWN_SOUND)) return; SFX('click'); }, true);
+  document.addEventListener('mouseover', e => { const b = e.target.closest('button, .slot, input[type=range]'); if (!b || b.disabled || (e.relatedTarget && b.contains(e.relatedTarget))) return; SFX('hover'); });
   const RM = () => SET.reduce || (window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
 
   // ---------- static texts ----------
@@ -64,8 +70,14 @@
   // ---------- fit to screen ----------
   function fit() {
     const vv = window.visualViewport, vw = vv ? vv.width : window.innerWidth, vh = vv ? vv.height : window.innerHeight;
-    stage.className = 'full'; // the operations table is one fixed 16:9 layout, scaled to the window
-    const W = 1376, H = 768;
+    // PC: the 16:9 operations table. Phones (landscape) and small windows: a wider, shorter layout with the table zoomed to the map
+    const compact = vh < 560 || vw < 1000;
+    stage.className = compact ? 'compact' : 'full';
+    const W = compact ? 1000 : 1376, H = compact ? 470 : 768;
+    SW = W; SH0 = H;
+    // where the 1376 x 768 table sits on the stage: full = as is; compact = scaled so the parchment fills the space between the bars
+    if (compact) { const s = W / DW, top = 40, tray = 72, pc = (143 + 600) / 2; BT = { s, ox: 0, oy: (top + (H - tray)) / 2 - pc * s, top }; }
+    else BT = { s: 1, ox: 0, oy: 0, top: 75 };
     scale = Math.min(vw / W, vh / H);
     stage.style.transform = 'scale(' + scale + ')';
     stage.style.left = Math.max(0, (vw - W * scale) / 2) + 'px';
@@ -297,6 +309,7 @@
       if (S.terrOf(S.shareOf(g, id)) < S.CFG.defeatAlert) crit.push({ k: id + 'def', cls: 'bad', t: L(c.name + ' 敗北の危機: これ以上押し込まれると敗北', c.name + ' on the brink: one more push means defeat', c.name + ' 败北的危机: 再被推进就会战败') });
       if (c.surT > 0) crit.push({ k: id + 'sur', cls: 'bad', t: L(c.name + ' 降伏を検討中 あと' + wk(S.CFG.surrHold - c.surT) + '週', c.name + ' considering surrender, ' + wk(S.CFG.surrHold - c.surT) + ' wk', c.name + ' 正在考虑投降 还剩' + wk(S.CFG.surrHold - c.surT) + '周') });
     }
+    if (g.t >= S.CFG.cap - S.CFG.capWarn && g.t < S.CFG.cap) crit.push({ k: 'cap', cls: 'bad', t: L('強制講和まで あと' + wk(S.CFG.cap - g.t) + '週', 'Imposed peace, ' + wk(S.CFG.cap - g.t) + ' wk', '强制停战 还剩' + wk(S.CFG.cap - g.t) + '周') });
     if (g.peaceT > 0) crit.push({ k: 'peace', cls: 'bad', t: L('講和の動き 成立まで あと' + wk(S.CFG.peaceHold - g.peaceT) + '週', 'Peace talks: ' + wk(S.CFG.peaceHold - g.peaceT) + ' wk to a deal', '和谈动向 距离达成 还剩' + wk(S.CFG.peaceHold - g.peaceT) + '周') });
     list.unshift(...crit);
     const keys = new Set(list.map(x => x.k));
@@ -352,8 +365,9 @@
     const cv = $('fx');
     FX.W = 1000; FX.H = 500; // flat map space; PJ() puts it on the parchment
     const k = Math.min(2.5, (window.devicePixelRatio || 1) * scale);
-    cv.width = Math.max(1, Math.round(DW * k)); cv.height = Math.max(1, Math.round(DH * k));
-    cv.style.width = DW + 'px'; cv.style.height = DH + 'px';
+    cv.width = Math.max(1, Math.round(SW * k)); cv.height = Math.max(1, Math.round(SH0 * k));
+    cv.style.width = SW + 'px'; cv.style.height = SH0 + 'px';
+    if (BOARD.map) boardPlace();
     FX.cv = cv; FX.ctx = cv.getContext('2d'); FX.k = k;
     BOARD.share = -1; // rebuild the cached table at the new resolution
   }
@@ -368,6 +382,8 @@
   // The engine's territory share is never changed here. The map data only decides where the line is drawn:
   // the front is the contour of a precomputed field (phi) that encloses exactly the share's fraction of the map.
   const DW = 1376, DH = 768;
+  // table -> map-layer coordinates (the map layer starts below the header)
+  const TM = (x, y) => [BT.ox + x * BT.s, BT.oy + y * BT.s - BT.top];
   const BOARD = { map: null, img: null, flame: null, lmask: null, P: null, phi: null, sorted: null, gw: 0, gh: 0, tau: 0.5, share: -1, cache: null, tint: null, rowU: [], line: [], rTop: 1 };
   function homog(q) { // unit square -> quad (TL, TR, BR, BL), projective
     const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
@@ -389,14 +405,21 @@
     BOARD.phi = Float32Array.from(u16, x => x / 65535); BOARD.sorted = Float32Array.from(BOARD.phi).sort();
     BOARD.rTop = (BOARD.P(1, 0)[0] - BOARD.P(0, 0)[0]) / (BOARD.P(1, 1)[0] - BOARD.P(0, 1)[0]);
     // capitals: flat positions for the convoys, and the labels on the paper (the map area starts 75px down)
-    for (const id of ['A', 'B']) { const [cu, cv] = m.caps[id]; CAPS[id] = { x: cu, y: cv }; const [sx, sy] = BOARD.P(cu, cv), el = $('cap' + id); if (el) { el.style.left = sx + 'px'; el.style.top = (sy - 75) + 'px'; } }
-    const pp = $('paper'), tl = BOARD.P(0, 0), bl = BOARD.P(0, 1), br = BOARD.P(1, 1);
-    if (pp) Object.assign(pp.style, { left: bl[0] + 'px', top: (tl[1] - 75) + 'px', width: (br[0] - bl[0]) + 'px', height: (br[1] - tl[1]) + 'px' });
+    for (const id of ['A', 'B']) { const [cu, cv] = m.caps[id]; CAPS[id] = { x: cu, y: cv }; }
+    boardPlace();
     const [img, fl, lm] = await Promise.all([loadImg(m.img), loadImg(m.lantern.flame), loadImg(m.lantern.mask)]);
     if (BOARD.map !== m) return;
     BOARD.img = img; BOARD.flame = fl; BOARD.lmask = lm; BOARD.share = -1; DESK.flameSrc = null;
     if (g) boardShare(S.territory(g, 'A'));
   }
+  function boardPlace() { // DOM pieces that sit on the paper: capital labels, the area the tutorial points at
+    const m = BOARD.map; if (!m) return;
+    for (const id of ['A', 'B']) { const [cu, cv] = m.caps[id], [x, y] = TM(...BOARD.P(cu, cv)), el = $('cap' + id); if (el) { el.style.left = x + 'px'; el.style.top = y + 'px'; } }
+    const pp = $('paper'), tl = TM(...BOARD.P(0, 0)), bl = TM(...BOARD.P(0, 1)), br = TM(...BOARD.P(1, 1));
+    if (pp) Object.assign(pp.style, { left: bl[0] + 'px', top: tl[1] + 'px', width: (br[0] - bl[0]) + 'px', height: (br[1] - tl[1]) + 'px' });
+    pillPlace();
+  }
+  function pillPlace() { const ln = BOARD.line, end = ln[ln.length - 1]; if (!end) return; const [x, y] = TM(end[0], end[1]), pl = $('pill'); pl.style.left = x + 'px'; pl.style.top = (y - 2) + 'px'; }
   const phiAt = (u, v) => { // bilinear sample of the field at (u, v) in [0, 1]
     const gw = BOARD.gw, gh = BOARD.gh, x = Math.max(0, Math.min(gw - 1.001, u * gw - 0.5)), y = Math.max(0, Math.min(gh - 1.001, v * gh - 0.5));
     const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, p = BOARD.phi, a = p[j * gw + i], b = p[j * gw + i + 1], c = p[(j + 1) * gw + i], d = p[(j + 1) * gw + i + 1];
@@ -461,7 +484,7 @@
     }
     tc.putImageData(im, 0, 0);
     // cache: desk + tint + front line, redrawn only when the share moves
-    const k = FX.k || 1;
+    const k = (FX.k || 1) * BT.s;
     if (!BOARD.cache) BOARD.cache = document.createElement('canvas');
     const cc = BOARD.cache; if (cc.width !== Math.round(DW * k)) { cc.width = Math.round(DW * k); cc.height = Math.round(DH * k); }
     const c = cc.getContext('2d'); c.setTransform(k, 0, 0, k, 0, 0); c.globalCompositeOperation = 'source-over'; c.globalAlpha = 1;
@@ -469,7 +492,7 @@
     c.globalCompositeOperation = 'multiply'; c.imageSmoothingQuality = 'high'; c.drawImage(BOARD.tint, bx, by, TW * HS, TH * HS);
     c.globalCompositeOperation = 'source-over'; c.lineJoin = 'round'; c.lineCap = 'round';
     const ln = BOARD.line;
-    const top = ln[0]; if (top) { const pl = $('pill'); pl.style.left = top[0] + 'px'; pl.style.top = (top[1] - 75 - 6) + 'px'; } // the label rides on the top of the line
+    pillPlace(); // the label sits at the bottom end of the line
   }
   // fixed formation slots: row = position along the front, col = distance behind it
   function slotPos(side, slot, kind) {
@@ -600,8 +623,9 @@
     if (!FX.ctx || !g) return;
     FX.clock += dt;
     const ctx = FX.ctx, s = 1, live = started && !g.paused && !g.over, rm = RM();
-    ctx.setTransform(FX.k, 0, 0, FX.k, 0, 0);
-    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.setTransform(1, 0, 0, 1, 0, 0); ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = 1;
+    ctx.fillStyle = '#0b0907'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+    ctx.setTransform(FX.k * BT.s, 0, 0, FX.k * BT.s, FX.k * BT.ox, FX.k * BT.oy); // everything below is drawn in table coordinates
     if (BOARD.share < 0) boardShare(S.territory(g, 'A'));
     if (BOARD.cache && BOARD.share >= 0) { ctx.drawImage(BOARD.cache, 0, 0, DW, DH); drawFront(ctx, rm, dt); } else { ctx.fillStyle = '#0b0907'; ctx.fillRect(0, 0, DW, DH); }
     if (live) { detectArrivals('A'); detectArrivals('B'); detectPush(); }
@@ -692,11 +716,17 @@
     if (DESK.blurOK == null) DESK.blurOK = blurWorks();
     // --- a passing shadow every 20-60 s (off with reduced motion) ---
     if (!rm && DESK.blurOK) {
-      if (!DESK.pass && t >= DESK.nextAt) { DESK.pass = { t0: t, dur: 1.1 + Math.random() * 0.5, dir: Math.random() < 0.5 ? 1 : -1, str: 0.85 + Math.random() * 0.2 }; DESK.nextAt = t + 20 + Math.random() * 40; }
+      if (!DESK.pass && t >= DESK.nextAt) {
+        // footsteps come first: five steps 0.42 s apart, the loudest (third) one as the shadow crosses the middle of the desk
+        const dur = 1.1 + Math.random() * 0.5, dir = Math.random() < 0.5 ? 1 : -1, gap = 0.42;
+        DESK.pass = { t0: t + 2 * gap - dur / 2, dur, dir, str: 0.85 + Math.random() * 0.2 }; DESK.nextAt = t + 20 + Math.random() * 40;
+        if (mode === 'game' || mode === 'tut') SFX('steps', dir, gap);
+      }
       const ps = DESK.pass;
       if (ps) {
         const p = window.__shadowP != null ? window.__shadowP : (t - ps.t0) / ps.dur;
         if (p >= 1) DESK.pass = null;
+        else if (p < 0) { /* the steps are still approaching */ }
         else {
           const sc = SH.SC, OW = Math.ceil(DW / sc), OH = Math.ceil(DH / sc), edge = m.deskEdge;
           if (!DESK.lA) { DESK.lA = mkCv(OW, OH); DESK.lB = mkCv(OW, OH); DESK.lS = mkCv(OW, OH); DESK.full = mkCv(DW, DH); }
@@ -738,7 +768,7 @@
     if (fl < 0) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(' + (255 + fl * 12 | 0) + ',' + (255 + fl * 16 | 0) + ',' + (255 + fl * 22 | 0) + ')'; ctx.fillRect(0, 0, DW, DH); }
     ctx.restore();
   }
-  window.BSDesk = { pass() { DESK.pass = { t0: DESK.t, dur: 1.3, dir: 1, str: 1 }; }, get info() { return { blurOK: DESK.blurOK, pass: !!DESK.pass, t: DESK.t, map: !!BOARD.map, img: !!BOARD.img }; } }; // for checking by hand
+  window.BSDesk = { pass() { DESK.nextAt = DESK.t; }, get info() { return { blurOK: DESK.blurOK, pass: !!DESK.pass, t: DESK.t, map: !!BOARD.map, img: !!BOARD.img }; } }; // for checking by hand
 
   // ---------- tooltip ----------
   let tipTimer = null;
@@ -763,12 +793,13 @@
 
   // ---------- action dossiers ----------
   function openAct(kind, cid) {
+    SFX('page');
     if (!started || g.over || g.modal) return;
     const first = ['equip', 'merc', 'food'].find(k => g.inv[k] > 0);
     act = { kind, cid, item: first || (act && act.item) || 'equip', m: 1, msg: '', ok: true, log: [], blocked: false };
     g.paused = true; render(); renderAct(true);
   }
-  function closeAct() { if (!act) return; act = null; hideModal(); g.paused = false; render(); }
+  function closeAct() { if (!act) return; SFX('page'); act = null; hideModal(); g.paused = false; render(); }
   function flagsOf(c) {
     const fl = [], s = S.shareOf(g, c.id);
     if (c.susp <= -40) fl.push(['good', L('厚い信頼', 'Strong trust', '深厚信任')]); else if (c.susp <= -15) fl.push(['good', L('信頼', 'Trust', '信任')]); else if (c.funds >= S.CFG.richLine) fl.push(['good', L('資金潤沢', 'Rich', '资金充裕')]);
@@ -883,12 +914,14 @@
 
   // ---------- engine modals ----------
   function eventModal(m) {
+    SFX('news');
     showModal(`<div class="stamp">${esc(m.stamp || (m.pre ? L('事前情報 / 国内未発表', 'Advance intel / not yet public', '事前情报 / 国内尚未公开') : L('速報', 'Breaking', '快讯')))} ${S.dateOf(g.t)}</div><h2>${esc(m.title)}</h2><p>${esc(m.text)}</p>
       <div class="foot"><button class="btn primary" id="mGo">${L('確認して再開', 'OK, resume', '确认并继续')}</button></div>`);
     $('mGo').onclick = () => { hideModal(); g.modal = null; g.paused = false; render(); };
     $('mGo').focus();
   }
   function orderModal(m) {
+    SFX('news');
     const c = g.c[m.cid], it = I[m.item];
     showModal(`<div class="stamp">${L('緊急発注', 'Rush order', '紧急订单')} / ${S.dateOf(g.t)}</div><h2>${L(c.name + 'から至急の依頼', 'Urgent request from ' + c.name, c.name + '的紧急请求')}</h2>
       <p>${esc(L(c.name + 'が' + it.name + '(' + it.sub + ')を' + m.qty + 'セット、' + m.weeks + '週以内に求めています。価格は定価の' + m.mult.toFixed(2) + '倍です(現在の相場は約' + m.fair.toFixed(2) + '倍)。', c.name + ' needs ' + m.qty + ' sets of ' + it.name + ' (' + it.sub + ') within ' + m.weeks + ' weeks at x' + m.mult.toFixed(2) + ' list (market is about x' + m.fair.toFixed(2) + ').', c.name + '希望在' + m.weeks + '周内获得' + m.qty + '套' + it.name + '(' + it.sub + ')。价格为标价的' + m.mult.toFixed(2) + '倍(当前行情价约为' + m.fair.toFixed(2) + '倍)。'))}</p>
@@ -1041,6 +1074,7 @@
   }
   // end of a war: the screen dims in the ending's colour, then the report appears
   function endSequence() {
+    SFX('end');
     const r = g.result, f = $('fade'), red = r.type === 'collapse', green = r.type === 'peace' || r.type === 'cap';
     f.className = 'on' + (red ? ' endA' : green ? ' endG' : '');
     $('fadeT').textContent = endLabel(r); $('fadeS').textContent = S.dateOf(r.t);
@@ -1077,6 +1111,7 @@
     const rows = [
       ['fx', L('危機の演出', 'Crisis effects', '危机演出'), L('降伏・陥落・講和が近い時に、画面の縁を赤や緑に点滅させる', 'Flash the screen edges red or green when defeat or peace is near', '投降、沦陷、和谈临近时，让画面边缘闪烁红色或绿色')],
       ['reduce', L('動きを減らす', 'Reduce motion', '减少动态效果'), L('光点のゆらぎや点滅を抑える', 'Calm marker wobble and flashing', '抑制光点的晃动与闪烁')],
+      ['sound', L('効果音', 'Sound effects', '音效'), L('操作や出来事に効果音を付ける', 'Play sounds for actions and events', '为操作和事件播放音效')],
       ['autoFull', L('スマホで自動的に全画面', 'Auto full screen on phones', '手机上自动全屏'), L('戦争を始めた時や画面に触れた時に全画面にする', 'Go full screen when a war starts or the screen is touched', '开始战争或触碰画面时切换为全屏')],
     ];
     homePop(`<div class="hpanel small"><h2>${L('設定', 'Settings', '设置')}</h2>
@@ -1104,7 +1139,7 @@
   $('hTut').onclick = homeTutorials;
   $('hpop').addEventListener('click', e => {
     if (e.target === $('hpop') || e.target.closest('[data-hclose]')) { $('hpop').hidden = true; return; }
-    const sc = e.target.closest('[data-scn]'); if (sc) { startGame(sc.dataset.scn); return; }
+    const sc = e.target.closest('[data-scn]'); if (sc) { SFX('start'); startGame(sc.dataset.scn); return; }
     const tu = e.target.closest('[data-tut]'); if (tu) { startTutorial(+tu.dataset.tut); return; }
     const st = e.target.closest('[data-set]'); if (st) { const k = st.dataset.set; SET[k] = !SET[k]; saveSet(); homeSettings(); return; }
     const lg = e.target.closest('[data-lang]'); if (lg) { SET.lang = lg.dataset.lang; saveSet(); S.setLang(SET.lang); applyStatic(); homeLang(); return; }
@@ -1116,22 +1151,22 @@
     const mo = e.target.closest('[data-more]'); if (mo) { $('c' + mo.dataset.more).classList.toggle('open'); return; }
     if (mode !== 'game' && mode !== 'tut') return;
     const op = e.target.closest('[data-open]'); if (op) { openAct(op.dataset.open, op.dataset.c); return; }
-    const fq = e.target.closest('[data-food]'); if (fq) { if (fq.dataset.food === 'add') g.foodQueue = Math.min(10, g.foodQueue + 1); else g.foodQueue = Math.max(0, g.foodQueue - 1); render(); return; }
-    const tog = e.target.closest('[data-tog]'); if (tog) { const k = tog.dataset.tog; g.prodOn[k] = !g.prodOn[k]; render(); return; }
+    const fq = e.target.closest('[data-food]'); if (fq) { if (fq.dataset.food === 'add') { if (g.foodQueue < 10) SFX('prodOn'); } if (fq.dataset.food === 'add') g.foodQueue = Math.min(10, g.foodQueue + 1); else g.foodQueue = Math.max(0, g.foodQueue - 1); render(); return; }
+    const tog = e.target.closest('[data-tog]'); if (tog) { const k = tog.dataset.tog; g.prodOn[k] = !g.prodOn[k]; SFX(g.prodOn[k] ? 'prodOn' : 'prodOff'); render(); return; }
     if (!act) return;
     const pk = e.target.closest('[data-pick]'); if (pk) { act.item = pk.dataset.pick; renderAct(); return; }
     const q = e.target.closest('[data-qm]'); if (q) { if (+q.dataset.qm !== act.m) act.blocked = false; act.m = +q.dataset.qm; $('mRange').value = act.m; updatePrice(); return; }
     const d = e.target.closest('[data-do]');
     if (d && d.dataset.do === 'close') { closeAct(); return; }
-    if (d && d.dataset.do === 'home') { act = null; hideModal(); showHome(); return; }
-    if (d && d.dataset.do === 'retreat') { act = null; hideModal(); g.paused = false; S.retreat(g); render(); return; }
+    if (d && d.dataset.do === 'home') { SFX('click'); act = null; hideModal(); showHome(); return; }
+    if (d && d.dataset.do === 'retreat') { SFX('click'); act = null; hideModal(); g.paused = false; S.retreat(g); render(); return; }
     if (d && d.dataset.do === 'sell') {
       if (act.blocked) return;
-      const r = S.sell(g, act.cid, act.item, act.m); act.msg = r.text; act.ok = r.ok;
+      const r = S.sell(g, act.cid, act.item, act.m); act.msg = r.text; act.ok = r.ok; SFX(r.ok ? 'sell' : 'refused');
       act.log.push({ ok: r.ok, text: SHORT()[act.item] + ' ' + (act.m === 0 ? L('無償', 'free', '无偿') : '×' + act.m.toFixed(2)) + ' → ' + r.text });
       if (!r.ok && r.tier !== 'none') act.blocked = true;
       render(); renderAct(); return; }
-    const o = e.target.closest('[data-op]'); if (o) { const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); act.msg = r.text; act.ok = r.ok; const nm = o.dataset.op === 'consult' ? (o.dataset.arg === 'pass' ? L('戦争コンサル【消極】', 'Consulting [Cautious]', '战争顾问【消极】') : L('戦争コンサル【積極】', 'Consulting [Aggressive]', '战争顾问【积极】')) : O[o.dataset.op].name; act.log.push({ ok: r.ok, text: nm + ': ' + r.text }); render(); renderAct(); return; }
+    const o = e.target.closest('[data-op]'); if (o) { const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); act.msg = r.text; act.ok = r.ok; SFX(r.ok ? 'covert' : 'refused'); const nm = o.dataset.op === 'consult' ? (o.dataset.arg === 'pass' ? L('戦争コンサル【消極】', 'Consulting [Cautious]', '战争顾问【消极】') : L('戦争コンサル【積極】', 'Consulting [Aggressive]', '战争顾问【积极】')) : O[o.dataset.op].name; act.log.push({ ok: r.ok, text: nm + ': ' + r.text }); render(); renderAct(); return; }
   });
   stage.addEventListener('input', e => { if (act && e.target.id === 'mRange') { if (+e.target.value !== act.m) act.blocked = false; act.m = +e.target.value; updatePrice(); } });
   document.addEventListener('keydown', e => {
@@ -1180,7 +1215,7 @@
       }
       wireKey = ''; render(); fxFrame(0.016);
     },
-    get act() { return act; },
+    get act() { return act; }, sfx: SFX,
     openCard(id, open) { $('c' + id).classList.toggle('open', open); },
     home: showHome, render, get scale() { return scale; }, get lang() { return SET.lang; },
   };

@@ -157,7 +157,7 @@
   }
   const skip = s => (s.wait && s.wait()) || (s.need && !s.need());
   function prevIndex() { let j = i - 1; while (j >= 0 && skip(STEPS[j])) j--; return j >= 0 ? j + 1 : 0; } // 0 = none
-  function next() { if (busy || STEPS[i].wait || STEPS[i].end) return; if (performance.now() - shownAt < 300) return; go(i + 1); }
+  function next() { if (busy || STEPS[i].wait || STEPS[i].end) return; if (performance.now() - shownAt < 300) return; if (window.BSUI && window.BSUI.sfx) window.BSUI.sfx('page'); go(i + 1); }
   function back() { if (busy) return; const p = prevIndex(); if (p) go(p - 1); }
   function tick() {
     if (!on || busy) return;
