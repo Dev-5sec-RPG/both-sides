@@ -103,7 +103,7 @@ window.BSSE = (() => {
     steps(dir = 1, gap = 0.42) {
       const t0 = now() + 0.02, lv = [0.2, 0.48, 1, 0.48, 0.2], pan = [-0.85, -0.45, 0, 0.45, 0.85];
       for (let i = 0; i < 5; i++) {
-        const t = t0 + i * gap + (Math.random() - 0.5) * 0.03, far = 1 - lv[i], L = lv[i] * 0.55;
+        const t = t0 + i * gap + (Math.random() - 0.5) * 0.03, far = 1 - lv[i], L = lv[i] * 0.33;   // kept quiet: an extra, not a feature (0.55 before, -40%)
         const p = ac.createStereoPanner ? ac.createStereoPanner() : null, bus = ac.createGain(), lp = ac.createBiquadFilter();
         lp.type = 'lowpass'; lp.frequency.value = 5200 - far * 3600; bus.connect(lp);
         if (p) { p.pan.value = pan[i] * dir; lp.connect(p); p.connect(master); } else lp.connect(master);

@@ -322,9 +322,11 @@
   }
   let wireKey = '';
   function renderWire() {
-    const key = g.news.length + ':' + (g.news[0] && g.news[0].text);
+    // sale-by-sale records stay out of the feed: selling five sets at once would fill it
+    const feed = g.news.filter(n => n.kind !== 'sold');
+    const key = feed.length + ':' + (feed[0] && feed[0].text);
     if (key === wireKey) return; wireKey = key;
-    $('wire').innerHTML = g.news.slice(0, 6).map(n => `<li class="${n.kind}"><span class="t">${S.dateOf(n.t)}</span><span class="x" title="${esc(n.text)}">${esc(n.text)}</span></li>`).join('');
+    $('wire').innerHTML = feed.slice(0, 6).map(n => `<li class="${n.kind}"><span class="t">${S.dateOf(n.t)}</span><span class="x" title="${esc(n.text)}">${esc(n.text)}</span></li>`).join('');
   }
 
   // ---------- crisis vignette: red = capital/surrender, green = peace/imposed peace ----------
@@ -837,32 +839,69 @@
   function mvClear() { MOVIE.timers.forEach(clearTimeout); MOVIE.timers = []; }
   function mvLater(fn, ms) { MOVIE.timers.push(setTimeout(fn, ms)); }
   function mvVideos(side) { return side === 'A' ? [mvEl('mvA0'), mvEl('mvA1')] : [mvEl('mvB0'), mvEl('mvB1')]; }
+  // a video is "ready" once it sits on its first frame with that frame decoded. Reused videos are
+  // rewound first, otherwise the last frame of the previous showing flashes up before the seek lands
+  function mvReady(v, ms) {
+    return new Promise(res => {
+      let fin = false; const evs = ['seeked', 'loadeddata', 'canplay'];
+      const ok = r => { if (fin) return; fin = true; evs.forEach(e => v.removeEventListener(e, check)); res(r); };
+      const check = () => { if (v.readyState >= 2 && !v.seeking && v.currentTime < 0.05) ok(true); };
+      v.pause(); v.onended = null; evs.forEach(e => v.addEventListener(e, check));
+      setTimeout(() => ok(v.readyState >= 2), ms);
+      if (v.readyState === 0) v.load();
+      if (v.currentTime > 0.01) { try { v.currentTime = 0; } catch (e) { /* not ready yet */ } }
+      check();
+    });
+  }
+  // run fn once the video has actually put a new frame on screen (not merely been told to play)
+  function mvOnFrame(v, fn) {
+    let fin = false; const ok = () => { if (!fin) { fin = true; fn(); } };
+    if (v.requestVideoFrameCallback) v.requestVideoFrameCallback(() => ok());
+    else v.addEventListener('playing', () => setTimeout(ok, 40), { once: true });
+    setTimeout(ok, 400);
+  }
   function playMovie(m, done) {
     const who = m.kind === 'order' ? m.cid : m.who, side = who === 'A' || who === 'B' ? who : (Math.random() < 0.5 ? 'A' : 'B');
     const [intro, loop] = mvVideos(side);
     if (!intro || !loop || intro.error || loop.error) { done(); return; }
-    mvClear(); MOVIE.on = true; MOVIE.side = side; MOVIE.done = done; MOVIE.pages = talkPages(m, side); MOVIE.page = 0; MOVIE.phase = 'intro';
+    mvClear(); MOVIE.on = true; MOVIE.side = side; MOVIE.done = done; MOVIE.pages = talkPages(m, side); MOVIE.page = 0; MOVIE.phase = 'load';
+    MOVIE.serial = (MOVIE.serial || 0) + 1; const serial = MOVIE.serial;
     document.querySelectorAll('#mvStage video').forEach(v => { v.classList.remove('on'); v.pause(); });
     $('mvTalk').hidden = true; $('mvSkip').textContent = L('スキップ ▶▶', 'Skip ▶▶', '跳过 ▶▶'); $('mvStage').getAnimations().forEach(a => a.cancel());
     const black = $('mvBlack'); black.style.transition = 'none'; black.style.opacity = 1; $('movie').hidden = false;
-    let started = false;
-    const go = () => {
-      if (started || !MOVIE.on) return; started = true;
-      try { intro.currentTime = 0; } catch (e) { /* not ready */ }
-      intro.classList.add('on');
-      void black.offsetWidth; black.style.transition = 'opacity .35s linear'; black.style.opacity = 0;
+    // both clips are rewound and decoded while the screen is still black, so the hand-over later has nothing to wait for
+    MOVIE.loopReady = mvReady(loop, 2500);
+    mvReady(intro, 2500).then(ok => {
+      if (!MOVIE.on || serial !== MOVIE.serial) return;
+      if (!ok) { mvEnd(true); return; }
+      MOVIE.phase = 'intro';
+      intro.onended = () => { if (MOVIE.on && serial === MOVIE.serial && MOVIE.phase === 'intro') mvToLoop(); };
       const p = intro.play(); if (p && p.catch) p.catch(() => {});
-      intro.onended = () => { if (MOVIE.on && MOVIE.phase === 'intro') mvToLoop(); };
-    };
-    if (intro.readyState >= 3) go(); else { intro.addEventListener('canplay', go, { once: true }); intro.load(); mvLater(() => { if (!started) { mvEnd(true); } }, 2500); }
+      mvOnFrame(intro, () => {
+        if (!MOVIE.on || serial !== MOVIE.serial) return;
+        intro.classList.add('on');
+        void black.offsetWidth; black.style.transition = 'opacity .35s linear'; black.style.opacity = 0;
+      });
+      // if the clip stalls and never reports its end, move on anyway
+      mvLater(() => { if (MOVIE.on && serial === MOVIE.serial && MOVIE.phase === 'intro') mvToLoop(); }, ((intro.duration || 3.5) + 1.5) * 1000);
+    });
   }
+  // intro -> loop: the intro holds its last frame underneath until the loop is really showing,
+  // then the loop fades in over it (a short cross-fade also hides the small jump between the two clips)
   function mvToLoop() {
-    const [intro, loop] = mvVideos(MOVIE.side);
-    MOVIE.phase = 'talk';
-    try { loop.currentTime = 0; } catch (e) { /* not ready */ }
-    const p = loop.play(); if (p && p.catch) p.catch(() => {});
-    loop.classList.add('on'); intro.classList.remove('on'); intro.pause();
-    mvShowPage();
+    if (MOVIE.phase !== 'intro') return;
+    const [intro, loop] = mvVideos(MOVIE.side), serial = MOVIE.serial;
+    MOVIE.phase = 'switch';
+    MOVIE.loopReady.then(() => {
+      if (!MOVIE.on || serial !== MOVIE.serial) return;
+      const p = loop.play(); if (p && p.catch) p.catch(() => {});
+      mvOnFrame(loop, () => {
+        if (!MOVIE.on || serial !== MOVIE.serial) return;
+        loop.classList.add('on');
+        mvLater(() => { intro.classList.remove('on'); intro.pause(); }, 260);
+        MOVIE.phase = 'talk'; mvShowPage();
+      });
+    });
   }
   function mvShowPage() {
     $('mvWho').textContent = MOVIE.side === 'A' ? L('密偵（' + g.c.A.name + '方面）', 'Scout (' + g.c.A.name + ' desk)', '密探（' + g.c.A.name + '方面）') : L('密偵（' + g.c.B.name + '方面）', 'Scout (' + g.c.B.name + ' desk)', '密探（' + g.c.B.name + '方面）');

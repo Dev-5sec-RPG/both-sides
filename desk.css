@@ -140,6 +140,8 @@
 .mv-stage { position: absolute; inset: 0; transform: scale(1.03); transform-origin: 50% 50%; }
 .mv-stage video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; object-position: 50% 15%; opacity: 0; }
 .mv-stage video.on { opacity: 1; }
+.mv-stage video + video.on { transition: opacity .22s linear; }   /* the loop fades in over the held last frame of the intro */
+.mv-stage video:not(.on) { transition: none; }
 .mv-black { position: absolute; inset: 0; background: #000; opacity: 1; pointer-events: none; transition: opacity .3s linear; }
 .mv-skip { position: absolute; top: 14px; right: 16px; z-index: 2; padding: 7px 14px; border-radius: 4px; border: 1px solid rgba(231, 194, 122, .5); background: rgba(10, 7, 5, .6); color: #e7c27a; font: 600 14px var(--f-body); letter-spacing: .06em; cursor: pointer; }
 .mv-skip:hover { background: rgba(40, 28, 16, .85); }

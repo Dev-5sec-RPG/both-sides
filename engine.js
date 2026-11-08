@@ -393,7 +393,7 @@
     }
     take(g, item); if (item === 'food') g.foodRev += price; g.money += price; g.revenue += price; g.sales++; g.supplied[item]++; c.sold.push({ t: g.t, v: price, k: item }); c.bought[item] += 1; c.lastDeal[item] = { m: mult, t: g.t, tier, label }; // 前回の成約(画面に表示する)
     c.funds -= price; deliver(g, c, item); book(g, c, item, price);
-    news(g, L(c.name + 'が' + it.name + '(' + it.lot + ')を' + fmt(price) + 'で購入: ' + label + sTxt, c.name + ' bought ' + it.name + ' (' + it.lot + ') for ' + fmt(price) + ': ' + label + sTxt, c.name + '以' + fmt(price) + '购买了' + it.name + '(' + it.lot + '):' + label + sTxt), 'sale');
+    news(g, L(c.name + 'が' + it.name + '(' + it.lot + ')を' + fmt(price) + 'で購入: ' + label + sTxt, c.name + ' bought ' + it.name + ' (' + it.lot + ') for ' + fmt(price) + ': ' + label + sTxt, c.name + '以' + fmt(price) + '购买了' + it.name + '(' + it.lot + '):' + label + sTxt), 'sold');
     if (bypass) tl(g, L(c.name + 'は' + bypass + '(' + it.name + ' ×' + mult.toFixed(2) + ')。', c.name + ' ' + bypass + ' (' + it.name + ' x' + mult.toFixed(2) + ').', c.name + bypass + '(' + it.name + ' ×' + mult.toFixed(2) + ')。'), L('大幅な値引きは、断られる状況でも通ることがある', 'A deep discount can pass even when a sale would be refused', '大幅降价有时能在本会被拒绝的情况下成交'), 'act');
     return { ok:true, tier, text: L(c.name + ': ' + label + '。' + fmt(price) + 'の売上' + sTxt + (bypass ? '。' + bypass : ''), c.name + ': ' + label + '. Sold for ' + fmt(price) + sTxt + (bypass ? '. It ' + bypass : ''), c.name + ':' + label + '。销售额' + fmt(price) + sTxt + (bypass ? '。' + bypass : '')) };
   }
@@ -551,7 +551,7 @@
       if (c.funds < price) break;
       take(g, o.item); g.money += price; g.revenue += price; g.sales++; g.supplied[o.item]++; c.sold.push({ t: g.t, v: price, k: o.item, order: true });
       c.funds -= price; deliver(g, c, o.item); c.susp = clamp(c.susp - 2, -100, 100); o.left--;
-      news(g, L(c.name + 'へ緊急発注の' + it.name + 'を' + fmt(price) + 'で納品(残り' + o.left + ')。', 'Delivered rush ' + it.name + ' to ' + c.name + ' for ' + fmt(price) + ' (' + o.left + ' left).', '向' + c.name + '交付紧急订单的' + it.name + '，金额' + fmt(price) + '(剩余' + o.left + ')。'), 'sale');
+      news(g, L(c.name + 'へ緊急発注の' + it.name + 'を' + fmt(price) + 'で納品(残り' + o.left + ')。', 'Delivered rush ' + it.name + ' to ' + c.name + ' for ' + fmt(price) + ' (' + o.left + ' left).', '向' + c.name + '交付紧急订单的' + it.name + '，金额' + fmt(price) + '(剩余' + o.left + ')。'), 'sold');
     }
     if (o.left <= 0) { c.susp = clamp(c.susp - 8, -100, 100); c.morale = clamp(c.morale + 3, 0, 100); news(g, L(c.name + 'の緊急発注をすべて納品した。疑惑度 -8、戦意 +3', 'Rush order for ' + c.name + ' complete. Suspicion -8, morale +3', c.name + '的紧急订单已全部交付。怀疑度 -8，士气 +3'), 'sale'); tl(g, L(c.name + 'の緊急発注を期限内に納品した。', 'Delivered the rush order for ' + c.name + ' on time.', '在期限内交付了' + c.name + '的紧急订单。'), L('必要な時に届けたことで、疑惑度 -8・戦意 +3', 'Help when it mattered: suspicion -8, morale +3', '在需要时送达，怀疑度 -8、士气 +3'), 'act'); g.order = null; return; }
     if (g.t > o.deadline) { c.susp = clamp(c.susp + 10, -100, 100); news(g, L(c.name + 'への緊急発注は期限切れ。約束を破られたと受け取られた。疑惑度 +10', 'The rush order for ' + c.name + ' expired. It feels betrayed. Suspicion +10', c.name + '的紧急订单已过期限，被视为违约。怀疑度 +10'), 'bad'); g.order = null; }
