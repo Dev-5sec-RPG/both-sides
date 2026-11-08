@@ -204,5 +204,7 @@
     else if (e.key === 'ArrowLeft') back();
     else if (e.key === 'Escape') home();
   });
-  window.BSTut = { start, enter, stop, relayout() { if (on && !busy) fill(); } };
+  window.BSTut = { start, enter, stop, relayout() { if (on && !busy) fill(); },
+    // for pad.js: the current step, and advancing it the same way a tap does
+    get on() { return on; }, step() { return on ? STEPS[i] : null; }, next, back, home };
 })();

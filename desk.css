@@ -159,3 +159,27 @@
 .setrow .segs { display: flex; gap: 4px; flex: none; }
 .setrow .segs .btn { padding: 4px 9px; font-size: 12px; min-height: 0; }
 .setrow .segs .btn.sel { border-color: var(--brass2); color: var(--brass2); background: rgba(217, 178, 95, .18); }
+
+/* ---------- controller / keyboard: button glyphs and the selection frame ---------- */
+.kg { display: none; }
+.inp-pad .kg, .inp-kb .kg { display: inline-flex; align-items: center; margin-left: 7px; vertical-align: middle; pointer-events: none; }
+.kg > span, .padhint span.kc, .padhint span.sh, .padhint span.face { display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box;
+  font: 700 10.5px/1 system-ui, "Segoe UI", sans-serif; letter-spacing: 0; color: #f1e4c8; background: rgba(0, 0, 0, .45); border: 1px solid rgba(241, 228, 200, .45); }
+.kg .kc, .padhint .kc { border-radius: 3px; border-bottom-width: 2px; }
+.kg .sh, .padhint .sh { border-radius: 8px 8px 4px 4px; }
+.kg .face, .padhint .face { width: 18px; padding: 0; border-radius: 50%; font-size: 10px; }
+.face.ga { background: #2f6b2a; border-color: #7cc46f; } .face.gb { background: #7a2318; border-color: #e0705e; }
+.face.gx { background: #1f4a7a; border-color: #6aa3e6; } .face.gy { background: #7a6212; border-color: #e8c84c; }
+.face.pc { color: #9cc3ff; } .face.pr { color: #ff8f8f; } .face.ps { color: #f3a6d6; } .face.pt { color: #8fe0b0; }
+.padhint { display: none; }
+.inp-pad .padhint:not(:empty), .inp-kb .padhint:not(:empty) { display: flex; flex-wrap: wrap; gap: 4px 14px; justify-content: center; margin: 4px 0 2px; font-size: 11.5px; color: var(--muted); }
+.padhint > span { display: inline-flex; align-items: center; gap: 3px; }
+.inp-pad .padf { outline: 2px solid #e7c27a !important; outline-offset: 2px; box-shadow: 0 0 0 5px rgba(231, 194, 122, .22) !important; }
+.inp-pad #mRange.padf { outline-offset: 5px; }
+.inp-pad *:focus-visible:not(.padf) { outline: none; }
+.mv-hint .kg { margin-left: 6px; }
+.pmenu { display: flex; flex-direction: column; gap: 8px; margin: 10px 0 4px; }
+.pmenu .btn { width: 100%; }
+.compact .kg { margin-left: 4px; }
+.compact .kg > span { min-width: 15px; height: 15px; font-size: 9px; padding: 0 3px; }
+.compact .kg .face { width: 15px; }

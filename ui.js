@@ -906,8 +906,8 @@
   function mvShowPage() {
     $('mvWho').textContent = MOVIE.side === 'A' ? L('密偵（' + g.c.A.name + '方面）', 'Scout (' + g.c.A.name + ' desk)', '密探（' + g.c.A.name + '方面）') : L('密偵（' + g.c.B.name + '方面）', 'Scout (' + g.c.B.name + ' desk)', '密探（' + g.c.B.name + '方面）');
     $('mvText').textContent = MOVIE.pages[MOVIE.page];
-    const touch = matchMedia('(pointer: coarse)').matches;
-    $('mvHint').textContent = touch ? L('画面タップで次へ', 'Tap to continue', '轻触画面继续') : L('クリックで次へ（Enterキーでも可）', 'Click (or press Enter) to continue', '点击继续（也可按Enter键）');
+    const touch = matchMedia('(pointer: coarse)').matches, inp = window.BSPad ? window.BSPad.mode : 'mouse';
+    $('mvHint').textContent = inp !== 'mouse' ? L('次へ', 'Next', '下一步') : touch ? L('画面タップで次へ', 'Tap to continue', '轻触画面继续') : L('クリックで次へ（Enterキーでも可）', 'Click (or press Enter) to continue', '点击继续（也可按Enter键）');
     $('mvPg').textContent = (MOVIE.page + 1) + ' / ' + MOVIE.pages.length;
     $('mvTalk').hidden = false;
   }
@@ -1017,7 +1017,7 @@
       h = `<div class="stamp">${stampOf(L('販売', 'Sell', '出售'))}</div><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name, '向' + c.name + '推销')}</h2>
         <div class="picks">${picks}</div>
         <div class="priceline"><span class="mult" id="mMult"></span><span class="yen" id="mYen"></span></div>
-        <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="${L('価格倍率', 'Price multiplier', '价格倍率')}">
+        <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="${L('価格倍率', 'Price multiplier', '价格倍率')}"><div class="padhint" id="mPadHint"></div>
         <div class="quick">${[[0, L('無償供与', 'Free', '无偿提供')], [0.3, '×0.3'], [0.5, '×0.5'], [0.8, '×0.8'], [1, '×1.0'], [1.2, '×1.2'], [1.5, '×1.5'], [1.8, '×1.8'], [2, '×2.0']].map(([m, l]) => `<button class="btn" data-qm="${m}">${l}</button>`).join('')}</div>
         <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume', '关闭并继续')}</button><button class="btn primary" data-do="sell" ${has && !act.blocked ? '' : 'disabled'}>${sellLabel(has)}</button></div>
         ${respHTML()}${panel(c, 'sell')}${logHTML()}`;
@@ -1026,6 +1026,11 @@
         <p>${L('今の戦争は精算されず、記録も残りません。', 'This war will not be settled or recorded.', '当前战争不会结算，也不会留下记录。')}</p>
         <div class="foot"><button class="btn" data-do="close">${L('続ける', 'Keep playing', '继续')}</button><button class="btn primary" data-do="home">${L('ホームに戻る', 'Go home', '返回主页')}</button></div>`);
       if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus({ preventScroll: true }); $('mc').scrollTop = 0; }
+      return;
+    } else if (act.kind === 'menu') {
+      // controller / keyboard menu: the header's buttons gathered in one window
+      showModal(`<div class="stamp">${stampOf(L('メニュー', 'Menu', '菜单'))}</div><h2>${L('メニュー', 'Menu', '菜单')}</h2>
+        <div class="pmenu"><button class="btn primary" data-do="close">${L('続ける', 'Keep playing', '继续')}</button><button class="btn" data-pm="retreat">${L('撤退する', 'Withdraw', '撤离')}</button><button class="btn" data-pm="home">${L('ホームに戻る', 'Home', '返回主页')}</button></div>`);
       return;
     } else if (act.kind === 'retreat') {
       showModal(`<div class="stamp">${stampOf(L('撤退', 'Withdraw', '撤离'))}</div><h2>${L('ここで手を引きますか', 'Pull out now?', '要在这里收手吗')}</h2>
@@ -1325,6 +1330,7 @@
     if (mode === 'home' || !g) return;
     const mo = e.target.closest('[data-more]'); if (mo) { $('c' + mo.dataset.more).classList.toggle('open'); return; }
     if (mode !== 'game' && mode !== 'tut') return;
+    const pm = e.target.closest('[data-pm]'); if (pm) { const k = pm.dataset.pm; closeAct(); $(k === 'home' ? 'bHome' : 'bRetreat').click(); return; }
     const op = e.target.closest('[data-open]'); if (op) { openAct(op.dataset.open, op.dataset.c); return; }
     const fq = e.target.closest('[data-food]'); if (fq) { if (fq.dataset.food === 'add') { if (g.foodQueue < 10) SFX('prodOn'); } if (fq.dataset.food === 'add') g.foodQueue = Math.min(10, g.foodQueue + 1); else g.foodQueue = Math.max(0, g.foodQueue - 1); render(); return; }
     const tog = e.target.closest('[data-tog]'); if (tog) { const k = tog.dataset.tog; g.prodOn[k] = !g.prodOn[k]; SFX(g.prodOn[k] ? 'prodOn' : 'prodOff'); render(); return; }
@@ -1369,7 +1375,25 @@
   }
 
   // ---------- API for the tutorial ----------
+  // price steps and item switching for the controller and keyboard (pad.js)
+  function padSetM(v) {
+    if (!act || act.kind !== 'sell') return;
+    v = Math.min(2, Math.max(0, Math.round(v * 20) / 20));
+    if (v !== act.m) { act.blocked = false; SFX('hover'); }
+    act.m = v; const rg = $('mRange'); if (rg) rg.value = v; updatePrice();
+  }
+  function padItem(d) {
+    if (!act || act.kind !== 'sell') return;
+    const ks = Object.keys(I), i = ks.indexOf(act.item);
+    act.item = ks[(i + d + ks.length) % ks.length]; SFX('hover'); renderAct();
+  }
+  function padMenu() {
+    if (mode !== 'game' || !started || !g || g.over || g.modal || act) return false;
+    openAct('menu', null); return true;
+  }
   window.BSUI = {
+    pad: { get mode() { return mode; }, get act() { return act; }, setM: padSetM, item: padItem, menu: padMenu, closeAct,
+      movieOn: () => MOVIE.on, movieNext: mvAdvance, movieSkip },
     get g() { return g; }, stage, L, short, setScales,
     tutorialGame(kind) {
       mode = 'tut'; clearFades(); closeHome(); act = null; hideModal(); setupGame('s1');
