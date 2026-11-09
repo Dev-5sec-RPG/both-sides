@@ -183,3 +183,31 @@
 .compact .kg { margin-left: 4px; }
 .compact .kg > span { min-width: 15px; height: 15px; font-size: 9px; padding: 0 3px; }
 .compact .kg .face { width: 15px; }
+
+/* ---------- the end of a war: title, date, what became of it; then a slow fall to black ---------- */
+#fadeX { margin: 18px auto 0; max-width: 640px; padding: 0 24px; font-family: var(--f-body); font-size: 18px; line-height: 2; letter-spacing: .06em; color: #eadfc4; opacity: 0; transform: translateY(6px); transition: opacity 1.1s ease, transform 1.1s ease; text-shadow: 0 1px 6px rgba(0, 0, 0, .8); }
+#fadeX:empty { display: none; }
+#fadeX.show { opacity: 1; transform: none; }
+#fade::after { content: ""; position: absolute; inset: 0; background: #050607; opacity: 0; transition: opacity 1s ease; pointer-events: none; }
+#fade.outro::after { opacity: 1; }
+#fade .ft { position: relative; z-index: 1; }
+#fade.outro .ft { opacity: 0; transition: opacity .9s ease; }
+#fade.endA .ft b, #fade.endG .ft b { font-size: 40px; }
+.compact #fadeX { font-size: 14px; line-height: 1.8; max-width: 560px; margin-top: 10px; }
+.compact #fade.endA .ft b, .compact #fade.endG .ft b { font-size: 28px; }
+
+/* ---------- result: the score and the deeds/guilt carry the weight ---------- */
+.scorebox { text-align: center; padding: 6px 0 4px; }
+.scorebox .stamp { justify-content: center; }
+.scorebox .big { font-size: 52px; letter-spacing: .02em; }
+.deeds .ledger { padding: 14px 16px; gap: 6px; }
+.deeds .ledger div { font-size: 15.5px; padding: 3px 0; }
+.deeds .ledger .verdict { font-size: 16px; line-height: 1.75; padding-top: 10px; }
+.deeds .coda { color: var(--fg); font-style: normal; font-family: var(--f-disp); text-align: center; letter-spacing: .04em; margin: 16px 0 8px; display: grid; gap: 6px; }
+.deeds .coda .cv { font-size: 17px; line-height: 1.7; color: #e2d4b4; white-space: pre-line; text-wrap: balance; }
+.deeds .coda .cc { font-size: 21px; line-height: 1.6; text-wrap: balance; }
+.compact .scorebox .big { font-size: 36px; }
+.compact .deeds .ledger div { font-size: 12.5px; }
+.compact .deeds .ledger .verdict { font-size: 13px; }
+.compact .deeds .coda .cv { font-size: 13px; } .compact .deeds .coda .cc { font-size: 15px; }
+#fade.endA .ft, #fade.endG .ft, #fade.on:not(.endA):not(.endG) .ft { padding: 34px 48px; background: radial-gradient(ellipse at center, rgba(5, 6, 7, .72) 0%, rgba(5, 6, 7, .45) 55%, rgba(5, 6, 7, 0) 78%); }

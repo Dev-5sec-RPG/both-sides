@@ -777,8 +777,10 @@
   // on = the key events below get a movie (older saved values 'full' / 'important' count as on); none = windows only
   const MOVIE_KEY = new Set(['defeat', 'surrender', 'peace', 'cap', 'order', 'ev10', 'ev2']);
   const MOVIE = { on: false, side: 'A', pages: [], page: 0, phase: '', done: null, timers: [] };
+  const MOVIE_GAP = 18;   // 6 weeks of game time: after a movie, the next notices come as windows only
   function movieWanted(m) {
     if (mode !== 'game' || SET.movie === 'none') return false;
+    if (MOVIE.lastG === g && g.t - MOVIE.lastT < MOVIE_GAP) return false;
     const key = m.kind === 'order' ? 'order' : m.mk;
     if (!key) return false;
     return MOVIE_KEY.has(key);
@@ -868,7 +870,7 @@
     const who = m.kind === 'order' ? m.cid : m.who, side = who === 'A' || who === 'B' ? who : (Math.random() < 0.5 ? 'A' : 'B');
     const [intro, loop] = mvVideos(side);
     if (!intro || !loop || intro.error || loop.error) { done(); return; }
-    mvClear(); MOVIE.on = true; MOVIE.side = side; MOVIE.done = done; MOVIE.key = m.kind === 'order' ? 'order' : m.mk; MOVIE.pages = talkPages(m, side); MOVIE.page = 0; MOVIE.phase = 'load';
+    mvClear(); MOVIE.on = true; MOVIE.side = side; MOVIE.done = done; MOVIE.lastG = g; MOVIE.lastT = g.t; MOVIE.key = m.kind === 'order' ? 'order' : m.mk; MOVIE.pages = talkPages(m, side); MOVIE.page = 0; MOVIE.phase = 'load';
     MOVIE.serial = (MOVIE.serial || 0) + 1; const serial = MOVIE.serial;
     document.querySelectorAll('#mvStage video').forEach(v => { v.classList.remove('on'); v.pause(); });
     $('mvTalk').hidden = true; $('mvSkip').textContent = L('スキップ ▶▶', 'Skip ▶▶', '跳过 ▶▶'); $('mvStage').getAnimations().forEach(a => a.cancel());
@@ -1144,10 +1146,11 @@
       rows += `<div><span>${L('戦争の長さ', 'War length', '战争时长')}</span><b>${L(r.weeks + '週(あなたがいなければ 約' + b.weeks + '週)', r.weeks + ' wk (about ' + b.weeks + ' without you)', r.weeks + '周(若没有你 约' + b.weeks + '周)')}</b></div>
         <div><span>${L('推計死傷者', 'Est. casualties', '估计伤亡')}</span><b>${L(fmt(cas) + '人(あなたがいなければ 約' + fmt(Math.round(b.cas / 100) * 100) + '人)', fmt(cas) + ' (about ' + fmt(Math.round(b.cas / 100) * 100) + ' without you)', fmt(cas) + '人(若没有你 约' + fmt(Math.round(b.cas / 100) * 100) + '人)')}</b></div>`;
       verdict = (dw > 0 ? L('あなたの商売で、戦争は' + dw + '週長引いた。', 'Your trade made the war ' + dw + ' weeks longer. ', '因为你的生意，战争延长了' + dw + '周。') : dw < 0 ? L('あなたの商売で、戦争は' + (-dw) + '週早く終わった。', 'Your trade ended the war ' + (-dw) + ' weeks sooner. ', '因为你的生意，战争提前' + (-dw) + '周结束。') : L('あなたがいてもいなくても、戦争の長さは変わらなかった。', 'With or without you, the war lasted as long. ', '无论有没有你，战争的时长都没有改变。'))
-        + (dc > 0 ? L('死傷者は約' + fmt(dc) + '人増えた。', 'About ' + fmt(dc) + ' more were killed or wounded.', '伤亡增加了约' + fmt(dc) + '人。') : dc < 0 ? L('死傷者は約' + fmt(-dc) + '人少なかった。', 'About ' + fmt(-dc) + ' fewer were killed or wounded.', '伤亡减少了约' + fmt(-dc) + '人。') : '');
+        + '\n' + (dc > 0 ? L('死傷者は約' + fmt(dc) + '人増えた。', 'About ' + fmt(dc) + ' more were killed or wounded.', '伤亡增加了约' + fmt(dc) + '人。') : dc < 0 ? L('死傷者は約' + fmt(-dc) + '人少なかった。', 'About ' + fmt(-dc) + ' fewer were killed or wounded.', '伤亡减少了约' + fmt(-dc) + '人。') : '');
       coda = dc > 0 ? L('その' + fmt(dc) + '人の名は、あなたの帳簿には載らない。', 'Those ' + fmt(dc) + ' names will never appear in your ledger.', '那' + fmt(dc) + '人的名字，不会出现在你的账本上。') : L('利益は帳簿に残り、死者は数字として残る。', 'The profit stays in the ledger; the dead stay as numbers.', '利润留在账本上，死者则化为数字。');
     }
-    return `<div class="stamp">${L('戦果と罪状', 'Deeds and guilt', '战果与罪状')}</div><div class="ledger">${rows}${verdict ? `<div class="verdict">${esc(verdict)}</div>` : ''}</div>${coda ? `<div class="coda">${esc(coda)}</div>` : ''}`;
+    // the verdict (how much longer / how many more) and the closing line sit together, large, under the ledger
+    return `<div class="stamp">${L('戦果と罪状', 'Deeds and guilt', '战果与罪状')}</div><div class="ledger">${rows}</div>${verdict || coda ? `<div class="coda">${verdict ? `<div class="cv">${esc(verdict)}</div>` : ''}${coda ? `<div class="cc">${esc(coda)}</div>` : ''}</div>` : ''}`;
   }
   function chart() {
     const h = g.history; if (h.length < 2) return '';
@@ -1208,7 +1211,10 @@
     BGMST.result = true;
     const r = g.result;
     showModal(`<div class="stamp">${L('終戦報告', 'War report', '停战报告')} / ${endLabel(r)} / ${S.dateOf(r.t)}${L('(' + r.weeks + '週)', ' (' + r.weeks + ' wk)', '(' + r.weeks + '周)')}</div><h2>${esc(r.text)}</h2>
-      <div><div class="stamp">${L('利益(スコア)', 'Profit (score)', '利润(得分)')}</div><div class="big" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad2)'}">${r.profit >= 0 ? '+' : ''}${fmt(r.profit)}</div></div>
+      <div class="scorebox"><div class="stamp">${L('利益(スコア)', 'Profit (score)', '利润(得分)')}</div><div class="big" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad2)'}">${r.profit >= 0 ? '+' : ''}${fmt(r.profit)}</div></div>
+      <div class="deeds">${ledgerHTML(r)}</div>
+      <div class="stamp">${L('振り返り', 'Review', '回顾')}</div>
+      <div class="review">${reviewItems(r)}</div>
       ${finalHTML(r)}
       <div class="stamp">${L('帳簿', 'Ledger', '账本')}</div>
       <div class="res">
@@ -1225,16 +1231,13 @@
         <div><span>${L('取引回数', 'Deals', '交易次数')}</span><b class="num">${r.sales}</b></div>
         <div><span>${L('断られた回数', 'Turned down', '被拒绝次数')}</span><b class="num">${r.stats.noneed + r.stats.refuse + r.stats.nofunds + r.stats.stop + r.stats.nomorale}</b></div>
       </div>
-      ${ledgerHTML(r)}
       <div class="stamp">${L('経緯(何が起きて、どうなったか)', 'Timeline (what happened and why)', '经过(发生了什么，结果如何)')}</div>
       <ul class="tline">${(r.timeline || []).map(e => `<li class="${e.kind}"><span class="d">${S.dateOf(e.t)}</span><span><span class="w">${esc(e.what)}</span>${e.why ? `<span class="y">${esc(e.why)}</span>` : ''}</span></li>`).join('')}</ul>
-      <div class="stamp">${L('振り返り', 'Review', '回顾')}</div>
-      <div class="review">${reviewItems(r)}</div>
       ${chart()}
       <div class="foot"><button class="btn" id="mHome">${L('ホームに戻る', 'Home', '返回主页')}</button><button class="btn primary" id="mGo">${L('同じ戦争をもう一度', 'Same war again', '再打一次同样的战争')}</button></div>`);
     $('mGo').onclick = () => { hideModal(); startGame(curSc); };
     $('mHome').onclick = () => { hideModal(); showHome(); };
-    $('mGo').focus();
+    $('mGo').focus({ preventScroll: true }); $('mc').scrollTop = 0;   // open at the top: the score and the deeds come first
   }
 
   // ---------- game lifecycle ----------
@@ -1267,12 +1270,36 @@
     later(() => { f.className = ''; started = true; g.paused = false; render(); }, out + (rm ? 500 : 2100));
   }
   // end of a war: the screen dims in the ending's colour, then the report appears
+  // what became of the two nations, read on the dark screen before the report
+  function endStory(r) {
+    const Ln = r.loser ? g.c[r.loser].name : '', Wn = r.loser ? g.c[r.loser === 'A' ? 'B' : 'A'].name : '';
+    if (r.type === 'collapse' && g.endKind === 'surrender') return L(Ln + 'は戦意も国土も失い、' + Wn + 'に降伏を宣言した。' + Ln + 'は' + Wn + 'に吸収され、地図から消えた。',
+      Ln + ', its will and its land gone, declared surrender to ' + Wn + '. ' + Ln + ' was absorbed into ' + Wn + ' and vanished from the map.',
+      Ln + '失去了士气与国土，向' + Wn + '宣布投降。' + Ln + '被' + Wn + '吞并，从地图上消失了。');
+    if (r.type === 'collapse') return L(Wn + 'の軍が' + Ln + 'の首都に入った。政府は崩れ落ち、' + Ln + 'という国はその日をもって終わった。',
+      Wn + "'s army marched into " + Ln + "'s capital. The government fell, and " + Ln + ' ended that day.',
+      Wn + '的军队开进了' + Ln + '的首都。政府随之倒台，' + Ln + '这个国家就此终结。');
+    if (r.type === 'peace') return L('両国は疲れ果て、講和の席に着いた。国境は今の戦線で引き直され、勝者のいないまま銃声が止んだ。',
+      'Both nations, exhausted, sat down to make peace. The border was redrawn along the front, and the guns fell silent with no victor.',
+      '两国筋疲力尽，坐上了和谈桌。国境沿着现在的战线重新划定，枪声在没有胜者的情况下停息了。');
+    if (r.type === 'cap') return L('国際機関の監視団が両国に入り、戦闘は強制的に止められた。どちらの言い分も通らないまま、戦争は凍結された。',
+      'International monitors moved into both nations and the fighting was forced to stop. Neither side got its way; the war was frozen.',
+      '国际机构的监察团进入两国，战斗被强制停止。双方的主张都未能实现，战争就此冻结。');
+    return L('あなたは帳簿を閉じ、この戦争から手を引いた。銃声は、まだ止んでいない。', 'You closed the ledger and walked away from this war. The guns have not fallen silent.', '你合上账本，从这场战争中抽身。枪声仍未停息。');
+  }
   function endSequence() {
     SFX('end');
-    const r = g.result, f = $('fade'), red = r.type === 'collapse', green = r.type === 'peace' || r.type === 'cap';
+    const r = g.result, f = $('fade'), x = $('fadeX'), red = r.type === 'collapse', green = r.type === 'peace' || r.type === 'cap';
     f.className = 'on' + (red ? ' endA' : green ? ' endG' : '');
-    $('fadeT').textContent = endLabel(r); $('fadeS').textContent = S.dateOf(r.t);
-    later(() => { resultModal(); f.className = ''; }, RM() ? 400 : 1800);
+    $('fadeT').textContent = endLabel(r);
+    $('fadeS').textContent = S.dateOf(r.t) + L('(開戦から' + r.weeks + '週)', ' (week ' + r.weeks + ' of the war)', '(开战第' + r.weeks + '周)');
+    x.textContent = endStory(r); x.classList.remove('show');
+    let done = false;
+    const finish = () => { if (done) return; done = true; f.onclick = null; f.style.pointerEvents = ''; resultModal(); f.className = ''; x.classList.remove('show'); };
+    later(() => x.classList.add('show'), 1400);                 // the story fades in under the title
+    later(() => f.classList.add('outro'), 7000);                // everything sinks into black
+    later(finish, 8000);                                        // then the report
+    later(() => { f.style.pointerEvents = 'auto'; f.onclick = finish; }, 1500);   // a tap skips ahead
   }
   function showHome() {
     clearFades(); act = null; hideModal(); mode = 'home'; started = false; BGMST.result = false;
@@ -1392,7 +1419,7 @@
     else if (BGMST.result) want = 'bgm4';
     else if (!g || g.over) want = null;
     else if (mode === 'tut') want = 'bgm1';
-    else if (MOVIE.on && MOVIE.omen) want = null;
+    else if (MOVIE.on && MOVIE.omen && !BGMST.s3) want = null;
     else { want = BGMST.s3 ? 'bgm3' : (g.plIdx || 0) >= 1 ? 'bgm2' : 'bgm1'; duck = MOVIE.on; }
     B.want(want, duck);
   }
