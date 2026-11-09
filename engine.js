@@ -68,21 +68,23 @@
 
 
   // 戦争の設定(シナリオ)。Web版は2種
+  // 自国での装備生産(毎週の一定量)。損耗は戦況で変わるが生産量は変わらないので、差し引きは週ごとに増減する
+  const IND_S2 = 14000;   // 約1.4万/週: 何もしない時の損耗の約7割を埋める
   const SCENARIOS = {
     s1: { key:'s1', P0:0.52,
       A: { frontInit:61000, farmCap:143000, taxBase:15000, recruitBase:120, soldiers:130000, morale:60, antiwar:30, funds:5050000, eq:{ all:2700000 }, susp:0, threat:40 },
       B: { frontInit:45000, farmCap:74000, taxBase:8000, recruitBase:140, soldiers:80000,  morale:75, antiwar:20, funds:2550000, eq:{ all:1900000 }, susp:0, threat:60 } },
     s2: { key:'s2', P0:0.5,
-      A: { frontInit:50000, farmCap:90000, taxBase:11000, recruitBase:100, soldiers:100000, morale:65, antiwar:25, funds:3640000, eq:{ all:2700000 }, susp:0, threat:50 },
-      B: { frontInit:58000, farmCap:126000, taxBase:11000, recruitBase:170, soldiers:120000, morale:70, antiwar:20, funds:3360000, eq:{ all:2050000 }, susp:0, threat:50 } },
+      A: { frontInit:50000, farmCap:90000, taxBase:11000, recruitBase:100, soldiers:100000, morale:65, antiwar:25, funds:3640000, eq:{ all:2700000 }, industry:IND_S2, susp:0, threat:50 },
+      B: { frontInit:58000, farmCap:150000, taxBase:11000, recruitBase:170, soldiers:120000, morale:70, antiwar:20, funds:3360000, eq:{ all:2050000 }, susp:0, threat:50 } },
   };
   const SCN_TXT = {
     s1: { ja: { name:'大国と小国', desc:'豊かな大国A国と、貧しいが士気の高い小国B国。', A:'大国: 豊かで兵が多い', B:'小国: 貧しいが戦意が高い' },
           en: { name:'Giant vs. Minnow', desc:'Rich, populous Nation A against poor but spirited Nation B.', A:'Great power: rich, many troops', B:'Small nation: poor, high morale' },
           zh: { name:'大国与小国', desc:'富裕的大国A国，对阵贫穷但士气高昂的小国B国。', A:'大国: 富裕且兵力众多', B:'小国: 贫穷但士气高昂' } },
-    s2: { ja: { name:'工業国と農業国', desc:'装備の多い工業国A国と、兵と食料の多い農業国B国。', A:'工業国: 装備が多く、兵と食料が乏しい', B:'農業国: 兵と食料が豊富で、装備が乏しい' },
-          en: { name:'Industry vs. Farmland', desc:'Well-armed industrial Nation A against populous, well-fed agrarian Nation B.', A:'Industrial: well-armed, short of men and food', B:'Agrarian: many men and food, short of arms' },
-          zh: { name:'工业国与农业国', desc:'装备精良的工业国A国，对阵兵源与粮食充足的农业国B国。', A:'工业国: 装备多，兵员与粮食匮乏', B:'农业国: 兵员与粮食丰富，装备匮乏' } },
+    s2: { ja: { name:'工業国と農業国', desc:'装備を自国で作り続ける工業国A国と、兵と食料の多い農業国B国。', A:'工業国: 装備を自国で作るが、兵と食料が乏しい', B:'農業国: 兵と食料が豊富で、装備が乏しい' },
+          en: { name:'Industry vs. Farmland', desc:'Industrial Nation A, which keeps making its own arms, against populous, well-fed agrarian Nation B.', A:'Industrial: makes its own arms, short of men and food', B:'Agrarian: many men and food, short of arms' },
+          zh: { name:'工业国与农业国', desc:'持续自产装备的工业国A国，对阵兵源与粮食充足的农业国B国。', A:'工业国: 自产装备，兵员与粮食匮乏', B:'农业国: 兵员与粮食丰富，装备匮乏' } },
   };
   const BASE = SCENARIOS.s1;
   // 国の条件のゆらぎ(乱数): 兵・装備 ±15%、資金 ±30%、税収 ±25%、農業 ±15%、戦意 ±10、開戦時の戦線 ±4%
@@ -692,6 +694,8 @@
       c.front -= ls; syncSoldiers(c); totals(c); g.cas[c.id] += ls;
       losses[c.id] = { ls, s };
     }
+    // industry: a fixed amount of new equipment every week, whatever the fighting costs
+    for (const c of [A, B]) if (c.industry) { c.eq.all += c.industry / 3 * dt; totals(c); }
     const vol = g.t < 180 ? 1 : 1 + (g.t - 180) / 60 * 1.5;
     for (const c of [A, B]) {
       const { ls, s } = losses[c.id];
