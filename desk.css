@@ -211,3 +211,37 @@
 .compact .deeds .ledger .verdict { font-size: 13px; }
 .compact .deeds .coda .cv { font-size: 13px; } .compact .deeds .coda .cc { font-size: 15px; }
 #fade.endA .ft, #fade.endG .ft, #fade.on:not(.endA):not(.endG) .ft { padding: 34px 48px; background: radial-gradient(ellipse at center, rgba(5, 6, 7, .72) 0%, rgba(5, 6, 7, .45) 55%, rgba(5, 6, 7, 0) 78%); }
+
+/* ---------- cash in the sell / covert windows ---------- */
+.mc { position: relative; }
+.mhead { display: flex; align-items: flex-end; justify-content: space-between; gap: 16px; }
+.mhead h2 { margin: 0; }
+.mcash { text-align: right; line-height: 1.15; flex: none; }
+.mcash small { display: block; font-size: 11px; color: var(--muted); letter-spacing: .1em; }
+.mcash b { font-size: 19px; font-weight: 700; color: var(--fg); font-variant-numeric: tabular-nums; }
+.cdelta { position: absolute; z-index: 6; font: 700 14px/1 var(--f-num); font-variant-numeric: tabular-nums; pointer-events: none; animation: cdUp 1s ease-out forwards; }
+.cdelta.up { color: #7cc46a; } .cdelta.down { color: var(--bad2); }
+@keyframes cdUp { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(-16px); } }
+.compact .mcash b { font-size: 15px; }
+
+/* ---------- result: count-up, then the rest; NEW RECORD seal ---------- */
+.scorebox { position: relative; }
+.rprev { font-size: 12px; color: var(--muted); margin-top: 2px; font-variant-numeric: tabular-nums; }
+.rrest { display: grid; gap: 11px; }
+.rrest.wait { opacity: 0; visibility: hidden; }
+.rrest.wait.show { visibility: visible; animation: restIn .6s ease forwards; }
+@keyframes restIn { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+.nrec { position: absolute; right: 6%; top: 22px; padding: 5px 10px 6px; border: 3px double #c4483a; border-radius: 5px; color: #d0503f; font: 800 15px/1 var(--f-num); letter-spacing: .16em;
+  transform: rotate(-8deg); background: rgba(196, 72, 58, .07); pointer-events: none; animation: nrecIn .22s ease-out both; }
+@keyframes nrecIn { from { opacity: 0; transform: rotate(-8deg) scale(1.35); } to { opacity: .95; transform: rotate(-8deg) scale(1); } }
+.compact .nrec { font-size: 11px; top: 14px; right: 2%; }
+
+/* ---------- records panel ---------- */
+.hpanel.rec { width: min(680px, 94%); }
+.rtab { width: 100%; border-collapse: collapse; font-size: 13.5px; margin-bottom: 8px; }
+.rtab td { padding: 6px 8px; border-bottom: 1px solid rgba(201, 160, 90, .18); }
+.rtab td.num { text-align: right; font-weight: 700; font-variant-numeric: tabular-nums; }
+.rtab td.pos { color: var(--good); } .rtab td.neg { color: var(--bad2); }
+.rtab td.d { color: var(--muted); font-size: 12px; white-space: nowrap; }
+.rtab td.none, .hpanel.rec p.none { color: var(--muted); }
+.compact .rtab { font-size: 11.5px; } .compact .rtab td { padding: 4px 6px; }

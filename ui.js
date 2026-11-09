@@ -25,7 +25,7 @@
     cal: ['暦', 'Date', '日期'], money: ['所持金', 'Cash', '现金'], profit: ['利益(スコア)', 'Profit (score)', '利润(得分)'],
     retreat: ['撤退', 'Withdraw', '撤离'], home: ['ホームに戻る', 'Home', '返回主页'], capA: ['A国 首都', 'Capital A', 'A国 首都'], capB: ['B国 首都', 'Capital B', 'B国 首都'],
     frontline: ['戦線', 'front', '战线'], stockTitle: ['倉庫(装備・傭兵は自動生産で押すと停止/再開。兵糧は押した回数だけ作る。各12まで)', 'Warehouse (arms and mercs auto-produce; tap to pause. Rations: one per tap. Max 12 each)', '仓库(装备与雇佣兵自动生产，点击可停止/恢复。军粮按点击次数生产。各最多12)'],
-    newsTitle: ['戦況ニュース', 'War news', '战况新闻'], hNew: ['新しい戦争', 'New War', '新的战争'], hTut: ['チュートリアル', 'Tutorial', '教程'], hSet: ['設定', 'Settings', '设置'],
+    newsTitle: ['戦況ニュース', 'War news', '战况新闻'], hNew: ['新しい戦争', 'New War', '新的战争'], hTut: ['チュートリアル', 'Tutorial', '教程'], hRec: ['戦歴', 'Records', '战绩'], hSet: ['設定', 'Settings', '设置'],
     rotate: ['このゲームは横画面向けです。端末を横向きにしてお楽しみください。', 'This game is made for landscape. Please turn your device sideways.', '本游戏适合横屏。请将设备横向放置后游玩。'], rotateOk: ['このまま遊ぶ', 'Play anyway', '直接游玩'],
   };
   const tx = k => L(T[k][0], T[k][1], T[k][2]);
@@ -978,6 +978,16 @@
   });
 
   // ---------- modal plumbing ----------
+  // cash on hand, shown at the top right of the sell / covert windows; a deal shows its amount rising and fading
+  function cashHTML() { return `<div class="mcash"><small>${L('所持金', 'Cash', '现金')}</small><b id="mCash" class="num">${fmt(g.money)}</b></div>`; }
+  function cashDelta(v) {
+    const mc = $('mc'), c = $('mCash'); if (!mc || !c || !v) return;
+    mc.querySelectorAll('.cdelta').forEach(x => x.remove());
+    const d = document.createElement('div'); d.className = 'cdelta ' + (v > 0 ? 'up' : 'down'); d.textContent = (v > 0 ? '+' : '−') + fmt(Math.abs(v));
+    const mr = mc.getBoundingClientRect(), cr = c.getBoundingClientRect(), k = mr.width / mc.offsetWidth || 1;
+    d.style.right = ((mr.right - cr.right) / k) + 'px'; d.style.top = ((cr.bottom - mr.top) / k + mc.scrollTop + 2) + 'px';
+    mc.appendChild(d); setTimeout(() => d.remove(), 1100);
+  }
   function showModal(html, cls) { const m = $('mc'); m.className = 'mc' + (cls ? ' ' + cls : ''); m.innerHTML = html; $('modal').hidden = false; $('tip').hidden = true; m.scrollTop = 0; }
   function hideModal() { $('modal').hidden = true; }
 
@@ -1032,7 +1042,7 @@
           <span class="pe">${esc(info)}</span>${priceTags(c)}</button>`;
       }).join('');
       const has = g.inv[act.item] > 0;
-      h = `<div class="stamp">${stampOf(L('販売', 'Sell', '出售'))}</div><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name, '向' + c.name + '推销')}</h2>
+      h = `<div class="stamp">${stampOf(L('販売', 'Sell', '出售'))}</div><div class="mhead"><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name, '向' + c.name + '推销')}</h2>${cashHTML()}</div>
         <div class="picks">${picks}</div>
         <div class="priceline"><span class="mult" id="mMult"></span><span class="yen" id="mYen"></span></div>
         <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="${L('価格倍率', 'Price multiplier', '价格倍率')}"><div class="padhint" id="mPadHint"></div>
@@ -1076,7 +1086,7 @@
         return `<div class="oprow"><div><div class="on">${esc(name)} <span class="oc num">${fmt(O[k].cost)}</span></div><div class="od">${esc(d)}</div>${note}${why ? `<div class="why">${esc(why)}</div>` : ''}</div>
           <button class="btn" data-op="${k}"${arg ? ` data-arg="${arg}"` : ''} ${why ? 'disabled' : ''}>${L('実行', 'Do it', '执行')}</button></div>`;
       }).join('');
-      h = `<div class="stamp">${stampOf(L('暗躍', 'Covert', '暗中行动'))}</div><h2>${L(cn + 'に対して動く', 'Act on ' + cn, '针对' + cn + '采取行动')}</h2>
+      h = `<div class="stamp">${stampOf(L('暗躍', 'Covert', '暗中行动'))}</div><div class="mhead"><h2>${L(cn + 'に対して動く', 'Act on ' + cn, '针对' + cn + '采取行动')}</h2>${cashHTML()}</div>
         <div class="oplist">${rows}</div>
         <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume', '关闭并继续')}</button></div>
         ${respHTML()}${panel(c, 'ops')}${logHTML()}`;
@@ -1209,9 +1219,10 @@
   const endLabel = r => r.type === 'collapse' ? (g.endKind === 'surrender' ? L('降伏', 'Surrender', '投降') : L('首都陥落', 'Capital fallen', '首都沦陷')) : { peace: L('講和', 'Peace', '和谈'), cap: L('強制講和', 'Imposed peace', '强制停战'), retreat: L('撤退', 'Withdrawal', '撤离') }[r.type];
   function resultModal() {
     BGMST.result = true;
-    const r = g.result;
+    const r = g.result, rec = mode === 'game' ? recordResult(r) : { isNew: false, prev: null };
     showModal(`<div class="stamp">${L('終戦報告', 'War report', '停战报告')} / ${endLabel(r)} / ${S.dateOf(r.t)}${L('(' + r.weeks + '週)', ' (' + r.weeks + ' wk)', '(' + r.weeks + '周)')}</div><h2>${esc(r.text)}</h2>
-      <div class="scorebox"><div class="stamp">${L('利益(スコア)', 'Profit (score)', '利润(得分)')}</div><div class="big" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad2)'}">${r.profit >= 0 ? '+' : ''}${fmt(r.profit)}</div></div>
+      <div class="scorebox"><div class="stamp">${L('利益(スコア)', 'Profit (score)', '利润(得分)')}</div><div class="big" id="rScore" style="color:${r.profit >= 0 ? 'var(--good)' : 'var(--bad2)'}">${r.profit >= 0 ? '+' : ''}${fmt(r.profit)}</div>${rec.prev ? `<div class="rprev">${L('これまでの最高', 'Previous best', '此前最佳')} ${sgn(rec.prev.profit)}</div>` : ''}</div>
+      <div class="rrest" id="rRest">
       <div class="deeds">${ledgerHTML(r)}</div>
       <div class="stamp">${L('振り返り', 'Review', '回顾')}</div>
       <div class="review">${reviewItems(r)}</div>
@@ -1234,10 +1245,66 @@
       <div class="stamp">${L('経緯(何が起きて、どうなったか)', 'Timeline (what happened and why)', '经过(发生了什么，结果如何)')}</div>
       <ul class="tline">${(r.timeline || []).map(e => `<li class="${e.kind}"><span class="d">${S.dateOf(e.t)}</span><span><span class="w">${esc(e.what)}</span>${e.why ? `<span class="y">${esc(e.why)}</span>` : ''}</span></li>`).join('')}</ul>
       ${chart()}
-      <div class="foot"><button class="btn" id="mHome">${L('ホームに戻る', 'Home', '返回主页')}</button><button class="btn primary" id="mGo">${L('同じ戦争をもう一度', 'Same war again', '再打一次同样的战争')}</button></div>`);
+      <div class="foot"><button class="btn" id="mHome">${L('ホームに戻る', 'Home', '返回主页')}</button><button class="btn primary" id="mGo">${L('同じ戦争をもう一度', 'Same war again', '再打一次同样的战争')}</button></div></div>`);
+    scoreCountUp(r, rec);
     $('mGo').onclick = () => { hideModal(); startGame(curSc); };
     $('mHome').onclick = () => { hideModal(); showHome(); };
     $('mGo').focus({ preventScroll: true }); $('mc').scrollTop = 0;   // open at the top: the score and the deeds come first
+  }
+
+  // ---------- records: the best profit for each war, and the last plays ----------
+  const REC_KEY = 'bs_records';
+  function recLoad() { try { const r = JSON.parse(localStorage.getItem(REC_KEY) || 'null'); if (r && r.best && r.hist) return r; } catch (e) { /* none */ } return { best: {}, hist: [] }; }
+  function recSave(r) { try { localStorage.setItem(REC_KEY, JSON.stringify(r)); } catch (e) { /* storage off */ } }
+  const recKeyOf = r => r.random ? 'random' : (r.scKey || curSc);
+  // returns { isNew, prev } and stores this play
+  function recordResult(r) {
+    if (r._rec) return r._rec;
+    const db = recLoad(), key = recKeyOf(r), prev = db.best[key] || null;
+    const entry = { key, profit: Math.round(r.profit), type: r.type, kind: g.endKind || '', weeks: r.weeks, at: Date.now() };
+    const isNew = !prev || entry.profit > prev.profit;
+    if (isNew) db.best[key] = entry;
+    db.hist.unshift(entry); db.hist = db.hist.slice(0, 30);
+    recSave(db);
+    return (r._rec = { isNew, prev });
+  }
+  const warName = key => key === 'random' ? L('ランダムな戦争', 'Random war', '随机战争') : (S.SCENARIOS[key] ? S.SCENARIOS[key].name : key);
+  const endName = e => e.type === 'collapse' ? (e.kind === 'surrender' ? L('降伏', 'Surrender', '投降') : L('首都陥落', 'Capital fallen', '首都沦陷')) : { peace: L('講和', 'Peace', '和谈'), cap: L('強制講和', 'Imposed peace', '强制停战'), retreat: L('撤退', 'Withdrawal', '撤离') }[e.type] || '';
+  const dayOf = ms => { const d = new Date(ms); return d.getFullYear() + '/' + String(d.getMonth() + 1).padStart(2, '0') + '/' + String(d.getDate()).padStart(2, '0'); };
+  const sgn = v => (v >= 0 ? '+' : '−') + fmt(Math.abs(v));
+  function homeRecords() {
+    const db = recLoad(), keys = Object.keys(S.SCENARIOS).concat(db.best.random ? ['random'] : []);
+    const best = keys.map(k => { const b = db.best[k]; return `<tr><td>${esc(warName(k))}</td>${b ? `<td class="num ${b.profit >= 0 ? 'pos' : 'neg'}">${sgn(b.profit)}</td><td>${endName(b)} / ${b.weeks}${L('週', ' wk', '周')}</td><td class="d">${dayOf(b.at)}</td>` : `<td class="none" colspan="3">${L('記録なし', 'No record yet', '暂无记录')}</td>`}</tr>`; }).join('');
+    const hist = db.hist.slice(0, 10).map(h => `<tr><td class="d">${dayOf(h.at)}</td><td>${esc(warName(h.key))}</td><td class="num ${h.profit >= 0 ? 'pos' : 'neg'}">${sgn(h.profit)}</td><td>${endName(h)} / ${h.weeks}${L('週', ' wk', '周')}</td></tr>`).join('');
+    homePop(`<div class="hpanel rec"><h2>${L('戦歴', 'Records', '战绩')}</h2>
+      <div class="stamp">${L('自己ベスト(戦争ごとの最高利益)', 'Personal best (top profit per war)', '个人最佳(各战争的最高利润)')}</div>
+      <table class="rtab">${best}</table>
+      <div class="stamp">${L('最近の戦争(10件)', 'Recent wars (last 10)', '最近的战争(10场)')}</div>
+      ${hist ? `<table class="rtab">${hist}</table>` : `<p class="none">${L('まだ戦争に関わっていません。', 'No wars yet.', '还没有参与过战争。')}</p>`}
+      <div class="foot"><button class="btn primary" data-hclose>${L('閉じる', 'Close', '关闭')}</button></div></div>`);
+  }
+
+  // the score counts up from zero (ease-out, under 3 s); then the NEW RECORD seal and the rest of the report
+  function scoreCountUp(r, rec) {
+    const el = $('rScore'), rest = $('rRest'); if (!el || !rest) return;
+    const target = Math.round(r.profit), dur = 2600;
+    let done = false, raf = 0, t0 = 0;
+    const show = v => { el.textContent = (v >= 0 ? '+' : '−') + fmt(Math.abs(v)); };
+    const finish = () => {
+      if (done) return; done = true; cancelAnimationFrame(raf); show(target);
+      $('mc').removeEventListener('click', skip, true);
+      if (rec.isNew && target !== 0) {
+        const s = document.createElement('div'); s.className = 'nrec'; s.textContent = 'NEW RECORD';
+        el.parentElement.appendChild(s); SFX('click');
+      }
+      setTimeout(() => { rest.classList.add('show'); }, rec.isNew ? 420 : 120);
+    };
+    const skip = e => { if (!done) { e.stopPropagation(); e.preventDefault(); finish(); } };
+    if (RM() || !target) { finish(); return; }
+    rest.classList.add('wait'); show(0);
+    $('mc').addEventListener('click', skip, true);
+    const step = now => { if (!t0) t0 = now; const k = Math.min(1, (now - t0) / dur), e = 1 - Math.pow(1 - k, 4); show(Math.round(target * e / 1000) * 1000 || 0); if (k < 1) raf = requestAnimationFrame(step); else finish(); };
+    raf = requestAnimationFrame(step);
   }
 
   // ---------- game lifecycle ----------
@@ -1362,6 +1429,7 @@
   }
   function startTutorial(n) { if (!window.BSTut) return; if (touch && SET.autoFull) goFull(); window.BSTut.enter(n); } // the home screen stays until the screen is black
   $('hTut').onclick = homeTutorials;
+  $('hRec').onclick = homeRecords;
   $('hpop').addEventListener('click', e => {
     if (e.target === $('hpop') || e.target.closest('[data-hclose]')) { $('hpop').hidden = true; return; }
     const sc = e.target.closest('[data-scn]'); if (sc) { SFX('start'); startGame(sc.dataset.scn); return; }
@@ -1389,11 +1457,13 @@
     if (d && d.dataset.do === 'retreat') { SFX('click'); act = null; hideModal(); g.paused = false; S.retreat(g); render(); return; }
     if (d && d.dataset.do === 'sell') {
       if (act.blocked) return;
+      const before = g.money;
       const r = S.sell(g, act.cid, act.item, act.m); act.msg = r.text; act.ok = r.ok; SFX(r.ok ? 'sell' : 'refused');
+      const gain = g.money - before;
       act.log.push({ ok: r.ok, text: SHORT()[act.item] + ' ' + (act.m === 0 ? L('無償', 'free', '无偿') : '×' + act.m.toFixed(2)) + ' → ' + r.text });
       if (!r.ok && r.tier !== 'none') act.blocked = true;
-      render(); renderAct(); return; }
-    const o = e.target.closest('[data-op]'); if (o) { const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); act.msg = r.text; act.ok = r.ok; SFX(r.ok ? 'covert' : 'refused'); const nm = o.dataset.op === 'consult' ? (o.dataset.arg === 'pass' ? L('戦争コンサル【消極】', 'Consulting [Cautious]', '战争顾问【消极】') : L('戦争コンサル【積極】', 'Consulting [Aggressive]', '战争顾问【积极】')) : O[o.dataset.op].name; act.log.push({ ok: r.ok, text: nm + ': ' + r.text }); render(); renderAct(); return; }
+      render(); renderAct(); cashDelta(gain); return; }
+    const o = e.target.closest('[data-op]'); if (o) { const before = g.money; const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); setTimeout(() => cashDelta(g.money - before), 0); act.msg = r.text; act.ok = r.ok; SFX(r.ok ? 'covert' : 'refused'); const nm = o.dataset.op === 'consult' ? (o.dataset.arg === 'pass' ? L('戦争コンサル【消極】', 'Consulting [Cautious]', '战争顾问【消极】') : L('戦争コンサル【積極】', 'Consulting [Aggressive]', '战争顾问【积极】')) : O[o.dataset.op].name; act.log.push({ ok: r.ok, text: nm + ': ' + r.text }); render(); renderAct(); return; }
   });
   stage.addEventListener('input', e => { if (act && e.target.id === 'mRange') { if (+e.target.value !== act.m) act.blocked = false; act.m = +e.target.value; updatePrice(); } });
   document.addEventListener('keydown', e => {
