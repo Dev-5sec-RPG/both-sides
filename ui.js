@@ -870,7 +870,8 @@
     const who = m.kind === 'order' ? m.cid : m.who, side = who === 'A' || who === 'B' ? who : (Math.random() < 0.5 ? 'A' : 'B');
     const [intro, loop] = mvVideos(side);
     if (!intro || !loop || intro.error || loop.error) { done(); return; }
-    mvClear(); MOVIE.on = true; MOVIE.side = side; MOVIE.done = done; MOVIE.lastG = g; MOVIE.lastT = g.t; MOVIE.key = m.kind === 'order' ? 'order' : m.mk; MOVIE.pages = talkPages(m, side); MOVIE.page = 0; MOVIE.phase = 'load';
+    mvClear(); MOVIE.on = true; MOVIE.side = side; MOVIE.done = done; MOVIE.lastG = g; MOVIE.lastT = g.t; MOVIE.key = m.kind === 'order' ? 'order' : m.mk; MOVIE.pages = talkPages(m, side); MOVIE.page = 0;
+    MOVIE.vo = SET.voice ? MOVIE.pages.map((_, i) => { const a = new Audio(); a.preload = 'auto'; a.src = voiceSrc(i); try { a.load(); } catch (e) { /* later */ } return a; }) : null; MOVIE.phase = 'load';
     MOVIE.serial = (MOVIE.serial || 0) + 1; const serial = MOVIE.serial;
     document.querySelectorAll('#mvStage video').forEach(v => { v.classList.remove('on'); v.pause(); });
     $('mvTalk').hidden = true; $('mvSkip').textContent = L('スキップ ▶▶', 'Skip ▶▶', '跳过 ▶▶'); $('mvStage').getAnimations().forEach(a => a.cancel());
@@ -916,9 +917,11 @@
   function voicePlay() {
     voiceStop();
     if (!SET.voice || !MOVIE.key) return;
-    const a = new Audio(voiceSrc(MOVIE.page)); a.volume = 0.95; mvVoice = a;
+    // the lines were loaded when the movie began, so the voice starts together with the window
+    const a = (MOVIE.vo && MOVIE.vo[MOVIE.page]) || new Audio(voiceSrc(MOVIE.page));
+    try { a.currentTime = 0; } catch (e) { /* not loaded yet */ }
+    a.volume = 0.95; mvVoice = a;
     const p = a.play(); if (p && p.catch) p.catch(() => {});
-    if (MOVIE.page + 1 < MOVIE.pages.length) { const n = new Audio(); n.preload = 'auto'; n.src = voiceSrc(MOVIE.page + 1); }   // warm up the next line
   }
   function mvShowPage() {
     $('mvWho').textContent = MOVIE.side === 'A' ? L('密偵（' + g.c.A.name + '方面）', 'Scout (' + g.c.A.name + ' desk)', '密探（' + g.c.A.name + '方面）') : L('密偵（' + g.c.B.name + '方面）', 'Scout (' + g.c.B.name + ' desk)', '密探（' + g.c.B.name + '方面）');
@@ -996,7 +999,7 @@
     SFX('page');
     if (!started || g.over || g.modal) return;
     const first = ['equip', 'merc', 'food'].find(k => g.inv[k] > 0);
-    act = { kind, cid, item: first || (act && act.item) || 'equip', m: 1, msg: '', ok: true, log: [], blocked: false };
+    act = { kind, cid, item: first || (act && act.item) || 'equip', m: 1, msg: '', ok: true, log: [], blocked: false, deal: null };
     g.paused = true; render(); renderAct(true);
   }
   function closeAct() { if (!act) return; SFX('page'); act = null; hideModal(); g.paused = false; render(); }
@@ -1026,6 +1029,48 @@
   }
   function logHTML() { return act.log.length ? `<div class="stamp">${L('この停止中の行動', 'Actions this pause', '本次暂停中的行动')}</div><ul class="mlog">${act.log.slice().reverse().map(l => `<li class="${l.ok ? 'ok' : 'ng'}">${esc(l.text)}</li>`).join('')}</ul>` : ''; }
   const respHTML = () => `<div class="resp ${act.ok ? 'ok' : 'ng'}">${esc(act.msg)}</div>`;
+  // 販売の記帳: 1行目に取引内容と印、2行目に相手の反応と疑惑度・戦意などの変化。0.5秒で書き終わる
+  // 印: 成・渋=相手国の色、感・恩・贈=緑、否・欠・止=灰
+  const SEALS = { normal: ['成', 'na'], willing: ['成', 'na'], reluctant: ['渋', 'na'], grateful: ['感', 'gd'], thanks: ['感', 'gd'], debt: ['恩', 'gd'], free: ['贈', 'gd'], refuse: ['否', 'gy'], nofunds: ['欠', 'gy'], stop: ['止', 'gy'], nomorale: ['否', 'gy'], noneed: ['否', 'gy'] };
+  const SEAL_ZH = { '渋': '涩', '贈': '赠' };
+  const dsg = v => (v > 0 ? '+' : v < 0 ? '−' : '±') + Math.abs(v);
+  const mns = v => String(v).replace('-', '−');
+  function dealOf(r, c, item, m, gain, before) {
+    const [ch, col] = SEALS[r.tier] || ['否', 'gy'];
+    const W = /効果は少し薄かった|効果は薄かった|It had a bit less effect|It had little effect|效果略有减弱|效果减弱了/;
+    const segs = r.text.split(/。|\. /).map(x => x.replace(/[.。]+$/, '').trim()).filter(Boolean);
+    const pre = c.name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'); let label = (segs[0] || '').replace(new RegExp('^' + pre + '\\s*[:：]\\s*'), '').split(/[(（]/)[0].trim(), notes = segs.slice(r.ok ? 2 : 1);
+    if (r.tier === 'free') { label = L('無償供与を受け取った', 'Accepted the gift', '接受了无偿援助'); const w = r.text.match(W); notes = w ? [w[0]] : []; }
+    return { fresh: true, ok: r.ok, cid: c.id, date: S.dateOf(g.t), cn: c.name, item: I[item].name + ' ' + I[item].lot, m: m === 0 ? L('無償', 'Free', '无偿') : '×' + m.toFixed(2),
+      amt: r.ok ? fmt(gain) : L('不成立', 'No deal', '未成交'), seal: S.LANG.cur === 'zh' ? (SEAL_ZH[ch] || ch) : ch, col, label, notes,
+      fx: [['s', L('疑惑度', 'Suspicion', '怀疑度'), before.s, Math.round(c.susp)], ['m', L('戦意', 'Morale', '士气'), before.m, Math.round(c.morale)], ['w', L('反戦感情', 'Anti-war', '反战情绪'), before.w, Math.round(c.antiwar)]] };
+  }
+  function dealHTML() {
+    const d = act.deal; if (!d) return respHTML();
+    const fx = d.fx.map(([k, name, a, b]) => {
+      const dv = b - a;
+      if (k === 's') return `<span class="fx ${dv > 0 ? 'bad' : dv < 0 ? 'good' : 'flat'}"><small>${name}</small><b>${dv ? dsg(dv) : L('変化なし', 'No change', '无变化')}</b>${dv ? `<i>${mns(a)} → ${mns(b)}</i>` : ''}</span>`;
+      return dv ? `<span class="fx"><small>${name}</small><b>${dsg(dv)}</b><i>${mns(a)} → ${mns(b)}</i></span>` : '';
+    }).join('');
+    const notes = d.notes.map(n => `<span class="fx note">${esc(n)}</span>`).join('');
+    return `<div class="dl ${d.ok ? 'ok' : 'ng'}${d.fresh ? ' fresh' : ''}">
+      <div class="dl-1"><span class="dt">${esc(d.date)}</span><span class="cn">${esc(d.cn)}</span><span class="it">${esc(d.item)}</span><span class="mu num">${d.m}</span><span class="ldr"></span><span class="am num">${d.amt}</span></div>
+      <div class="dl-2"><span class="rx">${esc(d.label)}</span>${fx}${notes}</div><span class="sl ${d.col}${d.col === 'na' ? ' ' + d.cid : ''}">${d.seal}</span><i class="sweep"></i></div>`;
+  }
+  function animDeal() {
+    const el = $('mc').querySelector('.dl.fresh'); if (!el) return;
+    act.deal.fresh = false;
+    if (RM() || !el.animate) { el.classList.remove('fresh'); return; }
+    const fw = { fill: 'forwards' };
+    el.querySelector('.dl-1').animate([{ clipPath: 'inset(0 100% 0 0)' }, { clipPath: 'inset(0 0 0 0)' }], { duration: 300, easing: 'cubic-bezier(.4,0,.6,1)', ...fw });
+    el.querySelector('.sweep').animate([{ transform: 'scaleX(0)', opacity: 1 }, { transform: 'scaleX(1)', opacity: 1, offset: .7 }, { transform: 'scaleX(1)', opacity: .35 }], { duration: 500, easing: 'ease-out', ...fw });
+    [...el.querySelectorAll('.dl-2 > *')].forEach((x, i) => {
+      x.animate([{ opacity: 0, transform: 'translateY(4px)' }, { opacity: 1, transform: 'none' }], { duration: 180, delay: Math.min(i, 4) * 40, easing: 'ease-out', ...fw });
+      const b = x.querySelector('b'); if (b) b.animate([{ transform: 'scale(1.3)' }, { transform: 'scale(1)' }], { duration: 260, delay: Math.min(i, 4) * 40, easing: 'ease-out', fill: 'backwards' });
+    });
+    el.querySelector('.sl').animate([{ opacity: 0, transform: 'translateY(-50%) scale(1.7) rotate(-8deg)' }, { opacity: 1, transform: 'translateY(-50%) scale(.92) rotate(-3deg)', offset: .7 }, { opacity: 1, transform: 'translateY(-50%) scale(1) rotate(-3deg)' }], { duration: 190, delay: 300, easing: 'ease-in', ...fw });
+    setTimeout(() => el.classList.remove('fresh'), 520);
+  }
   const stampOf = k => k + L(' / 時が止まっています ', ' / Time is stopped ', ' / 时间已停止 ') + S.dateOf(g.t);
   function renderAct(focus) {
     const c = g.c[act.cid], oc = act.cid ? g.c[S.other(act.cid)] : null, sh = SHORT();
@@ -1048,7 +1093,7 @@
         <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="${L('価格倍率', 'Price multiplier', '价格倍率')}"><div class="padhint" id="mPadHint"></div>
         <div class="quick">${[[0, L('無償供与', 'Free', '无偿提供')], [0.3, '×0.3'], [0.5, '×0.5'], [0.8, '×0.8'], [1, '×1.0'], [1.2, '×1.2'], [1.5, '×1.5'], [1.8, '×1.8'], [2, '×2.0']].map(([m, l]) => `<button class="btn" data-qm="${m}">${l}</button>`).join('')}</div>
         <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume', '关闭并继续')}</button><button class="btn primary" data-do="sell" ${has && !act.blocked ? '' : 'disabled'}>${sellLabel(has)}</button></div>
-        ${respHTML()}${panel(c, 'sell')}${logHTML()}`;
+        ${dealHTML()}${panel(c, 'sell')}${logHTML()}`;
     } else if (act.kind === 'home') {
       showModal(`<div class="stamp">${stampOf(L('ホームに戻る', 'Home', '返回主页'))}</div><h2>${L('今の戦争を捨ててホームに戻りますか', 'Abandon this war and go home?', '放弃当前战争并返回主页吗')}</h2>
         <p>${L('今の戦争は精算されず、記録も残りません。', 'This war will not be settled or recorded.', '当前战争不会结算，也不会留下记录。')}</p>
@@ -1458,11 +1503,13 @@
     if (d && d.dataset.do === 'sell') {
       if (act.blocked) return;
       const before = g.money;
-      const r = S.sell(g, act.cid, act.item, act.m); act.msg = r.text; act.ok = r.ok; SFX(r.ok ? 'sell' : 'refused');
+      const sc = g.c[act.cid], bf = { s: Math.round(sc.susp), m: Math.round(sc.morale), w: Math.round(sc.antiwar) };
+      const r = S.sell(g, act.cid, act.item, act.m); act.msg = r.text; act.ok = r.ok; if (r.tier !== 'none') SFX('sell'); else SFX('refused');
       const gain = g.money - before;
       act.log.push({ ok: r.ok, text: SHORT()[act.item] + ' ' + (act.m === 0 ? L('無償', 'free', '无偿') : '×' + act.m.toFixed(2)) + ' → ' + r.text });
       if (!r.ok && r.tier !== 'none') act.blocked = true;
-      render(); renderAct(); cashDelta(gain); return; }
+      act.deal = r.tier === 'none' ? null : dealOf(r, sc, act.item, act.m, gain, bf);
+      render(); renderAct(); animDeal(); cashDelta(gain); return; }
     const o = e.target.closest('[data-op]'); if (o) { const before = g.money; const r = S.covert(g, o.dataset.op, act.cid, o.dataset.arg); setTimeout(() => cashDelta(g.money - before), 0); act.msg = r.text; act.ok = r.ok; SFX(r.ok ? 'covert' : 'refused'); const nm = o.dataset.op === 'consult' ? (o.dataset.arg === 'pass' ? L('戦争コンサル【消極】', 'Consulting [Cautious]', '战争顾问【消极】') : L('戦争コンサル【積極】', 'Consulting [Aggressive]', '战争顾问【积极】')) : O[o.dataset.op].name; act.log.push({ ok: r.ok, text: nm + ': ' + r.text }); render(); renderAct(); return; }
   });
   stage.addEventListener('input', e => { if (act && e.target.id === 'mRange') { if (+e.target.value !== act.m) act.blocked = false; act.m = +e.target.value; updatePrice(); } });

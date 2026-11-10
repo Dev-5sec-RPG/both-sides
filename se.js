@@ -1,5 +1,5 @@
 // Both Sides — sound effects. All sounds are synthesised with the Web Audio API; no audio files.
-//  1 hover  2 click  3 prodOn (production on / make rations)  4 prodOff  5 sell  6 covert  7 start (war begins)
+//  1 hover  2 click  3 prodOn (production on / make rations)  4 prodOff  5 sell (also when refused)  6 covert  7 start (war begins)
 //  8 page (open/close a window, tutorial next)  9 refused  10 news (news flash, warnings)  11 end (war over)
 //  12 steps (footsteps of the passing shadow, stereo)
 window.BSSE = (() => {
@@ -71,13 +71,25 @@ window.BSSE = (() => {
     },
     // ④ production off: just "ka" "chi"
     prodOff() { const t = now(); tick(t, 1700, 4, 0.024, 0.42); metal(t, 1700, [1, 2.3], 0.03, 0.04); tick(t + 0.075, 3100, 5, 0.02, 0.36); metal(t + 0.075, 3100, [1, 1.9], 0.03, 0.035); },
-    // ⑤ sale: no bell. two heavy mechanical keys, the drawer sliding out, coins settling, the drawer stopping
+    // ⑤ sale (every answer to an offer, refusal included): a key click, the pen writing the entry, then the seal pressed down
+    //    timed to the ledger row: the line is written in 0.3 s and the seal lands at about 0.43 s
     sell() {
-      const t = now();
-      [0, 0.07].forEach(d => { tick(t + d, 900, 2, 0.03, 0.95); tick(t + d, 180, 1, 0.04, 0.8, 'lowpass'); });
-      const n = noise(), f = ac.createBiquadFilter(), g = ac.createGain(); f.type = 'bandpass'; f.Q.value = 1.2; f.frequency.setValueAtTime(700, t + 0.15); f.frequency.exponentialRampToValueAtTime(380, t + 0.33);
-      n.connect(f); f.connect(g); out(g, 1, 0.1); env(g, t + 0.15, 0.03, 0.55, 0.17); n.start(t + 0.15); n.stop(t + 0.36);
-      tick(t + 0.34, 130, 1, 0.12, 1.4, 'lowpass', 0.15); tick(t + 0.34, 1100, 2, 0.04, 0.55);
+      const t = now(), sr = ac.sampleRate;
+      tone(t, 1900, 'sine', 0.03, 0.3, 0, 0.001);
+      // pen: noise kept between about 2 and 6 kHz, pulsing with the strokes
+      const pd = 0.32, n = Math.round(sr * pd), b = ac.createBuffer(1, n, sr), d = b.getChannelData(0), ph = Math.random() * 6;
+      let lo = 0, lo2 = 0;
+      for (let i = 0; i < n; i++) {
+        const x = Math.random() * 2 - 1; lo += 0.25 * (x - lo); lo2 += 0.55 * ((x - lo) - lo2);
+        const tt = i / sr, st = 0.55 + 0.45 * Math.abs(Math.sin(2 * Math.PI * 7.5 * tt + ph));
+        d[i] = lo2 * st * Math.min(1, tt / 0.03) * Math.min(1, (pd - tt) / 0.06);
+      }
+      const ps = ac.createBufferSource(), pg = ac.createGain(); ps.buffer = b; pg.gain.value = 0.3; ps.connect(pg); out(pg, 1, 0.04); ps.start(t + 0.01);
+      // seal: a falling low thump with a dull tap on paper
+      const ts = t + 0.42, o = ac.createOscillator(), og = ac.createGain(); o.type = 'sine';
+      o.frequency.setValueAtTime(225, ts); o.frequency.exponentialRampToValueAtTime(95, ts + 0.06); o.frequency.exponentialRampToValueAtTime(58, ts + 0.2);
+      o.connect(og); out(og, 1, 0.08); og.gain.setValueAtTime(0.0001, ts); og.gain.exponentialRampToValueAtTime(0.95, ts + 0.003); og.gain.exponentialRampToValueAtTime(0.0001, ts + 0.2); o.start(ts); o.stop(ts + 0.24);
+      tick(ts, 1800, 0.7, 0.03, 0.4, 'lowpass');
     },
     // ⑥ covert action: only the low cluster swelling in the dark
     covert() {
