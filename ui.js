@@ -358,8 +358,10 @@
   }
 
   // ---------- living map ----------
-  const FX = { cv: null, ctx: null, W: 0, H: 0, k: 1, units: { A: [], B: [] }, flashes: [], ripples: [], sparks: [], prevPipe: { A: [], B: [] }, shareLog: [], lastRipple: -99, clock: 0, lastCas: { A: null, B: null }, killAcc: { A: 0, B: 0 }, arrAcc: { A: 0, B: 0 }, prevTransit: { A: [], B: [] }, pushRate: 0, compactT: 0 };
+  const FX = { cv: null, ctx: null, W: 0, H: 0, k: 1, units: { A: [], B: [] }, flashes: [], ripples: [], sparks: [], prevPipe: { A: [], B: [] }, shareLog: [], lastRipple: -99, clock: 0, lastCas: { A: null, B: null }, killAcc: { A: 0, B: 0 }, arrAcc: { A: 0, B: 0 }, prevTransit: { A: [], B: [] }, pushRate: 0, compactT: 0,
+    burn: null, burnN: 0, burnAcc: 0, lastBurn: null, casI: { A: null, B: null }, intens: { A: 0, B: 0 }, boosts: [] };
   const MEN_PER_KILL = 3000, MEN_PER_MARKER = 3000;
+  const INT_FULL = 2600, BOOST_DUR = 1.8; // casualties a week (one side) at which the front's lights flicker hardest; how long a delivery's flare lasts (s)
   const COL = { A: { main: '#2f6db5', fill: 'rgba(36,58,84,.92)', dark: '#1d4a80' }, B: { main: '#c0442c', fill: 'rgba(84,40,32,.92)', dark: '#8e2f1d' } };
   const CAPS = { A: { x: 0.12, y: 0.58 }, B: { x: 0.88, y: 0.55 } }; // replaced by the map's own capitals
   const PER_ROW = { inf: 6, armor: 5 };
@@ -404,7 +406,12 @@
     BOARD.map = m; BOARD.P = homog(m.quad); BOARD.gw = m.gw; BOARD.gh = m.gh; BOARD.img = null; BOARD.cache = null;
     const bin = atob(m.phi), u16 = new Uint16Array(bin.length / 2);
     for (let k = 0; k < u16.length; k++) u16[k] = bin.charCodeAt(2 * k) | (bin.charCodeAt(2 * k + 1) << 8);
-    BOARD.phi = Float32Array.from(u16, x => x / 65535); BOARD.sorted = Float32Array.from(BOARD.phi).sort();
+    BOARD.phi = Float32Array.from(u16, x => x / 65535);
+    // land: maps with sea mark each cell (1 = land). The front's share counts land only; at sea the line, tint, lights and scorch are left out
+    BOARD.land = null;
+    if (m.land) { const lb = atob(m.land), n = m.gw * m.gh; BOARD.land = new Uint8Array(n); for (let k = 0; k < n; k++) BOARD.land[k] = (lb.charCodeAt(k >> 3) >> (k & 7)) & 1; }
+    BOARD.sorted = (BOARD.land ? BOARD.phi.filter((x, k) => BOARD.land[k]) : Float32Array.from(BOARD.phi)).sort();
+    BOARD.seaCv = null;
     BOARD.rTop = (BOARD.P(1, 0)[0] - BOARD.P(0, 0)[0]) / (BOARD.P(1, 1)[0] - BOARD.P(0, 1)[0]);
     // capitals: flat positions for the convoys, and the labels on the paper (the map area starts 75px down)
     for (const id of ['A', 'B']) { const [cu, cv] = m.caps[id]; CAPS[id] = { x: cu, y: cv }; }
@@ -421,7 +428,17 @@
     if (pp) Object.assign(pp.style, { left: bl[0] + 'px', top: tl[1] + 'px', width: (br[0] - bl[0]) + 'px', height: (br[1] - tl[1]) + 'px' });
     pillPlace();
   }
-  function pillPlace() { const ln = BOARD.line, end = ln[ln.length - 1]; if (!end) return; const [x, y] = TM(end[0], end[1]), pl = $('pill'); pl.style.left = x + 'px'; pl.style.top = (y - 2) + 'px'; }
+  function pillPlace() { const ln = BOARD.line, lk = BOARD.lineLand || []; let i = ln.length - 1; while (i > 0 && lk[i] === false) i--; const end = ln[i]; if (!end) return; const [x, y] = TM(end[0], end[1]), pl = $('pill'); pl.style.left = x + 'px'; pl.style.top = (y - 2) + 'px'; }
+  const isLand = (u, v) => { const L = BOARD.land; if (!L) return true; const i = Math.max(0, Math.min(BOARD.gw - 1, Math.floor(u * BOARD.gw))), j = Math.max(0, Math.min(BOARD.gh - 1, Math.floor(v * BOARD.gh))); return L[j * BOARD.gw + i] === 1; };
+  const landFlat = (x, y) => isLand(x / FX.W, y / FX.H); // flat map space (1000 x 500)
+  const landSoft = (u, v) => { // 0..1, smooth along the coast (for the tint's edge)
+    const L = BOARD.land; if (!L) return 1;
+    const gw = BOARD.gw, gh = BOARD.gh, x = Math.max(0, Math.min(gw - 1.001, u * gw - 0.5)), y = Math.max(0, Math.min(gh - 1.001, v * gh - 0.5));
+    const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
+    const a = L[j * gw + i], b = L[j * gw + i + 1], c = L[(j + 1) * gw + i], d = L[(j + 1) * gw + i + 1];
+    const t = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
+    return Math.max(0, Math.min(1, (t - 0.25) / 0.5));
+  };
   const phiAt = (u, v) => { // bilinear sample of the field at (u, v) in [0, 1]
     const gw = BOARD.gw, gh = BOARD.gh, x = Math.max(0, Math.min(gw - 1.001, u * gw - 0.5)), y = Math.max(0, Math.min(gh - 1.001, v * gh - 0.5));
     const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j, p = BOARD.phi, a = p[j * gw + i], b = p[j * gw + i + 1], c = p[(j + 1) * gw + i], d = p[(j + 1) * gw + i + 1];
@@ -444,7 +461,8 @@
     const kc = Math.min(1, dt * 3); FRONT.col = FRONT.col.map((c, i) => c + (tgt[i] - c) * kc);
     FRONT.phase = (FRONT.phase + dt / period) % 1;
     const br = rm ? 0.6 : 0.5 - 0.5 * Math.cos(FRONT.phase * Math.PI * 2), [r, g2, b] = FRONT.col.map(Math.round);
-    const path = () => { ctx.beginPath(); ln.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); };
+    const lk = BOARD.lineLand || [];
+    const path = () => { ctx.beginPath(); let pen = false; ln.forEach((p, i) => { if (lk[i] === false) { pen = false; return; } if (pen) ctx.lineTo(p[0], p[1]); else { ctx.moveTo(p[0], p[1]); pen = true; } }); };
     ctx.save(); ctx.lineJoin = 'round'; ctx.lineCap = 'round';
     path(); ctx.globalCompositeOperation = 'lighter'; ctx.strokeStyle = 'rgba(' + r + ',' + g2 + ',' + b + ',' + (0.06 + 0.26 * br) + ')'; ctx.lineWidth = 12 + 6 * br; ctx.stroke();
     ctx.globalCompositeOperation = 'source-over';
@@ -472,6 +490,7 @@
     for (let it = 0; it < 2; it++) for (let r = 1; r < NR - 1; r++) rowU[r] = (rowU[r - 1] + 2 * rowU[r] + rowU[r + 1]) / 4;
     BOARD.rowU = rowU;
     BOARD.line = rowU.map((u, r) => BOARD.P(u, (r + 0.5) / NR));
+    BOARD.lineLand = rowU.map((u, r) => isLand(u, (r + 0.5) / NR));
     // territory tint, stronger near the front; computed per screen pixel (half size) through the inverse mapping
     const tl = BOARD.P(0, 0), bl = BOARD.P(0, 1), br = BOARD.P(1, 1), tr = BOARD.P(1, 0);
     const bx = Math.floor(Math.min(tl[0], bl[0])), by = Math.floor(tl[1]), bw = Math.ceil(Math.max(tr[0], br[0])) - bx, bh = Math.ceil(bl[1]) - by, HS = 2, TW = Math.ceil(bw / HS), TH = Math.ceil(bh / HS);
@@ -479,10 +498,11 @@
     const tc = BOARD.tint.getContext('2d'), im = tc.createImageData(TW, TH), D = im.data, inv = BOARD.P.inv;
     for (let j = 0; j < TH; j++) for (let i = 0; i < TW; i++) {
       const uv = inv(bx + (i + 0.5) * HS, by + (j + 0.5) * HS), u = uv[0], v = uv[1], o = (j * TW + i) * 4;
-      if (u < 0 || u > 1 || v < 0 || v > 1) { D[o + 3] = 0; continue; }
+      const ls = (u < 0 || u > 1 || v < 0 || v > 1) ? 0 : landSoft(u, v);
+      if (!ls) { D[o + 3] = 0; continue; }
       const d = phiAt(u, v) - tau, near = Math.exp(-Math.abs(d) * 14), edge = Math.min(1, Math.min(u, 1 - u, v, 1 - v) * 60);
       if (d < 0) { D[o] = 70; D[o + 1] = 115; D[o + 2] = 205; } else { D[o] = 215; D[o + 1] = 85; D[o + 2] = 60; }
-      D[o + 3] = (d < 0 ? 0.42 + 0.24 * near : 0.34 + 0.24 * near) * edge * 255; // blue reads weaker under the warm light
+      D[o + 3] = (d < 0 ? 0.42 + 0.24 * near : 0.34 + 0.24 * near) * edge * ls * 255; // blue reads weaker under the warm light
     }
     tc.putImageData(im, 0, 0);
     // cache: desk + tint + front line, redrawn only when the share moves
@@ -521,8 +541,7 @@
       const frontRow = live.filter(u => u.slot < PER_ROW.inf);
       const pool = frontRow.length ? frontRow : live.slice(0, 3);
       const pick = pool[Math.floor(Math.random() * pool.length)];
-      pick.st = 'dead'; pick.t0 = FX.clock;
-      for (let i = 0; i < 5; i++) FX.sparks.push({ x: pick.x, y: pick.y, vx: (Math.random() - 0.5) * 40, vy: (Math.random() - 0.5) * 40, t0: FX.clock, life: 0.45, c: '200,50,25' });
+      pick.st = 'dead'; pick.t0 = FX.clock; pick.a = 1; // the light goes out quietly and leaves a small ember (drawEmber)
     }
   }
   function syncUnits(side) {
@@ -546,16 +565,20 @@
   // markers: points of light on the operations table (infantry = ring, armour = diamond)
   // glowing light points; PJ() makes the far side of the table smaller and dimmer
   const GLOW = { A: '110,170,255', B: '255,110,80' }, CORE = { A: '#d2ecff', B: '#ffd6c8' };
+  // u.fl: flicker (1 = steady; lower while the fighting is heavy). u.bo: flare when supplies have just reached this part of the front
   function drawUnit(ctx, u, side, s) {
-    const P = PJ(u.x, u.y), dead = u.st === 'dead', armor = u.kind === 'armor', glow = dead ? '230,70,30' : GLOW[side];
-    const grow = dead ? 1 + (FX.clock - u.t0) * 0.8 : 1, k = s * P.s * grow, al = Math.max(0, Math.min(1, u.a)) * P.a, R = (armor ? 14 : 12) * k;
+    if (!landFlat(u.x, u.y)) return;
+    const P = PJ(u.x, u.y), armor = u.kind === 'armor', glow = GLOW[side];
+    if (u.st === 'dead') { drawEmber(ctx, u, side, s, P); return; }
+    const bo = u.bo || 0, fl = u.fl == null ? 1 : u.fl;
+    const k = s * P.s, al = Math.max(0, Math.min(1, u.a)) * P.a * fl, R = (armor ? 14 : 12) * k * (1 + 1.5 * bo);
     ctx.save(); ctx.translate(P.x, P.y);
-    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = al;
+    ctx.globalCompositeOperation = 'lighter'; ctx.globalAlpha = Math.min(1, al * (1 + 0.8 * bo));
     const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
-    gl.addColorStop(0, 'rgba(' + glow + ',.6)'); gl.addColorStop(1, 'rgba(' + glow + ',0)');
+    gl.addColorStop(0, 'rgba(' + glow + ',' + (0.6 + 0.4 * bo).toFixed(3) + ')'); gl.addColorStop(1, 'rgba(' + glow + ',0)');
     ctx.fillStyle = gl; ctx.fillRect(-R, -R, R * 2, R * 2);
-    ctx.globalCompositeOperation = 'source-over';
-    ctx.strokeStyle = 'rgba(' + glow + ',.95)'; ctx.lineWidth = 1.3 * k; ctx.fillStyle = dead ? '#ffd2c6' : CORE[side];
+    ctx.globalCompositeOperation = 'source-over'; ctx.globalAlpha = al;
+    ctx.strokeStyle = 'rgba(' + glow + ',.95)'; ctx.lineWidth = 1.3 * k; ctx.fillStyle = bo > 0.35 ? '#ffffff' : CORE[side];
     if (armor) {
       ctx.beginPath(); ctx.moveTo(0, -5.2 * k); ctx.lineTo(5.2 * k, 0); ctx.lineTo(0, 5.2 * k); ctx.lineTo(-5.2 * k, 0); ctx.closePath(); ctx.stroke();
       ctx.beginPath(); ctx.moveTo(0, -2.6 * k); ctx.lineTo(2.6 * k, 0); ctx.lineTo(0, 2.6 * k); ctx.lineTo(-2.6 * k, 0); ctx.closePath(); ctx.fill();
@@ -564,6 +587,50 @@
       ctx.beginPath(); ctx.arc(0, 0, 2.2 * k, 0, Math.PI * 2); ctx.fill();
     }
     ctx.restore();
+  }
+  // a fallen unit: its light sinks and cools (0.9 s), and a small ember stays a little longer (about 2.6 s in all)
+  function drawEmber(ctx, u, side, s, P) {
+    const age = FX.clock - u.t0, k = s * P.s, armor = u.kind === 'armor';
+    ctx.save(); ctx.translate(P.x, P.y); ctx.globalCompositeOperation = 'lighter';
+    if (age < 0.9) {
+      const e = 1 - age / 0.9, R = (armor ? 14 : 12) * k * (0.45 + 0.55 * e);
+      ctx.globalAlpha = P.a * e * 0.9;
+      const gl = ctx.createRadialGradient(0, 0, 0, 0, 0, R);
+      gl.addColorStop(0, 'rgba(' + GLOW[side] + ',.5)'); gl.addColorStop(1, 'rgba(' + GLOW[side] + ',0)');
+      ctx.fillStyle = gl; ctx.fillRect(-R, -R, R * 2, R * 2);
+      ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = CORE[side];
+      ctx.beginPath(); ctx.arc(0, 0, 2.2 * k * e, 0, Math.PI * 2); ctx.fill();
+      ctx.globalCompositeOperation = 'lighter';
+    }
+    const ea = age < 0.4 ? age / 0.4 : Math.max(0, 1 - (age - 0.4) / 2.2);
+    if (ea > 0) {
+      const r = 3.4 * k, gl = ctx.createRadialGradient(0, 0, 0, 0, 0, r);
+      gl.addColorStop(0, 'rgba(255,150,70,.85)'); gl.addColorStop(1, 'rgba(255,90,30,0)');
+      ctx.globalAlpha = P.a * ea * 0.8; ctx.fillStyle = gl; ctx.fillRect(-r, -r, r * 2, r * 2);
+      ctx.globalAlpha = P.a * ea * 0.9; ctx.fillStyle = 'rgb(255,190,120)'; ctx.beginPath(); ctx.arc(0, 0, 0.8 * k, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
+  // ---------- scars of the war: scorch marks build up on the map wherever the fighting has gone on (display only) ----------
+  // one mark for every BURN_PER casualties, near the front of the moment. A long war leaves the paper dark around its front.
+  const BURN_PER = 300, BURN_K = 0.5, BURN_R = 22; // the layer is kept at half the table's resolution. BURN_R: a mark's base radius; each mark is 85-130% of it
+  function burnMark() {
+    if (!BOARD.P || !BOARD.rowU.length) return;
+    if (!FX.burn) FX.burn = mkCv(Math.round(DW * BURN_K), Math.round(DH * BURN_K));
+    let yf = 0, x = 0;
+    for (let k = 0; k < 8; k++) { yf = 0.05 + Math.random() * 0.9; x = frontX(yf) + (Math.random() - 0.5) * 34; if (landFlat(x, yf * FX.H)) break; if (k === 7) return; }
+    const P = PJ(x, yf * FX.H);
+    const c = FX.burn.getContext('2d'), r = BURN_R * (0.85 + Math.random() * 0.45) * P.s * BURN_K, a = 0.135 + Math.random() * 0.105;
+    c.save(); c.translate(P.x * BURN_K, P.y * BURN_K); c.rotate((Math.random() - 0.5) * 0.8); c.scale(1, 0.62 + Math.random() * 0.2);
+    const gr = c.createRadialGradient(0, 0, 0, 0, 0, r);
+    gr.addColorStop(0, 'rgba(16,8,3,' + a + ')'); gr.addColorStop(0.45, 'rgba(38,19,7,' + (a * 0.85) + ')'); gr.addColorStop(0.8, 'rgba(105,58,20,' + (a * 0.3) + ')'); gr.addColorStop(1, 'rgba(105,58,20,0)');
+    c.fillStyle = gr; c.beginPath(); c.arc(0, 0, r, 0, Math.PI * 2); c.fill(); c.restore();
+    FX.burnN++;
+  }
+  function paperClip(ctx) { const q = [BOARD.P(0, 0), BOARD.P(1, 0), BOARD.P(1, 1), BOARD.P(0, 1)]; ctx.beginPath(); q.forEach((p, i) => i ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1])); ctx.closePath(); ctx.clip(); }
+  function drawBurn(ctx, alpha) {
+    if (!FX.burn || !FX.burnN || !BOARD.P) return;
+    ctx.save(); paperClip(ctx); ctx.globalAlpha = alpha == null ? 1 : alpha; ctx.drawImage(FX.burn, 0, 0, DW, DH); ctx.restore();
   }
   function convoyPoint(side, p) {
     const lag = I[p.item].lag, prog = Math.max(0, Math.min(1, 1 - (p.at - g.t) / lag));
@@ -611,7 +678,7 @@
   }
   function detectArrivals(side) {
     const now = g.c[side].pipeline, prev = FX.prevPipe[side];
-    for (const p of prev) if (!now.includes(p) && p.at <= g.t + 0.2) FX.flashes.push({ side, yf: p.vy == null ? 0.5 : p.vy, t0: FX.clock, big: p.item !== 'food' });
+    for (const p of prev) if (!now.includes(p) && p.at <= g.t + 0.2) FX.boosts.push({ side, yf: p.vy == null ? 0.5 : p.vy, t0: FX.clock, big: p.item !== 'food' });
     FX.prevPipe[side] = now.slice();
   }
   function detectPush() {
@@ -629,9 +696,22 @@
     ctx.fillStyle = '#0b0907'; ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
     ctx.setTransform(FX.k * BT.s, 0, 0, FX.k * BT.s, FX.k * BT.ox, FX.k * BT.oy); // everything below is drawn in table coordinates
     if (BOARD.share < 0) boardShare(S.territory(g, 'A'));
-    if (BOARD.cache && BOARD.share >= 0) { ctx.drawImage(BOARD.cache, 0, 0, DW, DH); drawFront(ctx, rm, dt); } else { ctx.fillStyle = '#0b0907'; ctx.fillRect(0, 0, DW, DH); }
+    if (BOARD.cache && BOARD.share >= 0) { ctx.drawImage(BOARD.cache, 0, 0, DW, DH); drawBurn(ctx); drawFront(ctx, rm, dt); } else { ctx.fillStyle = '#0b0907'; ctx.fillRect(0, 0, DW, DH); }
     if (live) { detectArrivals('A'); detectArrivals('B'); detectPush(); }
     else { FX.prevPipe.A = g.c.A.pipeline.slice(); FX.prevPipe.B = g.c.B.pipeline.slice(); }
+    { // casualties drive the scorch marks and how hard the lights flicker
+      const all = g.cas.A + g.cas.B;
+      if (FX.lastBurn == null) FX.lastBurn = all;
+      if (live) { FX.burnAcc += all - FX.lastBurn; let n = 0; while (FX.burnAcc >= BURN_PER && n++ < 40) { FX.burnAcc -= BURN_PER; burnMark(); } }
+      FX.lastBurn = all;
+      for (const side of ['A', 'B']) {
+        const cs = g.cas[side]; if (FX.casI[side] == null) FX.casI[side] = cs;
+        const d = cs - FX.casI[side]; FX.casI[side] = cs;
+        if (live && dt > 0) FX.intens[side] += (Math.min(1, d / (dt / 3) / INT_FULL) - FX.intens[side]) * Math.min(1, dt / 1.5);
+        else if (!live) FX.intens[side] *= Math.max(0, 1 - dt * 2);
+      }
+      FX.boosts = FX.boosts.filter(b => FX.clock - b.t0 < BOOST_DUR);
+    }
     const push = Math.max(-1, Math.min(1, FX.pushRate * 60)); // >0: A pushing, <0: B pushing
     FX.compactT += dt; const doCompact = FX.compactT > 0.35; if (doCompact) FX.compactT = 0;
     for (const side of ['A', 'B']) {
@@ -639,7 +719,7 @@
       syncUnits(side); if (doCompact && live) compactSlots(side);
       const dir = side === 'A' ? -1 : 1, mine = side === 'A' ? push : -push, list = FX.units[side];
       for (const u of list) {
-        if (u.st === 'dead') { u.a -= dt * 1.6; }
+        if (u.st === 'dead') { u.a -= dt / 2.6; }
         else if (u.st === 'out') { u.a -= dt * 0.9; u.x += dir * dt * 14; }
         else {
           u.a = Math.min(1, u.a + dt * 1.2);
@@ -651,6 +731,12 @@
           ox = Math.sin(FX.clock * 2 + u.ph) * 1.1;
           if (mine > 0.15) ox += -dir * mine * 5 * Math.max(0, Math.sin(FX.clock * 5 + u.ph)); // the attacker surges forward
           else if (mine < -0.15) ox += (Math.random() - 0.5) * 2.4 * -mine; // the defender is shaken
+        }
+        u.fl = 1; u.bo = 0;
+        if (u.st === 'live') {
+          const I = FX.intens[side], near = u.kind === 'inf' ? u.slot < PER_ROW.inf * 2 : u.slot < PER_ROW.armor;
+          if (live && !rm && near && I > 0.04) u.fl = 1 - (0.1 + 0.55 * I) * Math.max(0, nA(FX.clock * (1 + 7 * I) + u.ph * 17));
+          for (const b of FX.boosts) if (b.side === side) { const age = FX.clock - b.t0, dy = (u.y / FX.H - b.yf) / 0.2; u.bo = Math.max(u.bo, Math.pow(1 - age / BOOST_DUR, 1.4) * Math.exp(-dy * dy) * (b.big ? 1 : 0.6)); }
         }
         const keep = u.x; u.x += ox; drawUnit(ctx, u, side, s); u.x = keep;
       }
@@ -1205,7 +1291,88 @@
       coda = dc > 0 ? L('その' + fmt(dc) + '人の名は、あなたの帳簿には載らない。', 'Those ' + fmt(dc) + ' names will never appear in your ledger.', '那' + fmt(dc) + '人的名字，不会出现在你的账本上。') : L('利益は帳簿に残り、死者は数字として残る。', 'The profit stays in the ledger; the dead stay as numbers.', '利润留在账本上，死者则化为数字。');
     }
     // the verdict (how much longer / how many more) and the closing line sit together, large, under the ledger
-    return `<div class="stamp">${L('戦果と罪状', 'Deeds and guilt', '战果与罪状')}</div><div class="ledger">${rows}</div>${verdict || coda ? `<div class="coda">${verdict ? `<div class="cv">${esc(verdict)}</div>` : ''}${coda ? `<div class="cc">${esc(coda)}</div>` : ''}</div>` : ''}`;
+    const rp = replayHTML(r);
+    return `<div class="stamp">${L('戦果と罪状', 'Deeds and guilt', '战果与罪状')}</div><div class="ledger">${rows}</div>${rp}${verdict || coda ? `<div class="coda${rp ? ' wait' : ''}">${verdict ? `<div class="cv">${esc(verdict)}</div>` : ''}${coda ? `<div class="cc">${esc(coda)}</div>` : ''}</div>` : ''}`;
+  }
+  // ---------- the report: the front replayed in about ten seconds, with the war as it would have gone without you (display only) ----------
+  const RP_MS = 10000; // the replay runs for 10 s
+  function replayHTML(r) {
+    if (r.type === 'retreat' || !r.base || !r.base.hist || r.base.hist.length < 2 || !g.history || g.history.length < 2 || !BOARD.img || !BOARD.P) return '';
+    return `<div class="replay"><canvas id="rpCv" aria-label="${L('戦線の推移', 'How the front moved', '战线的变化')}"></canvas>
+      <div class="rp-lg"><span class="me">${L('あなたが関わった戦争', 'The war you traded in', '你参与的战争')}</span><span class="cf">${L('あなたがいなかった場合', 'Without you', '若没有你')}</span></div></div>`;
+  }
+  function frontPts(sA, NR, NU) { // the same contour as the live map, coarser
+    const srt = BOARD.sorted, tau = srt[Math.max(0, Math.min(srt.length - 1, Math.floor(sA * srt.length)))], rowU = [];
+    let prev = null;
+    for (let r = 0; r < NR; r++) {
+      const v = (r + 0.5) / NR, xs = []; let a = phiAt(0, v) - tau;
+      for (let k = 1; k <= NU; k++) { const u = k / NU, b = phiAt(u, v) - tau; if ((a < 0) !== (b < 0)) xs.push((k - 1 + a / (a - b)) / NU); a = b; }
+      let pick = xs.length ? xs[0] : (a < 0 ? 1 : 0);
+      if (xs.length > 1 && prev != null) pick = xs.reduce((best, x) => Math.abs(x - prev) < Math.abs(best - prev) ? x : best, xs[0]);
+      rowU.push(pick); prev = pick;
+    }
+    for (let it = 0; it < 2; it++) for (let r = 1; r < NR - 1; r++) rowU[r] = (rowU[r - 1] + 2 * rowU[r] + rowU[r + 1]) / 4;
+    const pts = rowU.map((u, r) => BOARD.P(u, (r + 0.5) / NR));
+    pts.land = rowU.map((u, r) => isLand(u, (r + 0.5) / NR));
+    return pts;
+  }
+  function seaLayer() { // the map picture where it is sea, to put back over the replay's tint
+    if (!BOARD.land || !BOARD.img) return null;
+    if (BOARD.seaCv) return BOARD.seaCv;
+    const c = mkCv(DW, DH), x = c.getContext('2d'); x.drawImage(BOARD.img, 0, 0, DW, DH);
+    const im = x.getImageData(0, 0, DW, DH), D = im.data, inv = BOARD.P.inv;
+    for (let j = 0; j < DH; j++) for (let i = 0; i < DW; i++) { const uv = inv(i + 0.5, j + 0.5); D[(j * DW + i) * 4 + 3] = (uv[0] < 0 || uv[0] > 1 || uv[1] < 0 || uv[1] > 1) ? 0 : Math.round((1 - landSoft(uv[0], uv[1])) * 255); }
+    x.putImageData(im, 0, 0); BOARD.seaCv = c; return c;
+  }
+  function startReplay(r) {
+    const cv = $('rpCv'), coda = $('mc').querySelector('.deeds .coda.wait');
+    const reveal = () => { if (coda) coda.classList.add('show'); };
+    if (!cv) { reveal(); return; }
+    // the history holds a point every second of play (a third of a week); the labels use the report's own week counts
+    const me = g.history.map(h => h.terr), cf = r.base.hist, nMe = me.length, nCf = cf.length, nMax = Math.max(nMe, nCf), wMe = r.weeks, wCf = r.base.weeks, wMax = Math.max(wMe, wCf);
+    const q = [BOARD.P(0, 0), BOARD.P(1, 0), BOARD.P(1, 1), BOARD.P(0, 1)];
+    const x0 = Math.min(q[0][0], q[3][0]) - 6, x1 = Math.max(q[1][0], q[2][0]) + 6, y0 = q[0][1] - 6, y1 = q[3][1] + 6, bw = x1 - x0, bh = y1 - y0;
+    const dpr = Math.min(2, window.devicePixelRatio || 1), cssW = cv.clientWidth || 560;
+    cv.width = Math.round(cssW * dpr); cv.height = Math.round(cssW * bh / bw * dpr);
+    const c = cv.getContext('2d'), sc = cv.width / bw, NR = 64, NU = 160;
+    const at = (h, n, wk) => { const f = Math.max(0, Math.min(n - 1, wk - 1)), i = Math.floor(f), j = Math.min(n - 1, i + 1); return h[i] + (h[j] - h[i]) * (f - i); };
+    const path = (pts, solid) => { c.beginPath(); let pen = false; pts.forEach((p, i) => { if (!solid && pts.land && !pts.land[i]) { pen = false; return; } if (pen) c.lineTo(p[0], p[1]); else { c.moveTo(p[0], p[1]); pen = true; } }); };
+    const sea = seaLayer();
+    const label = (txt, p, col, dx) => { c.font = '600 20px ' + getComputedStyle(document.body).getPropertyValue('--f-body'); c.textAlign = dx < 0 ? 'right' : 'left'; c.lineWidth = 5; c.strokeStyle = 'rgba(10,6,3,.85)'; c.strokeText(txt, p[0] + dx, p[1]); c.fillStyle = col; c.fillText(txt, p[0] + dx, p[1]); };
+    const weekTxt = w => L('開戦から ' + w + '週', 'Week ' + w, '开战第 ' + w + ' 周');
+    function frame(k) {
+      const wk = Math.max(1, k * nMax);
+      c.setTransform(sc, 0, 0, sc, -x0 * sc, -y0 * sc);
+      c.globalAlpha = 1; c.globalCompositeOperation = 'source-over';
+      c.fillStyle = '#0b0907'; c.fillRect(x0, y0, bw, bh);
+      c.drawImage(BOARD.img, 0, 0, DW, DH);
+      c.fillStyle = 'rgba(8,5,3,.22)'; c.fillRect(x0, y0, bw, bh);
+      drawBurn(c, Math.min(1, wk / nMe)); // the scorch of this war builds up as the weeks run
+      const mEnd = wk >= nMe, cEnd = wk >= nCf, mPts = frontPts(at(me, nMe, Math.min(wk, nMe)), NR, NU), cPts = frontPts(at(cf, nCf, Math.min(wk, nCf)), NR, NU);
+      c.save(); paperClip(c);
+      path(mPts, true); c.lineTo(q[3][0], q[3][1]); c.lineTo(q[0][0], q[0][1]); c.closePath(); c.fillStyle = 'rgba(70,115,205,.24)'; c.fill();
+      path(mPts, true); c.lineTo(q[2][0], q[2][1]); c.lineTo(q[1][0], q[1][1]); c.closePath(); c.fillStyle = 'rgba(215,85,60,.2)'; c.fill();
+      c.restore();
+      if (sea) c.drawImage(sea, 0, 0, DW, DH);
+      c.lineJoin = 'round'; c.lineCap = 'round';
+      // without you: a white dotted line that stops where that war would have ended
+      path(cPts); c.setLineDash([7, 6]); c.lineWidth = 2.6; c.strokeStyle = cEnd ? 'rgba(240,234,218,.55)' : 'rgba(240,234,218,.95)'; c.stroke(); c.setLineDash([]);
+      // the war you traded in
+      path(mPts); c.lineWidth = 6; c.strokeStyle = 'rgba(25,12,5,.85)'; c.stroke();
+      path(mPts); c.lineWidth = 3; c.strokeStyle = mEnd ? '#f3d28a' : '#e9b85c'; c.stroke();
+      c.setTransform(sc, 0, 0, sc, -x0 * sc, -y0 * sc);
+      label(weekTxt(Math.max(1, Math.min(wMax, Math.round(wk / nMax * wMax)))), [x0 + 18, y0 + 34], '#efe6d2', 0);
+      const onLand = (p, f) => { let i = Math.floor(p.length * f); for (let d = 0; d < p.length; d++) { for (const k of [i + d, i - d]) if (k >= 0 && k < p.length && (!p.land || p.land[k])) return p[k]; } return p[i]; };
+      const mid = p => onLand(p, 0.3);
+      if (cEnd) label(L('ここで終わっていた(' + wCf + '週)', 'It would have ended here (wk ' + wCf + ')', '本应在此结束(第' + wCf + '周)'), mid(cPts), '#f0eadc', cPts[0][0] > (x0 + x1) / 2 ? -14 : 14);
+      if (mEnd) label(L('終戦(' + wMe + '週)', 'War over (wk ' + wMe + ')', '战争结束(第' + wMe + '周)'), onLand(mPts, 0.72), '#f3d28a', mPts[0][0] > (x0 + x1) / 2 ? -14 : 14);
+    }
+    if (RM()) { frame(1); reveal(); return; }
+    let t0 = 0, done = false;
+    const end = () => { if (done) return; done = true; frame(1); setTimeout(reveal, 250); };
+    cv.addEventListener('click', end);
+    const tick = now => { if (done || !cv.isConnected) return; if (!t0) t0 = now; const k = Math.min(1, (now - t0) / RP_MS); frame(k); if (k < 1) requestAnimationFrame(tick); else end(); };
+    frame(0); requestAnimationFrame(tick);
   }
   function chart() {
     const h = g.history; if (h.length < 2) return '';
@@ -1342,7 +1509,7 @@
         const s = document.createElement('div'); s.className = 'nrec'; s.textContent = 'NEW RECORD';
         el.parentElement.appendChild(s); SFX('click');
       }
-      setTimeout(() => { rest.classList.add('show'); }, rec.isNew ? 420 : 120);
+      setTimeout(() => { rest.classList.add('show'); startReplay(r); }, rec.isNew ? 420 : 120);
     };
     const skip = e => { if (!done) { e.stopPropagation(); e.preventDefault(); finish(); } };
     if (RM() || !target) { finish(); return; }
@@ -1360,6 +1527,7 @@
     { const n = (window.BS_MAPS || []).length; if (n) boardUse(Math.floor(Math.random() * n)); BOARD.share = -1; } // one map for each war
     setScales(); rebuildAll();
     FX.units = { A: [], B: [] }; FX.flashes = []; FX.ripples = []; FX.sparks = []; FX.prevPipe = { A: [], B: [] }; FX.shareLog = []; FX.lastCas = { A: null, B: null }; FX.killAcc = { A: 0, B: 0 }; FX.arrAcc = { A: 0, B: 0 }; FX.prevTransit = { A: [], B: [] }; FX.pushRate = 0;
+    FX.burn = null; FX.burnN = 0; FX.burnAcc = 0; FX.lastBurn = null; FX.casI = { A: null, B: null }; FX.intens = { A: 0, B: 0 }; FX.boosts = [];
     for (const k in effMemo) delete effMemo[k];
     render();
   }

@@ -245,3 +245,14 @@
 .rtab td.d { color: var(--muted); font-size: 12px; white-space: nowrap; }
 .rtab td.none, .hpanel.rec p.none { color: var(--muted); }
 .compact .rtab { font-size: 11.5px; } .compact .rtab td { padding: 4px 6px; }
+
+/* the report: the front replayed, with the war as it would have gone without you */
+.deeds .replay { margin: 14px 0 2px; }
+.deeds .replay canvas { display: block; width: 100%; border: 1px solid var(--line); border-radius: 4px; cursor: pointer; }
+.deeds .rp-lg { display: flex; justify-content: center; gap: 22px; margin-top: 6px; font-size: 12px; color: var(--muted); }
+.deeds .rp-lg span::before { content: ""; display: inline-block; width: 24px; vertical-align: middle; margin-right: 7px; }
+.deeds .rp-lg .me::before { border-top: 3px solid #e9b85c; }
+.deeds .rp-lg .cf::before { border-top: 2px dashed #efe9da; }
+.deeds .coda.wait { opacity: 0; transition: opacity .9s ease; }
+.deeds .coda.wait.show { opacity: 1; }
+.compact .deeds .rp-lg { font-size: 10.5px; gap: 14px; }

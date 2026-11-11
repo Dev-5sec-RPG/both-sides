@@ -520,7 +520,7 @@
     const b = makeGame(seed, { random: rnd, scenario: sc }); b.noBase = true; for (const k in b.prodOn) b.prodOn[k] = false;
     let guard = 0;
     while (!b.over && guard++ < 6000) { if (b.modal && b.modal.kind !== 'result') { b.modal = null; b.paused = false; } step(b, 0.1); }
-    return { t: b.t, weeks: weekOf(b.t), cas: b.cas.A + b.cas.B, type: b.result ? b.result.type : 'cap' };
+    return { t: b.t, weeks: weekOf(b.t), cas: b.cas.A + b.cas.B, type: b.result ? b.result.type : 'cap', hist: b.history.map(h => h.terr) }; // hist: A's land each week, for the replay on the report (display only)
   }
   function retreat(g) { if (g.over) return; endGame(g, 'retreat', L('あなたは戦場から手を引いた。戦争はまだ続いている。', 'You pulled out. The war goes on without you.', '你从战场抽身而退。战争仍在继续。')); }
   // 緊急発注: 劣勢に追い込まれた国・戦況が急変した国から、期限付きの好条件の依頼が届く
