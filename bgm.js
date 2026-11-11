@@ -24,7 +24,7 @@
   let wantName = null, wantDuck = false, enabled = true, switching = false, unlocked = false;
 
   function ctx() {
-    if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; ac = new C(); master = ac.createGain(); master.gain.value = 1; master.connect(ac.destination); }
+    if (!ac) { const C = window.AudioContext || window.webkitAudioContext; if (!C) return null; try { ac = new C({ latencyHint: 'playback' }); } catch (e) { ac = new C(); } /* music needs no quick response: a large buffer keeps it from crackling */ master = ac.createGain(); master.gain.value = 1; master.connect(ac.destination); }
     return ac;
   }
   function fetchDecode(url) {

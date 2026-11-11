@@ -1,3 +1,5 @@
+/* no blue/grey flash where a tap lands (phones) */
+* { -webkit-tap-highlight-color: transparent; }
 /* Both Sides — stylesheet */
 :root { --bg: #14171a; --ink: #101315; --panel: #1c2024; --panel2: #23282d; --line: #323940; --fg: #ddd8cb; --muted: #9a9e98; --brass: #c8a14c; --brass2: #e2c07d; --a: #5f93c9; --a2: #8fb6de; --a3: #3b6a99; --b: #c7664f; --b2: #e09a88; --b3: #8e3f2f; --good: #74ad7c; --bad: #d4574b; --bad2: #e58a7f; --warn: #d98a3e; --troop: #c9c3b6; --troop2: #8f8a7f; --eq: #9d86d6; --crew: #bcaae8; --terrain: #2a2f26; --contour: #3a4134; --f-disp: "Big Shoulders Text", "Arial Narrow", sans-serif; --f-body: "BIZ UDPGothic", "Hiragino Sans", "Yu Gothic", sans-serif; --f-num: "IBM Plex Mono", ui-monospace, "SFMono-Regular", monospace; color-scheme: dark; }
 html, body { height: 100%; margin: 0; overflow: hidden; background: var(--bg); color: var(--fg); }

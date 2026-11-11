@@ -409,8 +409,9 @@
     BOARD.phi = Float32Array.from(u16, x => x / 65535);
     // land: maps with sea mark each cell (1 = land). The front's share counts land only; at sea the line, tint, lights and scorch are left out
     BOARD.land = null;
-    if (m.land) { const lb = atob(m.land), n = m.gw * m.gh; BOARD.land = new Uint8Array(n); for (let k = 0; k < n; k++) BOARD.land[k] = (lb.charCodeAt(k >> 3) >> (k & 7)) & 1; }
-    BOARD.sorted = (BOARD.land ? BOARD.phi.filter((x, k) => BOARD.land[k]) : Float32Array.from(BOARD.phi)).sort();
+    BOARD.lw = m.lw || m.gw; BOARD.lh = m.lh || m.gh; // the land grid may be finer than the front field
+    if (m.land) { const lb = atob(m.land), n = BOARD.lw * BOARD.lh; BOARD.land = new Uint8Array(n); for (let k = 0; k < n; k++) BOARD.land[k] = (lb.charCodeAt(k >> 3) >> (k & 7)) & 1; }
+    BOARD.sorted = (BOARD.land ? BOARD.phi.filter((x, k) => isLand(((k % m.gw) + 0.5) / m.gw, (Math.floor(k / m.gw) + 0.5) / m.gh)) : Float32Array.from(BOARD.phi)).sort();
     BOARD.seaCv = null;
     BOARD.rTop = (BOARD.P(1, 0)[0] - BOARD.P(0, 0)[0]) / (BOARD.P(1, 1)[0] - BOARD.P(0, 1)[0]);
     // capitals: flat positions for the convoys, and the labels on the paper (the map area starts 75px down)
@@ -429,11 +430,11 @@
     pillPlace();
   }
   function pillPlace() { const ln = BOARD.line, lk = BOARD.lineLand || []; let i = ln.length - 1; while (i > 0 && lk[i] === false) i--; const end = ln[i]; if (!end) return; const [x, y] = TM(end[0], end[1]), pl = $('pill'); pl.style.left = x + 'px'; pl.style.top = (y - 2) + 'px'; }
-  const isLand = (u, v) => { const L = BOARD.land; if (!L) return true; const i = Math.max(0, Math.min(BOARD.gw - 1, Math.floor(u * BOARD.gw))), j = Math.max(0, Math.min(BOARD.gh - 1, Math.floor(v * BOARD.gh))); return L[j * BOARD.gw + i] === 1; };
+  const isLand = (u, v) => { const L = BOARD.land; if (!L) return true; const i = Math.max(0, Math.min(BOARD.lw - 1, Math.floor(u * BOARD.lw))), j = Math.max(0, Math.min(BOARD.lh - 1, Math.floor(v * BOARD.lh))); return L[j * BOARD.lw + i] === 1; };
   const landFlat = (x, y) => isLand(x / FX.W, y / FX.H); // flat map space (1000 x 500)
   const landSoft = (u, v) => { // 0..1, smooth along the coast (for the tint's edge)
     const L = BOARD.land; if (!L) return 1;
-    const gw = BOARD.gw, gh = BOARD.gh, x = Math.max(0, Math.min(gw - 1.001, u * gw - 0.5)), y = Math.max(0, Math.min(gh - 1.001, v * gh - 0.5));
+    const gw = BOARD.lw, gh = BOARD.lh, x = Math.max(0, Math.min(gw - 1.001, u * gw - 0.5)), y = Math.max(0, Math.min(gh - 1.001, v * gh - 0.5));
     const i = Math.floor(x), j = Math.floor(y), fx = x - i, fy = y - j;
     const a = L[j * gw + i], b = L[j * gw + i + 1], c = L[(j + 1) * gw + i], d = L[(j + 1) * gw + i + 1];
     const t = (a * (1 - fx) + b * fx) * (1 - fy) + (c * (1 - fx) + d * fx) * fy;
@@ -618,7 +619,13 @@
     if (!BOARD.P || !BOARD.rowU.length) return;
     if (!FX.burn) FX.burn = mkCv(Math.round(DW * BURN_K), Math.round(DH * BURN_K));
     let yf = 0, x = 0;
-    for (let k = 0; k < 8; k++) { yf = 0.05 + Math.random() * 0.9; x = frontX(yf) + (Math.random() - 0.5) * 34; if (landFlat(x, yf * FX.H)) break; if (k === 7) return; }
+    for (let k = 0; k < 8; k++) {
+      yf = 0.05 + Math.random() * 0.9; const fx = frontX(yf);
+      // spread: a bell curve around the front, cut at 30 % of the way to either capital (35 / 65 on a 0-100 scale)
+      const gs = (Math.random() + Math.random() + Math.random() - 1.5) / 0.5 * 0.42, q = Math.max(-1, Math.min(1, gs));
+      x = fx + (q < 0 ? q * 0.3 * Math.max(20, fx - CAPS.A.x * FX.W) : q * 0.3 * Math.max(20, CAPS.B.x * FX.W - fx)) + (Math.random() - 0.5) * 10;
+      if (landFlat(x, yf * FX.H)) break; if (k === 7) return;
+    }
     const P = PJ(x, yf * FX.H);
     const c = FX.burn.getContext('2d'), r = BURN_R * (0.85 + Math.random() * 0.45) * P.s * BURN_K, a = 0.135 + Math.random() * 0.105;
     c.save(); c.translate(P.x * BURN_K, P.y * BURN_K); c.rotate((Math.random() - 0.5) * 0.8); c.scale(1, 0.62 + Math.random() * 0.2);
@@ -711,6 +718,12 @@
         else if (!live) FX.intens[side] *= Math.max(0, 1 - dt * 2);
       }
       FX.boosts = FX.boosts.filter(b => FX.clock - b.t0 < BOOST_DUR);
+      // sound of the war beyond the room: a low air and far-off guns, both following the fighting (PC only)
+      if (window.BSSE && window.BSSE.air && !window.BSSE.phone) {
+        const I = Math.max(FX.intens.A, FX.intens.B), run = live && !act && SET.sound && $('movie').hidden;
+        window.BSSE.air(run ? 0.2 + 0.8 * I : 0);
+        if (run && I > 0.08 && Math.random() < dt * (0.05 + 0.5 * I)) SFX('boom', 0.5 + 0.5 * I);
+      }
     }
     const push = Math.max(-1, Math.min(1, FX.pushRate * 60)); // >0: A pushing, <0: B pushing
     FX.compactT += dt; const doCompact = FX.compactT > 0.35; if (doCompact) FX.compactT = 0;
@@ -798,6 +811,20 @@
     c.filter = 'blur(' + blur + 'px)'; c.fillStyle = '#000'; shBody(c, xp, wob, edge); c.fill(); c.filter = 'none';
     c.globalCompositeOperation = 'destination-in'; const gr = c.createLinearGradient(0, edge / SH.SC, 0, DH / SH.SC); gr.addColorStop(0, 'rgba(0,0,0,' + top + ')'); gr.addColorStop(1, 'rgba(0,0,0,' + bot + ')'); c.fillStyle = gr; c.fillRect(0, 0, W, H); c.globalCompositeOperation = 'source-over';
   }
+  // dust drifting through the lantern's light: bright near the flame, gone in the dark
+  const MOTES = [];
+  function drawMotes(ctx, dt, cx, cy, lum) {
+    if (!MOTES.length) for (let i = 0; i < 46; i++) MOTES.push({ x: Math.random(), y: Math.random(), z: 0.4 + Math.random() * 0.9, ph: Math.random() * 40, sp: 0.5 + Math.random() });
+    ctx.save(); ctx.globalCompositeOperation = 'lighter';
+    for (const m of MOTES) {
+      m.y -= dt * 0.006 * m.sp * m.z; m.x += dt * (0.004 * nB(DESK.t * 0.13 + m.ph) - 0.0015) * m.z;
+      if (m.y < -0.02) { m.y = 1.02; m.x = Math.random(); } if (m.x < -0.02) m.x = 1.02; if (m.x > 1.02) m.x = -0.02;
+      const x = cx - 620 + m.x * 900, y = cy - 120 + m.y * 520, d = Math.hypot((x - cx) / 520, (y - cy - 60) / 330);
+      const a = Math.max(0, 1 - d) * (0.35 + 0.3 * Math.sin(DESK.t * 0.9 * m.sp + m.ph)) * lum * 0.5; if (a <= 0.01) continue;
+      const r = 0.9 * m.z + 0.3; ctx.fillStyle = 'rgba(255,214,150,' + a.toFixed(3) + ')'; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.restore();
+  }
   function deskFrame(ctx, dt, rm) {
     const m = BOARD.map; if (!m || !BOARD.img) return;
     const L0 = m.lantern; DESK.t += dt; const t = DESK.t;
@@ -855,6 +882,7 @@
     gr = ctx.createRadialGradient(CX, CY + 40, 0, CX, CY + 40, R); gr.addColorStop(0, 'rgba(255,200,130,' + a2 + ')'); gr.addColorStop(0.55, 'rgba(255,170,90,' + (a2 * 0.45) + ')'); gr.addColorStop(1, 'rgba(255,160,80,0)'); ctx.fillStyle = gr; ctx.fillRect(0, 0, DW, DH);
     if (fl < 0) { ctx.globalCompositeOperation = 'multiply'; ctx.fillStyle = 'rgb(' + (255 + fl * 12 | 0) + ',' + (255 + fl * 16 | 0) + ',' + (255 + fl * 22 | 0) + ')'; ctx.fillRect(0, 0, DW, DH); }
     ctx.restore();
+    if (!rm) drawMotes(ctx, dt, CX, CY, 1 + 0.25 * fl);
   }
   window.BSDesk = { pass() { DESK.nextAt = DESK.t; }, get info() { return { blurOK: DESK.blurOK, pass: !!DESK.pass, t: DESK.t, map: !!BOARD.map, img: !!BOARD.img }; } }; // for checking by hand
 
@@ -1173,13 +1201,13 @@
           <span class="pe">${esc(info)}</span>${priceTags(c)}</button>`;
       }).join('');
       const has = g.inv[act.item] > 0;
-      h = `<div class="stamp">${stampOf(L('販売', 'Sell', '出售'))}</div><div class="mhead"><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name, '向' + c.name + '推销')}</h2>${cashHTML()}</div>
+      h = `<div class="act-l"><div class="stamp">${stampOf(L('販売', 'Sell', '出售'))}</div><div class="mhead"><h2>${L(c.name + 'へ売り込む', 'Sell to ' + c.name, '向' + c.name + '推销')}</h2>${cashHTML()}</div>
         <div class="picks">${picks}</div>
         <div class="priceline"><span class="mult" id="mMult"></span><span class="yen" id="mYen"></span></div>
         <input type="range" id="mRange" min="0" max="2" step="0.05" value="${act.m}" aria-label="${L('価格倍率', 'Price multiplier', '价格倍率')}"><div class="padhint" id="mPadHint"></div>
         <div class="quick">${[[0, L('無償供与', 'Free', '无偿提供')], [0.3, '×0.3'], [0.5, '×0.5'], [0.8, '×0.8'], [1, '×1.0'], [1.2, '×1.2'], [1.5, '×1.5'], [1.8, '×1.8'], [2, '×2.0']].map(([m, l]) => `<button class="btn" data-qm="${m}">${l}</button>`).join('')}</div>
         <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume', '关闭并继续')}</button><button class="btn primary" data-do="sell" ${has && !act.blocked ? '' : 'disabled'}>${sellLabel(has)}</button></div>
-        ${dealHTML()}${panel(c, 'sell')}${logHTML()}`;
+        ${dealHTML()}</div><div class="act-r">${panel(c, 'sell')}${logHTML()}</div>`;
     } else if (act.kind === 'home') {
       showModal(`<div class="stamp">${stampOf(L('ホームに戻る', 'Home', '返回主页'))}</div><h2>${L('今の戦争を捨ててホームに戻りますか', 'Abandon this war and go home?', '放弃当前战争并返回主页吗')}</h2>
         <p>${L('今の戦争は精算されず、記録も残りません。', 'This war will not be settled or recorded.', '当前战争不会结算，也不会留下记录。')}</p>
@@ -1217,13 +1245,13 @@
         return `<div class="oprow"><div><div class="on">${esc(name)} <span class="oc num">${fmt(O[k].cost)}</span></div><div class="od">${esc(d)}</div>${note}${why ? `<div class="why">${esc(why)}</div>` : ''}</div>
           <button class="btn" data-op="${k}"${arg ? ` data-arg="${arg}"` : ''} ${why ? 'disabled' : ''}>${L('実行', 'Do it', '执行')}</button></div>`;
       }).join('');
-      h = `<div class="stamp">${stampOf(L('暗躍', 'Covert', '暗中行动'))}</div><div class="mhead"><h2>${L(cn + 'に対して動く', 'Act on ' + cn, '针对' + cn + '采取行动')}</h2>${cashHTML()}</div>
+      h = `<div class="act-l"><div class="stamp">${stampOf(L('暗躍', 'Covert', '暗中行动'))}</div><div class="mhead"><h2>${L(cn + 'に対して動く', 'Act on ' + cn, '针对' + cn + '采取行动')}</h2>${cashHTML()}</div>
         <div class="oplist">${rows}</div>
         <div class="foot"><button class="btn" data-do="close">${L('閉じて再開', 'Close and resume', '关闭并继续')}</button></div>
-        ${respHTML()}${panel(c, 'ops')}${logHTML()}`;
+        ${respHTML()}</div><div class="act-r">${panel(c, 'ops')}${logHTML()}</div>`;
     }
     const keep = focus ? 0 : $('mc').scrollTop;
-    showModal(h, act.cid); $('mc').scrollTop = keep;
+    showModal(h, act.cid + ' act2'); $('mc').scrollTop = keep;
     if (act.kind === 'sell') updatePrice();
     if (focus) { const b = $('mc').querySelector('[data-do="close"]'); if (b) b.focus({ preventScroll: true }); $('mc').scrollTop = 0; }
   }
@@ -1299,6 +1327,7 @@
   function replayHTML(r) {
     if (r.type === 'retreat' || !r.base || !r.base.hist || r.base.hist.length < 2 || !g.history || g.history.length < 2 || !BOARD.img || !BOARD.P) return '';
     return `<div class="replay"><canvas id="rpCv" aria-label="${L('戦線の推移', 'How the front moved', '战线的变化')}"></canvas>
+      <button class="rp-btn" id="rpPlay" type="button" hidden>${L('もう一度再生', 'Replay', '重新播放')}</button>
       <div class="rp-lg"><span class="me">${L('あなたが関わった戦争', 'The war you traded in', '你参与的战争')}</span><span class="cf">${L('あなたがいなかった場合', 'Without you', '若没有你')}</span></div></div>`;
   }
   function frontPts(sA, NR, NU) { // the same contour as the live map, coarser
@@ -1367,12 +1396,18 @@
       if (cEnd) label(L('ここで終わっていた(' + wCf + '週)', 'It would have ended here (wk ' + wCf + ')', '本应在此结束(第' + wCf + '周)'), mid(cPts), '#f0eadc', cPts[0][0] > (x0 + x1) / 2 ? -14 : 14);
       if (mEnd) label(L('終戦(' + wMe + '週)', 'War over (wk ' + wMe + ')', '战争结束(第' + wMe + '周)'), onLand(mPts, 0.72), '#f3d28a', mPts[0][0] > (x0 + x1) / 2 ? -14 : 14);
     }
-    if (RM()) { frame(1); reveal(); return; }
-    let t0 = 0, done = false;
-    const end = () => { if (done) return; done = true; frame(1); setTimeout(reveal, 250); };
+    const btn = $('rpPlay');
+    if (RM()) { frame(1); reveal(); if (btn) btn.hidden = false; return; }
+    let t0 = 0, done = true, run = 0;
+    const end = () => { if (done) return; done = true; frame(1); setTimeout(reveal, 250); if (btn) btn.hidden = false; };
+    const play = () => {
+      const me2 = ++run; done = false; t0 = 0; if (btn) btn.hidden = true;
+      const tick = now => { if (done || run !== me2 || !cv.isConnected) return; if (!t0) t0 = now; const k = Math.min(1, (now - t0) / RP_MS); frame(k); if (k < 1) requestAnimationFrame(tick); else end(); };
+      frame(0); requestAnimationFrame(tick);
+    };
     cv.addEventListener('click', end);
-    const tick = now => { if (done || !cv.isConnected) return; if (!t0) t0 = now; const k = Math.min(1, (now - t0) / RP_MS); frame(k); if (k < 1) requestAnimationFrame(tick); else end(); };
-    frame(0); requestAnimationFrame(tick);
+    if (btn) btn.addEventListener('click', e => { e.stopPropagation(); SFX('click'); play(); });
+    play();
   }
   function chart() {
     const h = g.history; if (h.length < 2) return '';
@@ -1466,7 +1501,7 @@
 
   // ---------- records: the best profit for each war, and the last plays ----------
   const REC_KEY = 'bs_records';
-  function recLoad() { try { const r = JSON.parse(localStorage.getItem(REC_KEY) || 'null'); if (r && r.best && r.hist) return r; } catch (e) { /* none */ } return { best: {}, hist: [] }; }
+  function recLoad() { try { const r = JSON.parse(localStorage.getItem(REC_KEY) || 'null'); if (r && r.best && r.hist) { if (r.total == null) { r.total = r.hist.reduce((a, h) => a + h.profit, 0); r.plays = r.hist.length; } return r; } } catch (e) { /* none */ } return { best: {}, hist: [], total: 0, plays: 0 }; }
   function recSave(r) { try { localStorage.setItem(REC_KEY, JSON.stringify(r)); } catch (e) { /* storage off */ } }
   const recKeyOf = r => r.random ? 'random' : (r.scKey || curSc);
   // returns { isNew, prev } and stores this play
@@ -1476,6 +1511,8 @@
     const entry = { key, profit: Math.round(r.profit), type: r.type, kind: g.endKind || '', weeks: r.weeks, at: Date.now() };
     const isNew = !prev || entry.profit > prev.profit;
     if (isNew) db.best[key] = entry;
+    if (db.total == null) { db.total = db.hist.reduce((a, h) => a + h.profit, 0); db.plays = db.hist.length; } // first v12 run: start from the wars on record
+    db.total += entry.profit; db.plays = (db.plays || 0) + 1;
     db.hist.unshift(entry); db.hist = db.hist.slice(0, 30);
     recSave(db);
     return (r._rec = { isNew, prev });
@@ -1496,6 +1533,14 @@
       <div class="foot"><button class="btn primary" data-hclose>${L('閉じる', 'Close', '关闭')}</button></div></div>`);
   }
 
+  // rank from the profit of one war (names are provisional)
+  const RANKS = [[8e6, '死の商人', 'Merchant of Death', '死亡商人'], [5e6, '政商', 'Power Broker', '政商'], [3e6, '御用商人', 'Court Purveyor', '御用商人'], [1e6, '仲買人', 'Broker', '掮客'], [0, '行商人', 'Peddler', '行商'], [-Infinity, '見習い', 'Apprentice', '学徒']];
+  const rankOf = p => { const i = RANKS.findIndex(r => p >= r[0]); return { i: RANKS.length - 1 - i, name: L(RANKS[i][1], RANKS[i][2], RANKS[i][3]) }; };
+  function homeSum() {
+    const el = $('hSum'); if (!el) return; const db = recLoad();
+    el.hidden = !db.plays;
+    if (db.plays) el.innerHTML = `<span><small>${L('総利益', 'Lifetime profit', '累计利润')}</small><b class="num ${db.total >= 0 ? 'pos' : 'neg'}">${sgn(db.total)}</b></span><i></i><span><small>${L('関わった戦争', 'Wars traded', '参与的战争')}</small><b class="num">${db.plays}</b></span>`;
+  }
   // the score counts up from zero (ease-out, under 3 s); then the NEW RECORD seal and the rest of the report
   function scoreCountUp(r, rec) {
     const el = $('rScore'), rest = $('rRest'); if (!el || !rest) return;
@@ -1505,6 +1550,7 @@
     const finish = () => {
       if (done) return; done = true; cancelAnimationFrame(raf); show(target);
       $('mc').removeEventListener('click', skip, true);
+      if (r.type !== 'retreat' || target > 0) { const rk = rankOf(target), d = document.createElement('div'); d.className = 'rank r' + rk.i; d.innerHTML = `<small>${L('格付け', 'Rank', '评级')}</small><b>${esc(rk.name)}</b>`; el.parentElement.appendChild(d); }
       if (rec.isNew && target !== 0) {
         const s = document.createElement('div'); s.className = 'nrec'; s.textContent = 'NEW RECORD';
         el.parentElement.appendChild(s); SFX('click');
@@ -1584,9 +1630,42 @@
   function showHome() {
     clearFades(); act = null; hideModal(); mode = 'home'; started = false; BGMST.result = false;
     if (g) g.paused = true;
-    $('fade').className = ''; $('home').hidden = false; $('hpop').hidden = true;
+    $('fade').className = ''; $('home').hidden = false; $('hpop').hidden = true; homeSum(); homeFx(); if (window.BSSE && window.BSSE.air) window.BSSE.air(0);
     if (window.BSTut) window.BSTut.stop();
     applyStatic();
+  }
+  let homeRaf = 0;
+  function homeFx() {
+    const cv = $('hfx'); if (!cv || homeRaf) return;
+    const c = cv.getContext('2d'), W = cv.width = 688, H = cv.height = 384;
+    let last = 0, t = 0, gust = 0, gustV = 0;
+    const tick = now => {
+      if ($('home').hidden) { homeRaf = 0; return; }
+      const dt = Math.min(0.05, last ? (now - last) / 1000 : 0); last = now; t += dt;
+      c.clearRect(0, 0, W, H);
+      if (!RM()) {
+        // flicker: fast jitter + slower swells + now and then a draught that makes the flame dip hard
+        if (Math.random() < dt * 0.2) gustV = 0.4 + Math.random() * 0.4;
+        gust += (gustV - gust) * Math.min(1, dt * 9); gustV *= Math.pow(0.04, dt);
+        // the swing kept to about -50 % (dips) and +75 % (flares) of the full range
+        const fr = Math.max(-1, Math.min(1, 0.5 * nA(t * 9.1) + 0.3 * nC(t * 3.3) + 0.2 * nB(t * 17) - gust)), fl = fr > 0 ? fr * 0.75 : fr * 0.5, cx = 24 + 3 * nD(t * 4), cy = 8;
+        // the dark side: the room dims when the flame dips
+        c.globalCompositeOperation = 'source-over';
+        c.fillStyle = 'rgba(0,0,0,' + Math.max(0, Math.min(0.42, 0.12 - 0.22 * fl)).toFixed(3) + ')'; c.fillRect(0, 0, W, H);
+        // the light: reaches far across the table
+        c.globalCompositeOperation = 'lighter';
+        const R = 760 + 90 * fl;
+        let gr = c.createRadialGradient(cx, cy, 0, cx, cy, R);
+        gr.addColorStop(0, 'rgba(255,178,96,' + Math.max(0, 0.42 + 0.28 * fl).toFixed(3) + ')');
+        gr.addColorStop(0.18, 'rgba(255,160,80,' + Math.max(0, 0.2 + 0.14 * fl).toFixed(3) + ')');
+        gr.addColorStop(0.5, 'rgba(255,145,64,' + Math.max(0, 0.08 + 0.06 * fl).toFixed(3) + ')');
+        gr.addColorStop(1, 'rgba(255,140,60,0)');
+        c.fillStyle = gr; c.fillRect(0, 0, W, H);
+        c.globalCompositeOperation = 'source-over';
+      }
+      homeRaf = requestAnimationFrame(tick);
+    };
+    homeRaf = requestAnimationFrame(tick);
   }
   function closeHome() { $('home').hidden = true; $('hpop').hidden = true; }
 

@@ -1,17 +1,20 @@
 // Both Sides — sound effects. All sounds are synthesised with the Web Audio API; no audio files.
 //  1 hover  2 click  3 prodOn (production on / make rations)  4 prodOff  5 sell (also when refused)  6 covert  7 start (war begins)
 //  8 page (open/close a window, tutorial next)  9 refused  10 news (news flash, warnings)  11 end (war over)
-//  12 steps (footsteps of the passing shadow, stereo)
+//  12 steps (footsteps of the passing shadow, stereo)  13 boom (a distant gun)  + air(level): the room's low tone during a war
 window.BSSE = (() => {
+  const PHONE = (() => { try { return matchMedia('(pointer: coarse)').matches || /Android|iPhone|iPad|iPod/.test(navigator.userAgent); } catch (e) { return false; } })();
   let ac = null, master = null, verb = null, vol = 0.8;
   function init() {
     if (ac) return;
-    ac = new (window.AudioContext || window.webkitAudioContext)();
+    // phones: a larger audio buffer (fewer crackles while the map is being drawn) and a shorter room echo (the echo is the heaviest part)
+    const C = window.AudioContext || window.webkitAudioContext;
+    try { ac = new C({ latencyHint: PHONE ? 'balanced' : 'interactive' }); } catch (e) { ac = new C(); }
     master = ac.createGain(); master.gain.value = vol;
     const comp = ac.createDynamicsCompressor(); comp.threshold.value = -14; comp.ratio.value = 3;
     master.connect(comp); comp.connect(ac.destination);
     // a room: a generated impulse response, darker toward the tail
-    const len = ac.sampleRate * 2.4, ir = ac.createBuffer(2, len, ac.sampleRate);
+    const len = ac.sampleRate * (PHONE ? 1.0 : 2.4), ir = ac.createBuffer(2, len, ac.sampleRate);
     for (let ch = 0; ch < 2; ch++) { const d = ir.getChannelData(ch); let lp = 0; for (let i = 0; i < len; i++) { const t = i / len; lp += (Math.random() * 2 - 1 - lp) * (0.5 - 0.42 * t); d[i] = lp * Math.pow(1 - t, 2.6); } }
     verb = ac.createConvolver(); verb.buffer = ir; const vg = ac.createGain(); vg.gain.value = 0.55; verb.connect(vg); vg.connect(master);
   }
@@ -129,6 +132,15 @@ window.BSSE = (() => {
         n2.connect(lp2); lp2.connect(g2); g2.connect(bus); env(g2, t + 0.004, 0.002, L * 0.25, 0.05); n2.start(t + 0.004); n2.stop(t + 0.08);
       }
     },
+    // ⑬ a distant gun: a dull thump from far beyond the room (very quiet; how often is decided by the fighting)
+    boom(level = 1) {
+      const t = now() + Math.random() * 0.05, f0 = 62 + Math.random() * 26;
+      const o = ac.createOscillator(), g = ac.createGain(), lp = ac.createBiquadFilter(); o.type = 'sine';
+      o.frequency.setValueAtTime(f0, t); o.frequency.exponentialRampToValueAtTime(f0 * 0.55, t + 0.5);
+      lp.type = 'lowpass'; lp.frequency.value = 160; o.connect(lp); lp.connect(g); out(g, 1, 0.9);
+      g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.085 * level, t + 0.02); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.9); o.start(t); o.stop(t + 1);
+      tick(t, 240, 0.6, 0.35, 0.03 * level, 'lowpass', 0.9);
+    },
     // ⑪ the war ends (before the report): a low bell, a second softer strike, a long hum dying away
     end() {
       const t = now();
@@ -137,7 +149,7 @@ window.BSSE = (() => {
       g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.05, t + 0.6); g.gain.exponentialRampToValueAtTime(0.0001, t + 3.8); o.start(t); o.stop(t + 3.9);
     },
   };
-  let on = true, lastHover = 0;
+  let on = true, lastHover = 0, amb = null;
   return {
     play(k, ...a) {
       if (!on || !S[k]) return;
@@ -147,6 +159,15 @@ window.BSSE = (() => {
         S[k](...a);
       } catch (e) { /* audio unavailable */ }
     },
+    // the room's air while a war runs: a low, steady tone that rises a little with the fighting (0 = off). Not on phones.
+    air(level) {
+      if (PHONE || !ac || (!amb && !(level > 0))) return;
+      try {
+        if (!amb) { const n = noise(), lp = ac.createBiquadFilter(), g = ac.createGain(); lp.type = 'lowpass'; lp.frequency.value = 150; lp.Q.value = 0.4; g.gain.value = 0; n.connect(lp); lp.connect(g); g.connect(master); n.start(); amb = g; }
+        amb.gain.setTargetAtTime(on && level > 0 ? 0.05 + 0.09 * Math.min(1, level) : 0, ac.currentTime, 0.9);
+      } catch (e) { /* audio unavailable */ }
+    },
+    get phone() { return PHONE; },
     set enabled(v) { on = !!v; }, get enabled() { return on; },
     set volume(v) { vol = v; if (master) master.gain.value = v; },
   };
